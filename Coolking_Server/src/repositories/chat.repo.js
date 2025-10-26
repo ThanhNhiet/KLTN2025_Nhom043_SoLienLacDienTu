@@ -16,7 +16,9 @@ const datetimeFormatter = require("../utils/format/datetime-formatter");
  */
 const formatLastMessageContent = (message) => {
     if (!message) return '';
-
+    if (message.isDeleted === true) {
+        return '[Tin nhắn đã bị thu hồi]';
+    }
     switch (message.type) {
         case MessageType.TEXT:
         case MessageType.LINK:
@@ -39,11 +41,10 @@ const getLastMessage = async (chatID) => {
     try {
         const lastMessage = await Message.findOne({ chatID })
             .sort({ createdAt: -1 })
-            .select('senderID type content filename createdAt')
+            .select('senderID type content filename createdAt isDeleted')
             .lean();
 
         if (!lastMessage) return null;
-
         return {
             senderID: lastMessage.senderID,
             type: lastMessage.type,
