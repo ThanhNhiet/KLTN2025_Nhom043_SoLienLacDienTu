@@ -216,12 +216,17 @@ const MessageConversationCpn: React.FC<MessageConversationCpnProps> = ({
 
     const renderReplyReference = (replyTo: any) => {
         let replyContent = replyTo.content;
-        
-        if (replyTo.type === 'image') {
-            const imageUrls = replyTo.content.split(',').map((url: string) => url.trim()).filter((url: string) => url);
-            replyContent = imageUrls.length > 1 ? `🖼️ ${imageUrls.length} hình ảnh` : '🖼️ Hình ảnh';
-        } else if (replyTo.type === 'file') {
-            replyContent = '📁 File';
+        const originalMessage = allMessages.find(msg => msg._id === replyTo.messageID);
+
+        if (originalMessage?.isDeleted) {
+            replyContent = 'Tin nhắn đã bị thu hồi';
+        } else {
+            if (replyTo.type === 'image') {
+                const imageUrls = replyTo.content.split(',').map((url: string) => url.trim()).filter((url: string) => url);
+                replyContent = imageUrls.length > 1 ? `🖼️ ${imageUrls.length} hình ảnh` : '🖼️ Hình ảnh';
+            } else if (replyTo.type === 'file') {
+                replyContent = '📁 File';
+            }
         }
         
         return (
@@ -232,7 +237,9 @@ const MessageConversationCpn: React.FC<MessageConversationCpnProps> = ({
                 <div className="text-xs text-blue-600 font-medium">
                     {replyTo.senderInfo?.userName || replyTo.senderInfo?.name || 'Unknown User'}
                 </div>
-                <div className="text-sm text-gray-700 truncate">
+                <div className={`text-sm truncate ${
+                    originalMessage?.isDeleted ? 'text-gray-400 italic' : 'text-gray-700'
+                }`}>
                     {replyContent}
                 </div>
             </div>
@@ -246,6 +253,8 @@ const MessageConversationCpn: React.FC<MessageConversationCpnProps> = ({
         // Touch events for mobile
         let touchTimer: number;
         const handleTouchStart = (e: React.TouchEvent) => {
+            if (message.isDeleted) return;
+
             touchTimer = window.setTimeout(() => {
                 // Simulate context menu on long press
                 const touch = e.touches[0];
@@ -267,7 +276,10 @@ const MessageConversationCpn: React.FC<MessageConversationCpnProps> = ({
                 key={message._id}
                 id={`message-${message._id}`}
                 className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4 group`}
-                onContextMenu={(e) => handleContextMenu(e, message)}
+                onContextMenu={(e) => {
+                    if (message.isDeleted) return;
+                    handleContextMenu(e, message);
+                }}
                 onTouchStart={handleTouchStart}
                 onTouchEnd={handleTouchEnd}
                 onTouchCancel={handleTouchEnd}

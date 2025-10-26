@@ -192,9 +192,9 @@ export const useMessageConversation = (selectedChatId?: string, currentUserId?: 
         if (messageElement) {
             messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
             // Highlight message briefly
-            messageElement.classList.add('bg-yellow-200');
+            messageElement.classList.add('bg-yellow-50');
             setTimeout(() => {
-                messageElement.classList.remove('bg-yellow-200');
+                messageElement.classList.remove('bg-yellow-50');
             }, 2000);
         }
     };
@@ -422,6 +422,12 @@ export const useMessageConversation = (selectedChatId?: string, currentUserId?: 
     const handleDeleteMessage = async (messageId: string) => {
         try {
             await deleteMessage(messageId);
+            // Kiểm tra pinned messages có tồn tại message này không, nếu có thì xóa và cập nhật lại
+            const isPinned = pinnedMessages.some(msg => msg._id === messageId);
+            if (isPinned) {
+                await handleUnpinMessage(messageId);
+            }
+
             // Không hiển thị thông báo thành công
             closeContextMenu();
             // Refresh messages
