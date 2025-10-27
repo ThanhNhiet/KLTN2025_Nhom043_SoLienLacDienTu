@@ -172,11 +172,7 @@ export const useMessage = () => {
         try {
             const response = await messageServices.sendTextMessage(chatID, text);
             setLoading(false);
-            
-            // Thêm tin nhắn mới vào danh sách hiện tại
-            if (response) {
-                setMessages(prevMessages => [...prevMessages, response]);
-            }
+            return response;
         } catch (err: any) {
             setError(err.message || 'Có lỗi xảy ra khi gửi tin nhắn.');
             setLoading(false);
@@ -191,7 +187,8 @@ export const useMessage = () => {
         try {
             const response = await messageServices.sendFileMessages(chatID, files);
             setLoading(false);
-            addMessagesToState(response);
+            // addMessagesToState(response); // Bỏ đi để tránh dup
+            return response;
         }
         catch (err: any) {
             setError(err.message || 'Có lỗi xảy ra khi gửi tin nhắn.');
@@ -207,7 +204,8 @@ export const useMessage = () => {
         try {
             const response = await messageServices.sendImageMessages(chatID, files);
             setLoading(false);
-            addMessagesToState(response);
+            // addMessagesToState(response); // Bỏ đi để tránh dup
+            return response;
         } catch (err: any) {
             setError(err.message || 'Có lỗi xảy ra khi gửi tin nhắn.');
             setLoading(false);
@@ -222,9 +220,8 @@ export const useMessage = () => {
         try {
             const response = await messageServices.sendReplyTextMessage(chatID, text, replyTo);
             setLoading(false);
-            if (response) {
-                setMessages(prevMessages => [...prevMessages, response]);
-            }
+            // Không thêm vào state ở đây
+            return response;
         }
         catch (err: any) {
             setError(err.message || 'Có lỗi xảy ra khi gửi tin nhắn.');
@@ -240,7 +237,8 @@ export const useMessage = () => {
         try {
             const response = await messageServices.sendReplyFileMessage(chatID, files, replyTo);
             setLoading(false);
-            addMessagesToState(response);
+            // addMessagesToState(response); // Bỏ đi để tránh dup
+            return response;
         } catch (err: any) {
             setError(err.message || 'Có lỗi xảy ra khi gửi tin nhắn.');
             setLoading(false);
@@ -255,9 +253,8 @@ export const useMessage = () => {
         try {
             const response = await messageServices.sendReplyImageMessage(chatID, files, replyTo);
             setLoading(false);
-            if (response) {
-                setMessages(prevMessages => [...prevMessages, response]);
-            }
+            // Không thêm vào state ở đây
+            return response;
         } catch (err: any) {
             setError(err.message || 'Có lỗi xảy ra khi gửi tin nhắn.');
             setLoading(false);

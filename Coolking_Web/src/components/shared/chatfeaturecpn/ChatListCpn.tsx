@@ -1,6 +1,7 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { useChat } from '../../../hooks/useChat';
 import UserSearchResultModal from '../../../pages/chatfeature/UserSearchResultModal';
+import { useSocket } from '../../../contexts/SocketContext';
 
 interface ChatListCpnProps {
     onChatSelect: (chatId: string) => void;
@@ -15,6 +16,7 @@ const ChatListCpn = forwardRef<any, ChatListCpnProps>(({ onChatSelect, selectedC
     const { loading, error, currentPage, pages, chatItems,
         getChats4AllUser, searchChats4AllUser, searchUser, createPrivateChat } = useChat();
     const [showUserSearchModal, setShowUserSearchModal] = useState(false);
+    const { socket } = useSocket();
 
     const handleSearchUser = async (keyword: string) => {
         return await searchUser(keyword);
@@ -47,14 +49,76 @@ const ChatListCpn = forwardRef<any, ChatListCpnProps>(({ onChatSelect, selectedC
     }, [onLastMessageUpdate]);
 
     const updateChatLastMessage = (chatId: string, lastMessage: any) => {
-        setLocalChatItems(prev => 
-            prev.map(chat => 
-                chat._id === chatId 
-                    ? { ...chat, lastMessage, unread: false }
-                    : chat
-            )
-        );
+        // Tạo một bản sao của tin nhắn để sửa đổi an toàn
+        const messageToUpdate = { ...lastMessage };
+
+        // Xử lý content cho type 'image' và 'file' ngay tại đây
+        if (messageToUpdate.type === 'image') {
+            messageToUpdate.content = 'Hình ảnh';
+        } else if (messageToUpdate.type === 'file') {
+            messageToUpdate.content = 'File';
+        }
+
+        setLocalChatItems(prevItems => {
+            const chatIndex = prevItems.findIndex(chat => chat._id === chatId);
+            
+            // Nếu không tìm thấy chat, không làm gì cả
+            if (chatIndex === -1) {
+                return prevItems;
+            }
+
+            // Lấy chat cần cập nhật
+            const updatedChat = {
+                ...prevItems[chatIndex],
+                lastMessage: messageToUpdate,
+                // Đánh dấu là chưa đọc nếu người dùng không ở trong chat này
+                unread: chatId !== selectedChatId
+            };
+
+            // Xóa chat cũ khỏi danh sách và đưa chat đã cập nhật lên đầu
+            const newChatItems = prevItems.filter(chat => chat._id !== chatId);
+            return [updatedChat, ...newChatItems];
+        });
     };
+
+    // Lắng nghe sự kiện socket cho ChatList
+    useEffect(() => {
+        if (socket) {
+            // Nhận tin nhắn mới và cập nhật last message
+            const handleReceiveMessage = ({ chat_id, newMessage }: { chat_id: string, newMessage: any }) => {
+                updateChatLastMessage(chat_id, newMessage);
+            };
+
+            // Cập nhật last message khi tin nhắn bị xóa
+            const handleRenderMessage = ({ chat_id, message_id }: { chat_id: string, message_id: string }) => {
+                setLocalChatItems(prev =>
+                    prev.map(chat => {
+                        // Nếu tin nhắn bị xóa là tin nhắn cuối cùng của đoạn chat
+                        if (chat._id === chat_id && chat.lastMessage?._id === message_id) {
+                            return {
+                                ...chat,
+                                lastMessage: {
+                                    ...chat.lastMessage,
+                                    content: "[Tin nhắn đã bị thu hồi]",
+                                    isDeleted: true
+                                }
+                            };
+                        }
+                        return chat;
+                    })
+                );
+            };
+
+            socket.on('receive_message', handleReceiveMessage);
+            socket.on('render_message', handleRenderMessage);
+
+            return () => {
+                socket.off('receive_message', handleReceiveMessage);
+                socket.off('render_message', handleRenderMessage);
+            };
+        }
+        // Thêm selectedChatId vào dependency array để cập nhật 'unread' status chính xác
+    }, [socket, selectedChatId]);
 
     // Expose methods to parent component
     useImperativeHandle(ref, () => ({
@@ -187,10 +251,15 @@ const ChatListCpn = forwardRef<any, ChatListCpnProps>(({ onChatSelect, selectedC
                             key={chat._id}
                             onClick={() => {
                                 onChatSelect(chat._id);
-                                // Mark as read when selecting chat
+                                // Đánh dấu đã đọc nếu có tin nhắn chưa đọc
                                 if (chat.unread) {
-                                    // Update local state immediately
+                                    // Cập nhật local state ngay lập tức
                                     updateChatLastMessage(chat._id, { ...chat.lastMessage });
+                                    setLocalChatItems(prev =>
+                                        prev.map(c =>
+                                            c._id === chat._id ? { ...c, unread: false } : c
+                                        )
+                                    );
                                 }
                             }}
                             className={`flex items-center p-4 hover:bg-gray-50 cursor-pointer border-b border-gray-100 transition-colors ${selectedChatId === chat._id ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
