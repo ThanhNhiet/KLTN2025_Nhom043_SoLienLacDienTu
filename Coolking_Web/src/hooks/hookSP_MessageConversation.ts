@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useMessage, type Message } from './useMessage';
+import { useSocket } from '../contexts/SocketContext';
 import type { ChatMember } from './useChat';
 
 interface ReplyState {
@@ -37,6 +38,9 @@ export const useMessageConversation = (selectedChatId?: string, currentUserId?: 
     const messagesContainerRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // Socket
+    const { socket } = useSocket();
+
     // Hook
     const {
         loading,
@@ -72,6 +76,27 @@ export const useMessageConversation = (selectedChatId?: string, currentUserId?: 
             loadPinnedMessages();
         }
     }, [selectedChatId, clearMessages]);
+
+    // Lắng nghe sự kiện pin/unpin từ socket
+    useEffect(() => {
+        if (socket && selectedChatId) {
+            const handlePinUpdate = (data: { chat_id: string }) => {
+                if (data.chat_id === selectedChatId) {
+                    // Khi có sự kiện pin hoặc unpin từ người khác, tải lại danh sách
+                    loadPinnedMessages();
+                }
+            };
+
+            socket.on('receive_pin_message', handlePinUpdate);
+            socket.on('receive_unpin_message', handlePinUpdate);
+
+            return () => {
+                socket.off('receive_pin_message', handlePinUpdate);
+                socket.off('receive_unpin_message', handlePinUpdate);
+            };
+        }
+    }, [socket, selectedChatId]);
+
 
     // Update allMessages when new messages arrive  
     useEffect(() => {
@@ -360,9 +385,13 @@ export const useMessageConversation = (selectedChatId?: string, currentUserId?: 
     const handlePinMessage = async (message: Message) => {
         if (!currentUserId) return;
         try {
-            await pinMessage(message._id, currentUserId);
-            // Fetch lại danh sách pinned messages
+            const pinnedMessage = await pinMessage(message._id, currentUserId);
+            // Fetch lại danh sách pinned messages cho client hiện tại
             await loadPinnedMessages();
+            // Emit sự kiện cho các client khác
+            if (socket && selectedChatId && pinnedMessage) {
+                socket.emit('pin_message', { chat_id: selectedChatId, pinnedMessage });
+            }
             // Không hiển thị thông báo thành công
             closeContextMenu();
         } catch (error) {
@@ -373,10 +402,13 @@ export const useMessageConversation = (selectedChatId?: string, currentUserId?: 
 
     const handleUnpinMessage = async (messageId: string) => {
         try {
-            await unpinMessage(messageId);
-            // Fetch lại danh sách pinned messages
+            const unpinnedMessage = await unpinMessage(messageId);
+            // Fetch lại danh sách pinned messages cho client hiện tại
             await loadPinnedMessages();
-            // Không hiển thị thông báo thành công
+            // Emit sự kiện cho các client khác
+            if (socket && selectedChatId && unpinnedMessage) {
+                socket.emit('unpin_message', { chat_id: selectedChatId, unpinnedMessage_id: messageId });
+            }
         } catch (error) {
             console.error('Error unpinning message:', error);
             showToast('Lỗi khi gỡ ghim tin nhắn', 'error');
@@ -389,7 +421,7 @@ export const useMessageConversation = (selectedChatId?: string, currentUserId?: 
             // Kiểm tra pinned messages có tồn tại message này không, nếu có thì xóa và cập nhật lại
             const isPinned = pinnedMessages.some(msg => msg._id === messageId);
             if (isPinned) {
-                await handleUnpinMessage(messageId);
+                await handleUnpinMessage(messageId); // Hàm này giờ đã emit socket event
             }
 
             // Không hiển thị thông báo thành công

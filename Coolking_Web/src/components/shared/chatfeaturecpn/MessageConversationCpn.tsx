@@ -64,9 +64,11 @@ const MessageConversationCpn: React.FC<MessageConversationCpnProps> = ({
         scrollToMessage,
         showToast,
         scrollToBottom, // Import scrollToBottom từ hook
-        hasSelectedFiles,
-        isAutoLoading
-    } = useMessageConversation(selectedChatId, current_user_id, onLastMessageUpdate);
+        hasSelectedFiles, // Thêm getSenderName
+        isAutoLoading,
+        getSenderName,
+        loadPinnedMessages
+    } = useMessageConversation(selectedChatId, current_user_id, onLastMessageUpdate); // socket is now used inside the hook
 
     // Khởi tạo state cho tin nhắn để quản lý real time
     const [localMessages, setLocalMessages] = useState<Message[]>([]);
@@ -130,6 +132,8 @@ const MessageConversationCpn: React.FC<MessageConversationCpnProps> = ({
             socket.on('receive_message', handleReceiveMessage);
             socket.on('render_message', handleRenderMessage);
 
+            // Không cần lắng nghe pin/unpin ở đây vì hook đã xử lý
+
             return () => {
                 // Rời phòng
                 socket.off('receive_message', handleReceiveMessage);
@@ -138,6 +142,11 @@ const MessageConversationCpn: React.FC<MessageConversationCpnProps> = ({
         }
 
     }, [socket, selectedChatId, messagesEndRef, messagesContainerRef, current_user_id]);
+
+    const handleOpenPinnedModal = () => {
+        loadPinnedMessages(); // Fetch lại dữ liệu mới nhất khi mở modal
+        setShowPinnedModal(true);
+    };
 
     // Search functionality
     const handleSearchMessages = async () => {
@@ -476,7 +485,7 @@ const MessageConversationCpn: React.FC<MessageConversationCpnProps> = ({
                     {/* Timestamp and status */}
                     <div className={`text-xs ${isOwnMessage ? 'text-gray-500' : 'text-gray-500'} flex items-center justify-between`}>
                         <span>{message.createdAt}</span>
-                        {message.pinnedInfo && (
+                        {!!message.pinnedInfo && (
                             <span className="ml-2">📌</span>
                         )}
                     </div>
@@ -536,7 +545,7 @@ const MessageConversationCpn: React.FC<MessageConversationCpnProps> = ({
                 {latestPinnedMessage && (
                     <div
                         className="p-3 bg-yellow-50 border-b border-yellow-200 cursor-pointer hover:bg-yellow-100 transition-colors"
-                        onClick={() => setShowPinnedModal(true)}
+                        onClick={handleOpenPinnedModal}
                     >
                         <div className="flex items-center space-x-2">
                             <span className="text-yellow-600">📌</span>
@@ -751,12 +760,14 @@ const MessageConversationCpn: React.FC<MessageConversationCpnProps> = ({
                         >
                             Trả lời
                         </button>
-                        <button
-                            onClick={() => handlePinMessage(contextMenu.message!)}
-                            className="w-full px-4 py-2 text-left hover:bg-gray-100 text-sm"
-                        >
-                            Ghim tin nhắn
-                        </button>
+                        {!contextMenu.message.pinnedInfo && (
+                            <button
+                                onClick={() => handlePinMessage(contextMenu.message!)}
+                                className="w-full px-4 py-2 text-left hover:bg-gray-100 text-sm"
+                            >
+                                Ghim tin nhắn
+                            </button>
+                        )}
                         {((contextMenu.message.senderInfo?.userID || contextMenu.message.senderID) === current_user_id) && (
                             <button
                                 onClick={() => handleDeleteMessage(contextMenu.message!._id)}
@@ -793,21 +804,21 @@ const MessageConversationCpn: React.FC<MessageConversationCpnProps> = ({
                 <PinnedMessagesModal
                     isOpen={showPinnedModal}
                     onClose={() => setShowPinnedModal(false)}
-                    pinnedMessages={pinnedMessages}
+                    pinnedMessages={pinnedMessages.map(msg => {
+                        // Tìm tên người ghim từ danh sách members
+                        let pinnedByName = 'Unknown User';
+                        if (msg.pinnedInfo?.pinnedBy && members) {
+                            const pinner = members.find(m => m.userID === msg.pinnedInfo?.pinnedBy);
+                            pinnedByName = pinner ? pinner.userName : msg.pinnedInfo?.pinnedBy || 'Unknown User';
+                        }
+                        return {
+                            ...msg,
+                            senderName: getSenderName(msg, members),
+                            pinnedByName: pinnedByName // Thêm thuộc tính mới
+                        };
+                    })}
                     onUnpinMessage={handleUnpinMessage}
                     onNavigateToMessage={scrollToMessage}
-                    getSenderName={(senderID) => {
-                        // Tìm từ pinnedMessages hoặc members
-                        const message = pinnedMessages.find(msg =>
-                            (msg.senderInfo?.userID || msg.senderID) === senderID
-                        );
-                        if (message?.senderInfo?.name) {
-                            return message.senderInfo.name;
-                        }
-                        const member = members?.find(m => m.userID === senderID);
-                        return member ? member.userName : senderID;
-                    }}
-                    members={members}
                 />
 
                 {/* Click outside to close context menu */}

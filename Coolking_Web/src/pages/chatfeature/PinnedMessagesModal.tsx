@@ -1,25 +1,23 @@
 import React from 'react';
 import type { Message } from '../../hooks/useMessage';
-import type { ChatMember } from '../../hooks/useChat';
+
+// Thêm senderName vào kiểu Message để modal sử dụng
+type PinnedMessage = Message & { senderName?: string; pinnedByName?: string };
 
 interface PinnedMessagesModalProps {
     isOpen: boolean;
     onClose: () => void;
-    pinnedMessages: Message[];
+    pinnedMessages: PinnedMessage[];
     onUnpinMessage: (messageId: string) => void;
     onNavigateToMessage: (messageId: string) => void;
-    getSenderName: (senderID: string) => string;
-    members?: ChatMember[];
 }
 
 const PinnedMessagesModal: React.FC<PinnedMessagesModalProps> = ({
     isOpen,
     onClose,
     pinnedMessages,
-    onUnpinMessage,
-    onNavigateToMessage,
-    getSenderName,
-    members
+    onUnpinMessage, // Sẽ emit socket event từ hook
+    onNavigateToMessage
 }) => {
     const formatMessageContent = (message: Message) => {
         switch (message.type.toLowerCase()) {
@@ -84,7 +82,7 @@ const PinnedMessagesModal: React.FC<PinnedMessagesModalProps> = ({
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center space-x-2 mb-2">
                                                     <span className="text-sm font-medium text-gray-900">
-                                                        {getSenderName(message.senderInfo?.userID || message.senderID || '')}
+                                                        {message.senderName || 'Unknown User'}
                                                     </span>
                                                     <span className="text-xs text-gray-500">
                                                         {message.createdAt}
@@ -103,22 +101,7 @@ const PinnedMessagesModal: React.FC<PinnedMessagesModalProps> = ({
                                                 {/* Pinned Info */}
                                                 {message.pinnedInfo && (
                                                     <div className="text-xs text-gray-500">
-                                                        Được ghim bởi {(() => {
-                                                            // Ưu tiên pinnedByinfo.userName
-                                                            if (message.pinnedInfo.pinnedByinfo?.userName) {
-                                                                return message.pinnedInfo.pinnedByinfo.userName;
-                                                            }
-                                                            
-                                                            // Fallback: tìm từ members bằng pinnedBy ID
-                                                            const pinnedByID = message.pinnedInfo.pinnedBy;
-                                                            if (pinnedByID && members) {
-                                                                const member = members.find(m => m.userID === pinnedByID);
-                                                                if (member) return member.userName;
-                                                            }
-                                                            
-                                                            // Fallback cuối cùng
-                                                            return pinnedByID || 'Unknown';
-                                                        })()} • {message.pinnedInfo.pinnedDate}
+                                                        Được ghim bởi {message.pinnedByName || 'Unknown User'} • {message.pinnedInfo?.pinnedDate}
                                                     </div>
                                                 )}
                                             </div>
