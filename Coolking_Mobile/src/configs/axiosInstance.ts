@@ -133,6 +133,7 @@ axiosInstance.interceptors.response.use(
 
         // Lưu token mới trước khi đánh thức queue
         await AsyncStorage.setItem('token', newAccessToken);
+        await deleteRefreshToken();
         if (newRefreshToken) await saveRefreshToken(newRefreshToken);
 
         // Đánh thức queue -> truyền token mới

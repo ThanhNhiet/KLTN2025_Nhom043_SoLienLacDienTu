@@ -1,5 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
-import { getAllMessages, sendMessageText as apiSendMessageText , sendMessageImage as apiSendMessageImage , sendMessageFile as apiSendMessageFile , replyToMessage } from "../../api/chat/MessageApi";
+import { useState, useEffect, useCallback,useMemo } from "react";
+import { 
+    getAllMessages, 
+    sendMessageText as apiSendMessageText, 
+    sendMessageImage as apiSendMessageImage, 
+    sendMessageFile as apiSendMessageFile, 
+    replyToMessage,
+    getPinnedMessage,
+} from "../../api/chat/MessageApi";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { set } from "date-fns";
 // --- CẬP NHẬT: Hàm parseCustomDate ổn định hơn ---
@@ -40,10 +47,57 @@ const parseCustomDate = (dateString: string): Date => {
 };
 
 // --- Types (không đổi) ---
-type ItemSenderInfo = { userID: string; name: string; avatar: string | null; role: string; muted: boolean; joninDate?: string | null; lastReadAt?: string | null; }
-type ItemPinnedInfo = { messageID: string; pinnedByinfo : ItemSenderInfo; pinnedDate: string; }
-type ItemReplyInfo = { messageID: string; senderInfo: ItemSenderInfo; content: string; type: string; }
-type ItemMessage = { _id: string; chatID: string; type: 'text' | 'image' | string; content: string; filename: string | null; status: string; isDeleted: boolean; senderInfo: ItemSenderInfo; pinnedInfo: ItemPinnedInfo | null; replyTo: ItemReplyInfo | null; createdAt: string; updatedAt: string; };
+type ItemSenderInfo = { 
+    userID: string; 
+    name: string; 
+    avatar: string | null; 
+    role: string; 
+    muted: boolean; 
+    joninDate?: string | null; 
+    lastReadAt?: string | null; 
+}
+type ItempinnedByinfo ={
+    userID: string; 
+    userName: string; 
+    avatar: string | null; 
+    role: string; 
+    muted: boolean; 
+    joninDate?: string | null; 
+    lastReadAt?: string | null; 
+}
+type ItemReplyByinfo ={
+    userID: string; 
+    userName: string; 
+    avatar: string | null; 
+    role: string; 
+    muted: boolean; 
+    joninDate?: string | null; 
+    lastReadAt?: string | null; 
+}
+type ItemPinnedInfo = { 
+    messageID: string; 
+    pinnedByinfo : ItempinnedByinfo; 
+    pinnedDate: string; 
+}
+type ItemReplyInfo = { 
+    messageID: string; 
+    senderInfo: ItemReplyByinfo; 
+    content: string; 
+    type: string; 
+}
+type ItemMessage = { _id: string; 
+    chatID: string; 
+    type: 'text' | 'image' | string; 
+    content: string; 
+    filename: string | null; 
+    status: string; 
+    isDeleted: boolean; 
+    senderInfo: ItemSenderInfo ; 
+    pinnedInfo: ItemPinnedInfo | null; 
+    replyTo: ItemReplyInfo | null; 
+    createdAt: string; 
+    updatedAt: string; 
+};
 
 type File = { uri: string; name?: string; mimeType?: string; }
 
@@ -52,6 +106,8 @@ interface MessagesApiResponse { messages: ItemMessage[]; hasMore: boolean; }
 // --- Custom Hook ---
 export const useMessages = (chatId: string) => {
     const [messages, setMessages] = useState<ItemMessage[]>([]);
+   // const [pinnedMessages, setPinnedMessages] = useState<ItemMessage[]>([]);
+    const  [pinnedIDs, setPinnedIDs] = useState<string[]>([]);
     const [newMessage, setNewMessage] = useState<string>('');
     const [replyingTo, setReplyingTo] = useState<ItemMessage | null>(null);
     const [page, setPage] = useState(1);
@@ -154,6 +210,38 @@ export const useMessages = (chatId: string) => {
         }
     }, [userId, messages]);
 
+    const fetchPinnedMessages = useCallback( async (chatId: string) => {
+        try {
+
+            const data  = await getPinnedMessage(chatId);
+            if (data == null) {
+                throw new Error("No data received");
+            }
+            const pinnIDs = data.map((msg: ItemMessage) => msg._id);
+            setPinnedIDs(pinnIDs);
+        } catch (error) {
+            console.error("Error fetching pinned messages:", error);
+            throw error;
+        }
+    }, []);
+    useEffect(() => {
+        if (chatId) {
+            fetchPinnedMessages(chatId);
+        }   
+    }, [chatId, fetchPinnedMessages]);
+
+     // --- Lọc danh sách tin nhắn đã ghim ---
+        const pinnedMessages = useMemo(() => {
+            return messages
+                .filter(msg => pinnedIDs.includes(msg._id))
+                .sort((a, b) => {
+                     const dateA = a.pinnedInfo ? new Date(a.pinnedInfo.pinnedDate.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$2/$1/$3')) : new Date(0); // Chuyển DD/MM/YYYY -> MM/DD/YYYY
+                     const dateB = b.pinnedInfo ? new Date(b.pinnedInfo.pinnedDate.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$2/$1/$3')) : new Date(0);
+                     // Sắp xếp mới nhất lên đầu
+                     return dateB.getTime() - dateA.getTime();
+                });
+        }, [messages]); 
+
     const loadMoreMessages = useCallback(() => {
         if (!loadingMore && hasMore) {
             setPage((prevPage) => prevPage + 1);
@@ -161,6 +249,7 @@ export const useMessages = (chatId: string) => {
             console.log("Load more skipped:", {loadingMore, hasMore});
         }
     }, [loadingMore, hasMore]);
+
 
 
     const sendMessageText = async (chatId: string, content: string) => {
@@ -190,7 +279,7 @@ export const useMessages = (chatId: string) => {
 
     };
 
-    
+    // Hàm xử lý gửi tin nhắn văn bản
     const handleSendMessageText = async (chatID :string , content:string) => {
         if (content.trim() === '') return;
 
@@ -216,7 +305,7 @@ export const useMessages = (chatId: string) => {
 
       } 
     };
-
+    // Hàm xử lý gửi tin nhắn hình ảnh
     const handleSendMessageImage = async (chatID: string, images: File[]) => {
         if (images.length === 0) return;
 
@@ -267,37 +356,14 @@ export const useMessages = (chatId: string) => {
                  hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
             }).format(new Date()).replace(',', ''),
         };
-    // Add replyTo field if replying
-        const messageToSend: ItemMessage = replyingTo
-            ? {
-                ...newMsg,
-                replyTo: { // Construct the replyTo object based on API requirements
-                    messageID: replyingTo._id,
-                    senderInfo: replyingTo.senderInfo, // Or just sender ID/Name
-                    content: replyingTo.content,
-                    type: replyingTo.type,
-                }
-            }
-            : { ...newMsg, replyTo: null }; // Ensure replyTo is explicitly null otherwise
-
-        // Optimistic UI Update
-        setMessages(prevMessages => [messageToSend, ...prevMessages]);
-        setNewMessage('');
-        setReplyingTo(null); // Clear reply state after sending
-
-        // TODO: Call actual API function (e.g., sendMessageText or a new one for replies)
+    
         try {
-            // const sentMsg = await sendMessageWithReply(messageToSend); // Example API call
-            // Update message state with server response (e.g., update _id, status)
-            // setMessages(prev => prev.map(m => m._id === messageToSend._id ? { ...sentMsg, status: 'sent' } : m));
-             console.log("Simulating sending:", messageToSend); 
+        
         } catch (err) {
             console.error("Send message failed:", err);
-            // Revert or mark message as failed
-            setMessages(prev => prev.map(m => m._id === messageToSend._id ? { ...m, status: 'failed' } : m));
+           
         }
     };
-
 
 
     return { 
@@ -318,6 +384,7 @@ export const useMessages = (chatId: string) => {
         image,
         fileName,
         imageName,
+        pinnedMessages,
 
         // Functions
         loadMoreMessages ,

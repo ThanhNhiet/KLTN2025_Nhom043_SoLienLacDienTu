@@ -130,4 +130,16 @@ export const replyToMessage = async (chatID: string, text: string, replyTo: Obje
         throw error;
     }
 }
-      
+     
+export const getPinnedMessage = async (chatId: string) => {
+    try {
+        const response = await axiosInstance.get(`/api/messages/pinned/${chatId}`);
+        if (response.data == null) {
+            throw new Error("No data received");
+        }
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching pinned message:", error);
+        throw error;
+    }
+}

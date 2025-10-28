@@ -26,3 +26,44 @@ export const getSearchChatsByKeyword = async (query: string) => {
         throw error;
     }
 };
+
+export const getSearchUsersByKeyword = async (query: string) => {
+    try {
+        const response = await axiosInstance.get(`/api/chats/user-search?keyword=${query}`);
+        if (response.data == null) {
+            throw new Error("No data received");
+        }
+        return response.data;
+        
+    } catch (error) {
+        console.error("Error searching users:", error);
+        throw error;
+    }
+};
+
+export const createNewChatPrivate = async (userID: string) => {
+    try {
+        const response = await axiosInstance.post(`/api/chats/private/${userID}`);
+        if (response.data == null) {
+            throw new Error("No data received");
+        }
+        return response.data;
+    } catch (error) {
+        console.error("Error creating new private chat:", error);
+        throw error;
+    }
+
+};
+export const getChatById = async (chatID: string) => {
+    try {
+        const response = await axiosInstance.get(`/api/chats/${chatID}`);
+        if (response.data == null) {
+            throw new Error("No data received");
+        }
+        return response.data;
+        
+    } catch (error) {
+        console.error("Error fetching chat by ID:", error);
+        throw error;
+    }
+}

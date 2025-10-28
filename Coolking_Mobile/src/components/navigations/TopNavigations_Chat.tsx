@@ -1,17 +1,21 @@
 import { Ionicons } from "@expo/vector-icons";
 import React,{useState} from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import SearchChatModal  from "../modals/SearchChatModal";   
+import SearchChatModal  from "../modals/SearchChatModal";  
+import CreateChatModal from "../modals/CreateChatModal"; 
 
 type props = {
   navigation: any;
   name: string;
+  onRefresh: () => void;
 };
 
-export default function TopNavigations_Chat({ navigation, name }: props) {
+export default function TopNavigations_Chat({ navigation, name, onRefresh }: props) {
 
     const [open, setOpen] = useState(false);
     const onPress = () => setOpen(true);
+    const [isCreateChatVisible, setCreateChatVisible] = useState(false);
+
 
   return (
     <>
@@ -36,6 +40,14 @@ export default function TopNavigations_Chat({ navigation, name }: props) {
       >
         <Ionicons name="search" size={24} color="#e5f0f0ff" />
       </TouchableOpacity>
+      {/* Nút Tạo Chat Mới */}
+      <TouchableOpacity
+        style={[styles.rightButton, { right: 50 }]}
+        onPress={() => setCreateChatVisible(true)}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="create-outline" size={24} color="#e5f0f0ff" />
+      </TouchableOpacity>
     </View>
 
     <SearchChatModal
@@ -44,6 +56,12 @@ export default function TopNavigations_Chat({ navigation, name }: props) {
       navigation={navigation}
     />
 
+    <CreateChatModal
+      isVisible={isCreateChatVisible}
+      onClose={() => setCreateChatVisible(false)}
+      navigation={navigation}
+      onRefresh={onRefresh}
+    />
     </>
   );
 }

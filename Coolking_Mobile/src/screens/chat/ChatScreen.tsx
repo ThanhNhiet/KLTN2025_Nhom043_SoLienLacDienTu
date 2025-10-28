@@ -117,6 +117,7 @@ export default function ChatScreen() {
         setRefreshing(false);
     }, [refetch]);
 
+
     const handlePressChat = (chat: ChatItemType) => {
         navigation.navigate("MessageScreen", { chat });
     };
@@ -177,7 +178,7 @@ export default function ChatScreen() {
     return (
         <SafeAreaProvider>
             <SafeAreaView style={styles.safeArea}>
-                <TopNavigations_Chat navigation={navigation} name='Tin nhắn' />
+                <TopNavigations_Chat navigation={navigation} name='Tin nhắn' onRefresh={onRefresh} />
                 {renderList()}
             </SafeAreaView>
         </SafeAreaProvider>

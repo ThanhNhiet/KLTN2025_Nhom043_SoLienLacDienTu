@@ -1,5 +1,5 @@
 import { useEffect, useState,useCallback } from "react";
-import { getChats , getSearchChatsByKeyword } from "../../api/chat/ChatApi";
+import { getChats , getSearchChatsByKeyword , getSearchUsersByKeyword, createNewChatPrivate} from "../../api/chat/ChatApi";
 import { refresh } from "@react-native-community/netinfo";
 
 // Giữ nguyên các type ChatItemType, lastMessageType
@@ -59,18 +59,70 @@ export const useChat = () => {
             const res = await getSearchChatsByKeyword(query);
             if (!res || !res.success) {
                 console.warn("No search results found");
-                setChats([]);
+               // setChats([]);
                 return;
             }
             return res.chats;
             setError(null);
         } catch (error) {
             setError(error as Error);
-            setChats([]);
+           // setChats([]);
         } finally {
             setLoading(false);
         }
     }, []);
+
+    const searchUsers = useCallback(async (query: string) => {
+        setLoading(true);
+        try {
+            const res = await getSearchUsersByKeyword(query);   
+            if (!res || !res.success) {
+                console.warn("No user search results found");
+                return [];
+            }
+            
+            // Transform the result into the expected format
+            const users = Array.isArray(res.result) 
+                ? res.result.map((user: any) => ({
+                    id: user.type === "Giảng viên" ? user.lecturer_id : user.admin_id,
+                    name: user.name,
+                    avatar: user.avatar,
+                    type: user.type
+                }))
+                : [{
+                    id: res.result.lecturer_id || res.result.admin_id,
+                    name: res.result.name,
+                    avatar: res.result.avatar,
+                    type: res.result.type
+                }];
+
+            return users;
+        } catch (error) {
+            setError(error as Error);
+            return [];
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    const createPrivateChat = useCallback(async (userID: string) => {
+        setLoading(true);
+        try {
+            const res = await createNewChatPrivate(userID);
+            if (!res || !res.success) {
+                console.warn("Failed to create private chat");
+                return null;
+            }
+            return res;
+    } catch (error) {
+        setError(error as Error);
+        return null;
+    } finally {
+        setLoading(false);
+    }
+
+    },[]);
+
 
     return {
         chats,
@@ -81,5 +133,7 @@ export const useChat = () => {
         setPage,
         totalPages,
         searchChats,
+        searchUsers,
+        createPrivateChat
     };
 };

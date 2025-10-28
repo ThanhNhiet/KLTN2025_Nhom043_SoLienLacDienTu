@@ -33,6 +33,7 @@ import ProfileChangePasswordScreen from "@/src/screens/profile/ProfileChangePass
 import ChatScreen from "@/src/screens/chat/ChatScreen";
 import MessageScreen from "@/src/screens/chat/MessageScreen";
 import MessageDetailScreen from "@/src/screens/chat/MessageDetailScreen";
+import FullImageScreen from "../screens/chat/FullImageScreen";
 
 // import score 
 import ScoreScreen from "../screens/score/ScoreScreen";
@@ -153,6 +154,13 @@ export default function AppRouter() {
             <Stack.Screen
                 name="MessageDetailScreen"
                 component={MessageDetailScreen}
+                options={{
+                    headerShown: false,
+                }}
+            />
+            <Stack.Screen
+                name="FullImageScreen"
+                component={FullImageScreen}
                 options={{
                     headerShown: false,
                 }}

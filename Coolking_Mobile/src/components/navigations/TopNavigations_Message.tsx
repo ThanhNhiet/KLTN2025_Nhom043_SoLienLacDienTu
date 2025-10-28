@@ -4,48 +4,35 @@ import { StyleSheet, Text, TouchableOpacity, View, Image } from "react-native";
 
 interface Props {
   navigation: any;
-  chatPartner: {
-    name: string;
-    avatar: string;
-    isOnline: boolean;
-  };
-}
+  chatPartner: {chatID: string; name: string; avatar: string; isOnline: boolean; };
+  // THÊM Props
+  onShowPinned: () => void; // Hàm gọi khi nhấn nút pin
+  hasPinnedMessages: boolean; // Để ẩn/hiện nút pin
+};
 
-export default function TopNavigations_Message({ navigation, chatPartner }: Props) {
+export default function TopNavigations_Message({ navigation, chatPartner, onShowPinned, hasPinnedMessages }: Props) {
   const ICON_COLOR = "#FFFFFF";
 
   return (
     <View style={styles.container}>
-      {/* Back Button */}
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
         <Ionicons name="arrow-back" size={24} color={ICON_COLOR} />
       </TouchableOpacity>
-
-      {/* Avatar */}
       <Image source={{ uri: chatPartner.avatar }} style={styles.headerAvatar} />
-
-      {/* FIX: Wrap Name and Status in a flexible View */}
       <View style={styles.headerInfo}>
-        <Text
-          style={styles.headerName}
-          numberOfLines={1} // Limit to 1 line
-          ellipsizeMode='tail' // Add '...' at the end if too long
-        >
-          {chatPartner.name}
-        </Text>
+        <Text style={styles.headerName} numberOfLines={1} ellipsizeMode='tail'>{chatPartner.name}</Text>
         {chatPartner.isOnline && <Text style={styles.headerStatus}>Đang hoạt động</Text>}
       </View>
 
-      {/* Action Icons */}
       <View style={styles.headerActions}>
-        {/* <TouchableOpacity style={{ marginRight: 12 }}>
-          <Ionicons name="call-outline" size={24} color={ICON_COLOR} />
-        </TouchableOpacity>
-        <TouchableOpacity style={{ marginRight: 16 }}>
-          <Ionicons name="videocam-outline" size={26} color={ICON_COLOR} />
-        </TouchableOpacity> */}
-        <TouchableOpacity style={{ marginRight: 8 }} onPress={()=>navigation.navigate("MessageDetailScreen")}>
-          <Ionicons name="information-circle-outline" size={24} color={ICON_COLOR} />
+        {/* THÊM: Nút hiển thị tin nhắn ghim */}
+        {hasPinnedMessages && ( // Chỉ hiện khi có tin ghim
+             <TouchableOpacity style={styles.actionButton} onPress={onShowPinned}>
+                <Ionicons name="pin-outline" size={22} color={ICON_COLOR} />
+            </TouchableOpacity>
+        )}
+        <TouchableOpacity style={styles.actionButton} onPress={() => {navigation.navigate("MessageDetailScreen", { chatID: chatPartner.chatID });}}>
+          <Ionicons name="ellipsis-vertical-outline" size={26} color={ICON_COLOR} />
         </TouchableOpacity>
       </View>
     </View>

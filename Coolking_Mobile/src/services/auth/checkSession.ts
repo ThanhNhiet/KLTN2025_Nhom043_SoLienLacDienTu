@@ -28,6 +28,7 @@ export const checkAndRefreshSession = async (): Promise<boolean> => {
 
     // ✅ Lưu token mới
     await AsyncStorage.setItem("token", newAccessToken);
+    await deleteRefreshToken();
     if (newRefreshToken) await saveRefreshToken(newRefreshToken);
     return true;
   } catch (error) {
