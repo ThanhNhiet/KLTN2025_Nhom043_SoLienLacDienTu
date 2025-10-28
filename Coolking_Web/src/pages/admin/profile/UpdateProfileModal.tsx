@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useLecturer } from '../../../hooks/useLecturer';
-import type { Lecturer } from '../../../hooks/useLecturer';
+import { useStaff } from '../../../hooks/useStaff';
+import type { Staff } from '../../../hooks/useStaff';
 
 interface UpdateProfileModalProps {
     isOpen: boolean;
     onClose: () => void;
-    lecturer: Lecturer | null;
+    staff: Staff | null;
     onUpdate: () => void;
 }
 
-const UpdateProfileModal: React.FC<UpdateProfileModalProps> = ({ isOpen, onClose, lecturer, onUpdate }) => {
-    const { updateLecturerInfo, updateLecturerAvatar, loading } = useLecturer();
+const UpdateProfileModal: React.FC<UpdateProfileModalProps> = ({ isOpen, onClose, staff, onUpdate }) => {
+    const { updateStaffInfo, updateStaffAvatar, loading } = useStaff();
     const [formData, setFormData] = useState({
         name: '',
         dob: '',
@@ -105,22 +105,22 @@ const UpdateProfileModal: React.FC<UpdateProfileModalProps> = ({ isOpen, onClose
 
     // Load dữ liệu khi mở modal
     useEffect(() => {
-        if (isOpen && lecturer) {
+        if (isOpen && staff) {
             const data = {
-                name: lecturer.name || '',
-                dob: formatDateForDisplay(lecturer.dob || ''),
-                gender: lecturer.gender === 'Nam',
-                phone: lecturer.phone || '',
-                email: lecturer.email || '',
-                address: lecturer.address || ''
+                name: staff.name || '',
+                dob: formatDateForDisplay(staff.dob || ''),
+                gender: staff.gender === 'Nam',
+                phone: staff.phone || '',
+                email: staff.email || '',
+                address: staff.address || ''
             };
             setFormData(data);
             setOriginalData(data);
-            setAvatarPreview(lecturer.avatar || '');
+            setAvatarPreview(staff.avatar || '');
             setAvatarFile(null);
             setError('');
         }
-    }, [isOpen, lecturer]);
+    }, [isOpen, staff]);
 
     // Hàm so sánh dữ liệu form với trimming
     const isDataChanged = (): boolean => {
@@ -237,31 +237,31 @@ const UpdateProfileModal: React.FC<UpdateProfileModalProps> = ({ isOpen, onClose
 
         try {
             let success = false;
-            let lecturer_avatar_url = localStorage.getItem('lecturer_avatar_url') || '';
-            let lecturer_name = localStorage.getItem('lecturer_name') || '';
+            let admin_avatar_url = localStorage.getItem('admin_avatar_url') || '';
+            let admin_name = localStorage.getItem('admin_name') || '';
 
             // Cập nhật thông tin cơ bản nếu có thay đổi
             const dataChanged = JSON.stringify(formData) !== JSON.stringify(originalData);
             if (dataChanged) {
-                const response = await updateLecturerInfo(
+                const response = await updateStaffInfo(
                     formData.phone,
                     formData.email,
                     formData.address
                 );
                 success = response?.success || false;
-                lecturer_name = response?.name || lecturer_name;
+                admin_name = response?.name || admin_name;
             }
 
             // Cập nhật avatar nếu có thay đổi
             if (avatarFile) {
-                const avatarResponse = await updateLecturerAvatar(avatarFile);
+                const avatarResponse = await updateStaffAvatar(avatarFile);
                 success = avatarResponse?.success || false;
-                lecturer_avatar_url = avatarResponse?.avatar || lecturer_avatar_url;
+                admin_avatar_url = avatarResponse?.avatar || admin_avatar_url;
             }
 
-            if (success && lecturer_avatar_url !== '' || (!dataChanged && !avatarFile)) {
-                localStorage.setItem('lecturer_avatar_url', lecturer_avatar_url);
-                localStorage.setItem('lecturer_name', lecturer_name);
+            if (success || (!dataChanged && !avatarFile)) {
+                localStorage.setItem('admin_avatar_url', admin_avatar_url);
+                localStorage.setItem('admin_name', admin_name);
                 onUpdate(); // Reload dữ liệu and show success notification
                 onClose(); // Close modal immediately
             }

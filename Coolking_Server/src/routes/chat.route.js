@@ -74,6 +74,10 @@ router.delete('/cleanup-gr-completed/:session_id', chatController.cleanupComplet
 // PUT /api/chats/mute/:chatID
 router.put('/mute/:chatID', chatController.updateMuteStatus);
 
+// Lấy thông tin cuộc trò chuyện theo chatID dành cho admin
+// GET /api/chats/info/:chatID
+router.get('/info/:chatID', chatController.getChatInfoByID4Admin);
+
 // Lấy thông tin cuộc trò chuyện theo chatID
 // GET /api/chats/:chatID
 router.get('/:chatID', chatController.getChatInfoByID);

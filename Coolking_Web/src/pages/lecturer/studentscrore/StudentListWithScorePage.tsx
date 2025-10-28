@@ -22,8 +22,15 @@ const StudentListWithScorePage: React.FC = () => {
 
   const handleSendWarning = (student: StudentWithScore) => {
     setSelectedStudent(student);
-    fetchStudentInfo(student.student_id);
     setShowWarningModal(true);
+  };
+
+  const handleSendSuccess = () => {
+    setShowWarningModal(false);
+    setSelectedStudent(null);
+    if (course_section_id) {
+      void fetchStudentsByCourseSection(course_section_id);
+    }
   };
 
   const handleStudentClick = (student: StudentWithScore) => {
@@ -37,16 +44,16 @@ const StudentListWithScorePage: React.FC = () => {
   };
 
   const getEvaluationBadge = (evaluate: string) => {
-    if (evaluate === 'ok') {
+    if (evaluate === 'danger' || evaluate === 'Not passed') {
       return (
-        <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
-          Bình thường
+        <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
+          Cần cảnh báo
         </span>
       );
     } else {
       return (
-        <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
-          Cần cảnh báo
+        <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+          Bình thường
         </span>
       );
     }
@@ -145,9 +152,9 @@ const StudentListWithScorePage: React.FC = () => {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10">STT</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-12 bg-gray-50 z-10">MSSV</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-32 bg-gray-50 z-10">Họ tên</th>
+                  <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider left-0 bg-gray-50 z-10">STT</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider left-12 bg-gray-50 z-10">MSSV</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider left-32 bg-gray-50 z-10">Họ tên</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ngày sinh</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">LT TK1</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">LT TK2</th>
@@ -176,13 +183,13 @@ const StudentListWithScorePage: React.FC = () => {
                       onClick={() => handleStudentClick(student)}
                       className="hover:bg-gray-50 cursor-pointer transition-colors duration-150"
                     >
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 sticky left-0 bg-white z-10">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 left-0 bg-white z-10">
                         {student.no}
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-blue-600 sticky left-12 bg-white z-10">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-blue-600 left-12 bg-white z-10">
                         {student.student_id}
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 sticky left-32 bg-white z-10">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 left-32 bg-white z-10">
                         {student.name}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -224,14 +231,14 @@ const StudentListWithScorePage: React.FC = () => {
                             e.stopPropagation();
                             handleSendWarning(student);
                           }}
-                          disabled={student.initial_evaluate === 'ok'}
+                          disabled={student.initial_evaluate === 'ok' || student.isWarningYet === true}
                           className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                            student.initial_evaluate !== 'ok'
+                            student.initial_evaluate !== 'ok' && !student.isWarningYet
                               ? 'bg-orange-600 hover:bg-orange-700 text-white'
                               : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                           }`}
                         >
-                          Gửi nhắc nhở
+                          {student.isWarningYet ? 'Đã yêu cầu' : 'Gửi yêu cầu cảnh báo'}
                         </button>
                       </td>
                     </tr>
@@ -253,8 +260,8 @@ const StudentListWithScorePage: React.FC = () => {
             setShowWarningModal(false);
             setSelectedStudent(null);
           }}
+          onSuccess={handleSendSuccess}
           student={selectedStudent}
-          studentInfo={studentInfo}
           courseSectionData={courseSectionData}
         />
       )}

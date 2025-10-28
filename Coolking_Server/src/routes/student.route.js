@@ -19,8 +19,11 @@ router.get('/basic-schedule/:student_id', studentController.getStudentBasicSched
 // GET /students/exam-schedule/:student_id - Lịch thi
 router.get('/exam-schedule/:student_id', studentController.getStudentExamSchedule);
 
-// GET /students/warn-list?sessionId=&facultyId=&page=&pageSize=
+// GET /students/warn-list?sessionId=&facultyId=&option=&page=&pageSize=
 router.get('/warn-list', studentController.getWarnedStudents);
+
+// GET /students/warn-list/search?sessionId=&facultyId=&studentId=
+router.get('/warn-list/search', studentController.searchWarnedStudents);
 
 // ===== ROUTES CHO STUDENT =====
 // PUT /students/update-info - Cập nhật thông tin

@@ -439,7 +439,7 @@ exports.updateMuteStatus = async (req, res) => {
     }
 };
 
-// GET /api/chats/info/:chatID
+// GET /api/chats/:chatID
 exports.getChatInfoByID = async (req, res) => {
     try {
         const authHeader = req.headers['authorization'];
@@ -459,6 +459,32 @@ exports.getChatInfoByID = async (req, res) => {
         res.status(200).json(chat);
     } catch (error) {
         console.error('Error in getChatInfoByID controller:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Lỗi server khi lấy thông tin cuộc trò chuyện'
+        });
+    }
+};
+
+// GET /api/chats/info/:chatID
+exports.getChatInfoByID4Admin = async (req, res) => {
+    try {
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
+        const decoded = jwtUtils.verifyAccessToken(token);  
+        if (!decoded || decoded.role !== 'ADMIN') {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
+        const { chatID } = req.params;
+        if (!chatID) {
+            return res.status(400).json({
+                success: false,
+                message: 'chatID là bắt buộc'
+            });
+        }
+        const chat = await chatRepo.getChatInfoById4Admin(chatID);
+        res.status(200).json(chat);
+    } catch (error) {
         res.status(500).json({
             success: false,
             message: error.message || 'Lỗi server khi lấy thông tin cuộc trò chuyện'

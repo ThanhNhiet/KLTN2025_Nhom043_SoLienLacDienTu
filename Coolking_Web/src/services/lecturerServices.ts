@@ -8,8 +8,8 @@ class LecturerService {
     }
 
     // PUT /api/lecturers/info
-    async updateLecturerInfo(name: string, dob: string, gender: boolean, phone: string, email: string, address: string) {
-        const data = { name, dob, gender, phone, email, address };
+    async updateLecturerInfo(phone: string, email: string, address: string) {
+        const data = { phone, email, address };
         const response = await axiosInstance.put('/lecturers/info', data);
         return response.data;
     }

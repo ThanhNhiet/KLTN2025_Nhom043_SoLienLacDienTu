@@ -1,5 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const { Alert, IsReadAlert } = require('../databases/mongodb/schemas');
+const { Op } = require('sequelize');
 const mongoose = require('mongoose');
 const datetimeFormatter = require("../utils/format/datetime-formatter");
 
@@ -524,17 +525,30 @@ const getAllAlerts4Admin = async (page = 1, pageSize = 10) => {
         const skip = (page - 1) * pageSize;
 
         // Lấy toàn bộ thông báo (bao gồm all + person)
-        const alerts = await Alert.find({})
+        const alerts = await Alert.find()
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(pageSize)
-            .select('_id senderID receiverID header body targetScope isRead createdAt updatedAt');
+            .select('_id senderID receiverID header body targetScope isRead createdAt updatedAt')
+            .lean();
 
+        // Chuẩn bị các promise để kiểm tra isWarningYet
+        const warningCheckPromises = alerts.map(alert => {
+            if (alert.header && alert.header.startsWith('Yêu cầu Cảnh báo học vụ')) {
+                return isWarningYet4Alert(alert.header);
+            }
+            return Promise.resolve(null); // Trả về null cho các trường hợp khác
+        });
+
+        // Thực thi các promise song song
+        const warningResults = await Promise.all(warningCheckPromises);
+
+        
         // Đếm tổng số
         const total = await Alert.countDocuments({});
 
         // Chuẩn hóa dữ liệu trả về
-        const processedAlerts = alerts.map(alert => ({
+        const processedAlerts = alerts.map((alert, index) => ({
             _id: alert._id,
             senderID: alert.senderID || 'System',
             receiverID: alert.receiverID || 'All',
@@ -542,7 +556,8 @@ const getAllAlerts4Admin = async (page = 1, pageSize = 10) => {
             body: alert.body,
             targetScope: alert.targetScope,
             isRead: alert.isRead,
-            createdAt: alert.createdAt ? datetimeFormatter.formatDateTimeVN(alert.createdAt) : null,
+            isWarningYet: warningResults[index], // Gán kết quả kiểm tra
+            createdAt: alert.createdAt ? datetimeFormatter.formatDateTimeVN(alert.createdAt) : null, 
             updatedAt: alert.updatedAt ? datetimeFormatter.formatDateTimeVN(alert.updatedAt) : null
         }));
 
@@ -760,6 +775,65 @@ const getAlertsBySender = async (senderID, page = 1, pageSize = 10) => {
     }
 };
 
+/**
+ * Kiểm tra xem cảnh báo đã được gửi chưa (dựa trên header đã cắt)
+ * @param {String} header - Tiêu đề gốc của yêu cầu cảnh báo
+ * @returns {Promise<boolean>} - true nếu đã có, false nếu chưa
+ */
+const isWarningYet4Alert = async (header) => {
+    try {
+        if (!header || typeof header !== 'string') {
+            return false;
+        }
+
+        // Cắt bỏ 2 từ đầu, ví dụ: "Yêu cầu Cảnh báo học vụ..." -> "Cảnh báo học vụ..."
+        const trimmedHeader = header.split(' ').slice(2).join(' ');
+
+        if (!trimmedHeader) {
+            return false;
+        }
+
+        // Tìm kiếm alert có header đã cắt
+        const existingAlert = await Alert.findOne({ header: trimmedHeader });
+
+        return !!existingAlert; // Trả về true nếu tìm thấy, ngược lại false
+
+    } catch (error) {
+        console.error('Error in isWarningYet4Alert:', error);
+        // Trong trường hợp lỗi, coi như chưa có để tránh chặn nhầm
+        return false;
+    }
+};
+
+/**
+ * Kiểm tra xem sinh viên đã nhận được cảnh báo cho một lớp học phần cụ thể chưa
+ * @param {string} course_section_id 
+ * @param {string} student_id 
+ * @returns {Promise<boolean>}
+ */
+const isWarningYet4Student = async (course_section_id, student_id) => {
+    try {
+        if (!course_section_id || !student_id) {
+            return false;
+        }
+
+        // Tìm kiếm alert có header chứa "Cảnh báo", course_section_id và student_id
+        const existingAlert = await Alert.findOne({
+            $and: [
+                { header: { $regex: '^Cảnh báo', $options: 'i' } },
+                { header: { $regex: course_section_id, $options: 'i' } },
+                { header: { $regex: student_id, $options: 'i' } }
+            ]
+        });
+
+        return !!existingAlert;
+
+    } catch (error) {
+        console.error('Error in isWarningYet4Student:', error);
+        return false;
+    }
+};
+
 module.exports = {
     sendAlertToAll,
     sendAlertToPerson,
@@ -773,5 +847,6 @@ module.exports = {
     searchAlertsByKeyword,
     getAlertsBySender,
     markSystemAlertAsRead,
-    deleteAlertSystem4Receiver
+    deleteAlertSystem4Receiver,
+    isWarningYet4Student
 };

@@ -62,41 +62,46 @@ const ChatMainPage: React.FC = () => {
         setChatMembers(members);
     };
 
+
     return (
         <div className="h-screen bg-gray-50 flex flex-col">
             <HeaderLeCpn />
-            
             {/* Main Chat Interface */}
-            <div className="flex-1 flex overflow-hidden">
-                {/* Chat List - Left Panel */}
-                <div className="w-80 flex-shrink-0">
-                    <ChatListCpn 
-                        ref={chatListRef}
-                        onChatSelect={handleChatSelect}
-                        selectedChatId={selectedChatId}
-                        onLastMessageUpdate={handleLastMessageUpdate}
-                    />
-                </div>
+            <div className="flex-1 overflow-x-auto">
+                <div
+                    className="flex h-full"
+                    style={{ minWidth: '600px' }}
+                >
+                    {/* Chat List - Left Panel */}
+                    <div className="w-80 flex-shrink-0">
+                        <ChatListCpn 
+                            ref={chatListRef}
+                            onChatSelect={handleChatSelect}
+                            selectedChatId={selectedChatId}
+                            onLastMessageUpdate={handleLastMessageUpdate}
+                        />
+                    </div>
 
-                {/* Message Conversation - Center Panel */}
-                <div className="flex-1 flex flex-col">
-                    <MessageConversationCpn
-                        selectedChatId={selectedChatId}
-                        onShowSearchResults={(results, members) => handleShowSearchResults(results, members, 'search')}
-                        members={chatMembers}
-                        onLastMessageUpdate={handleLastMessageUpdate}
-                    />
-                </div>
+                    {/* Message Conversation - Center Panel */}
+                    <div className="flex-1 flex flex-col">
+                        <MessageConversationCpn
+                            selectedChatId={selectedChatId}
+                            onShowSearchResults={(results, members) => handleShowSearchResults(results, members, 'search')}
+                            members={chatMembers}
+                            onLastMessageUpdate={handleLastMessageUpdate}
+                        />
+                    </div>
 
-                {/* Chat Info - Right Panel */}
-                <div className="w-80 flex-shrink-0 border-l border-gray-200">
-                    <ChatInfoCpn
-                        selectedChatId={selectedChatId}
-                        onShowImages={handleShowImages}
-                        onShowFiles={handleShowFiles}
-                        onShowLinks={handleShowLinks}
-                        onMembersUpdate={handleChatMembersUpdate}
-                    />
+                    {/* Chat Info - Right Panel */}
+                    <div className="w-80 flex-shrink-0 border-l border-gray-200">
+                        <ChatInfoCpn
+                            selectedChatId={selectedChatId}
+                            onShowImages={handleShowImages}
+                            onShowFiles={handleShowFiles}
+                            onShowLinks={handleShowLinks}
+                            onMembersUpdate={handleChatMembersUpdate}
+                        />
+                    </div>
                 </div>
             </div>
 

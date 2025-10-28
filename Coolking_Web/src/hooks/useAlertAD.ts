@@ -9,6 +9,7 @@ export interface Alert {
     body: string;
     targetScope: 'all' | 'person';
     isRead: boolean;
+    isWarningYet?: boolean;
     createdAt: string;
     updatedAt: string;
 }
@@ -108,6 +109,20 @@ export const useAlert = () => {
         }
     }, []);
 
+    // Gửi thông báo đến người dùng cụ thể
+    const sendAlertPersonal = useCallback(async (header: string, body: string, receiversID: string[]) => {
+        try {
+            setLoading(true);
+            setError('');
+            const data = await alertService.sendAlertPersonal(header, body, receiversID);
+            return data;
+        } catch (error: any) {
+            setError(error.message || 'Failed to send alert');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     return {
         loading,
         error,
@@ -123,6 +138,7 @@ export const useAlert = () => {
         searchAlerts,
         sendAlertToAll,
         deleteAlert,
-        updateAlert
+        updateAlert,
+        sendAlertPersonal
     };
 };

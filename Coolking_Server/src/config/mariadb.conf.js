@@ -40,7 +40,7 @@ const sequelize = new Sequelize(
         require: true,
         rejectUnauthorized: false,
       },
-      connectTimeout: 10000,
+      connectTimeout: 60000,
     },
     timezone: '+07:00',
     define: {

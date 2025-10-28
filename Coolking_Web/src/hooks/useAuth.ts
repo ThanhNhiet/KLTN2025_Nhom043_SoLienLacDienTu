@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import authService from '../services/authService';
 import lecturerService from '../services/lecturerServices';
+import staffService from '../services/staffServices';
+
 export interface UserInfo {
   id: string;
   user_id: string;
@@ -64,6 +66,9 @@ export const useAuth = () => {
       // Redirect dựa trên role
       const role = getUserRole();
       if (role === 'ADMIN') {
+        const adminInfo = await staffService.getStaffInfo();
+        localStorage.setItem('admin_name', adminInfo.name || '');
+        localStorage.setItem('admin_avatar_url', adminInfo.avatar || '');
         navigate('/admin/accounts');
       } else if (role === 'LECTURER') {
         const lecturerInfo = await lecturerService.getLecturerInfo();

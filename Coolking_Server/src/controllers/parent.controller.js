@@ -6,7 +6,7 @@ exports.getParentInfo = async (req, res) => {
         const authHeader = req.headers['authorization'];
         const token = authHeader && authHeader.split(' ')[1];
         const decoded = jwtUtils.verifyAccessToken(token);
-        if (!decoded || decoded.role === 'ADMIN') {
+        if (!decoded || !decoded.role === 'ADMIN') {
             return res.status(403).json({ message: 'Forbidden' });
         }
         const parentId = req.params.id;
@@ -25,7 +25,7 @@ exports.updateParentAvatar = async (req, res) => {
         const token = authHeader && authHeader.split(' ')[1];
         const decoded = jwtUtils.verifyAccessToken(token);
 
-        if (!decoded || decoded.role === 'ADMIN') {
+        if (!decoded || decoded.role === 'PARENT') {
             return res.status(403).json({ message: 'Forbidden' });
         }
 

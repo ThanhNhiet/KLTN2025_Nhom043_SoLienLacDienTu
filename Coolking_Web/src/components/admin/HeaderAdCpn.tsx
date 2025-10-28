@@ -1,10 +1,12 @@
 import React from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import logoImg from '../../assets/img/logo.png';
+import noImage from '../../assets/img/no-image.jpg';
 
 const HeaderAdCpn: React.FC = () => {
-  const { getUserInfo, logout } = useAuth();
-  const userInfo = getUserInfo();
+  const { logout } = useAuth();
+  const admin_name = localStorage.getItem('admin_name');
+  const admin_avatar_url = localStorage.getItem('admin_avatar_url');
 
   const handleLogout = async () => {
     try {
@@ -50,14 +52,35 @@ const HeaderAdCpn: React.FC = () => {
               >
                 Thống kê
               </a>
+              <a
+                href="/admin/chat"
+                className="text-gray-700 hover:text-blue-600 font-medium transition-colors duration-200 px-3 py-2 rounded-md hover:bg-gray-50"
+              >
+                Nhắn tin
+              </a>
             </nav>
           </div>
 
           {/* Right side - User info and logout */}
           <div className="flex items-center space-x-4">
-            <span className="text-gray-700 text-sm">
-              Xin chào <span className="font-semibold text-blue-600">{userInfo?.user_id || 'ADMIN001'}</span>
-            </span>
+            <a
+              href="/admin/profile"
+              className="hidden sm:flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors duration-200 group cursor-pointer"
+            >
+              {admin_avatar_url && (
+                <img
+                  src={admin_avatar_url}
+                  alt="Avatar"
+                  className="w-8 h-8 rounded-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = noImage;
+                  }}
+                />
+              )}
+              <span className="text-gray-700 text-sm font-medium group-hover:text-blue-600 transition-colors duration-200">
+                {admin_name || 'Quản trị viên'}
+              </span>
+            </a>
 
             <button
               onClick={handleLogout}

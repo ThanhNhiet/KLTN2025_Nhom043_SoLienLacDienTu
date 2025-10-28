@@ -1,4 +1,5 @@
 const sequelize = require("../config/mariadb.conf");
+const { Op } = require("sequelize");
 const initModels = require("../databases/mariadb/model/init-models");
 const models = initModels(sequelize);
 const datetimeFormatter = require("../utils/format/datetime-formatter");
@@ -6,6 +7,7 @@ const cloudinaryService = require("../services/cloudinary.service");
 const cloudinaryUtils = require("../utils/cloudinary.utils");
 const { Chat, ChatType, MemberRole } = require('../databases/mongodb/schemas/Chat');
 const mongoose = require('mongoose');
+const alertRepo = require("./alert.repo");
 
 /**
  *  Lấy danh sách sinh viên + điểm số bằng course_section_id - dùng cho giảng viên
@@ -85,10 +87,8 @@ const getStudentsScoreByCourseSectionId4Lecturer = async (course_section_id) => 
         }
 
         // Lấy thông tin từng sinh viên và điểm số
-        const students = [];
-
-        for (let i = 0; i < studentCourseSections.length; i++) {
-            const studentId = studentCourseSections[i].student_id;
+        const studentPromises = studentCourseSections.map(async (scs, i) => {
+            const studentId = scs.student_id;
 
             // Lấy thông tin sinh viên từ Student bằng student_id
             const student = await models.Student.findOne({
@@ -98,7 +98,7 @@ const getStudentsScoreByCourseSectionId4Lecturer = async (course_section_id) => 
 
             if (!student) {
                 console.warn(`Student not found with id: ${studentId}`);
-                continue;
+                return null;
             }
 
             // Lấy thông tin điểm từ Score theo từng student_id và course_section_id
@@ -167,21 +167,30 @@ const getStudentsScoreByCourseSectionId4Lecturer = async (course_section_id) => 
                 }
             }
 
-            students.push({
+            const studentData = {
                 no: i + 1, // STT
                 student_id: student.student_id,
                 name: student.name,
                 dob: datetimeFormatter.formatDateVN(student.dob),
                 score: scoreData,
                 initial_evaluate: initial_evaluate
-            });
-        }
+            };
+
+            // Nếu cần cảnh báo, kiểm tra xem đã cảnh báo chưa
+            if (initial_evaluate !== 'ok') {
+                studentData.isWarningYet = await alertRepo.isWarningYet4Student(course_section_id, student.student_id);
+            }
+
+            return studentData;
+        });
+
+        let students = (await Promise.all(studentPromises)).filter(s => s !== null);
 
         // Sắp xếp danh sách sinh viên theo tên tiếng Việt
         students.sort((a, b) => {
             // Tách tên ra khỏi họ và tên đệm
-            const lastNameA = a.name.split(' ').pop();
-            const lastNameB = b.name.split(' ').pop();
+            const lastNameA = a.name.split(' ').pop() || '';
+            const lastNameB = b.name.split(' ').pop() || '';
 
             // So sánh tên trước
             const nameComparison = lastNameA.localeCompare(lastNameB, 'vi');
@@ -271,10 +280,6 @@ const updateStudentAvatar = async (student_id, file) => {
         throw error;
     }
 }
-
-
-
-
 
 /**
  *  Lấy thông tin sinh viên bằng student_id - dùng cho giảng viên
@@ -915,7 +920,7 @@ const getStudentExamSchedule = async (student_id, options = {}) => {
  * @param {number} pageSize - Số lượng bản ghi trên một trang
  * @returns {Object} { total, page, pageSize, students, linkPrev, linkNext, pages }
  */
-const getFailedStudentsBySessionAndFaculty = async (session_id, faculty_id, page, pageSize = 10) => {
+const getFailedStudentsBySessionAndFaculty = async (session_id, faculty_id, option = 'all', page, pageSize = 10) => {
     try {
         // Validate input
         if (!session_id || !faculty_id) {
@@ -957,79 +962,82 @@ const getFailedStudentsBySessionAndFaculty = async (session_id, faculty_id, page
         }
 
         const courseSectionIds = courseSections.map(cs => cs.id);
-        const failedStudents = [];
+        let failedStudents = [];
 
-        // Duyệt qua từng course_section để tìm sinh viên có điểm không đạt
-        for (const courseSection of courseSections) {
-            // Lấy danh sách sinh viên trong course_section
-            const studentCourseSections = await models.StudentCourseSection.findAll({
-                where: { course_section_id: courseSection.id },
-                attributes: ['student_id']
+        // Lấy tất cả điểm của các course section này
+        const scores = await models.Score.findAll({
+            where: {
+                course_section_id: { [Op.in]: courseSectionIds },
+                [Op.or]: [
+                    { mid: { [Op.lt]: 4 } },
+                    { final: { [Op.lt]: 3 } },
+                    { avr: { [Op.lt]: 4 } }
+                ]
+            },
+            include: [
+                {
+                    model: models.Student,
+                    as: 'student',
+                    attributes: ['student_id', 'name'],
+                    required: true
+                },
+                {
+                    model: models.CourseSection,
+                    as: 'course_section',
+                    attributes: ['id'],
+                    include: [{
+                        model: models.Subject,
+                        as: 'subject',
+                        attributes: ['name']
+                    }]
+                }
+            ]
+        });
+
+        // Xử lý và kiểm tra cảnh báo
+        const studentCheckPromises = scores.map(async (score) => {
+            const student = score.student;
+            const courseSection = score.course_section;
+
+            // Lấy thông tin phụ huynh
+            const parent = await models.Parent.findOne({
+                where: { student_id: student.student_id },
+                attributes: ['parent_id']
             });
 
-            for (const scs of studentCourseSections) {
-                // Lấy thông tin điểm của sinh viên
-                const score = await models.Score.findOne({
-                    where: {
-                        student_id: scs.student_id,
-                        course_section_id: courseSection.id
-                    },
-                    attributes: [
-                        'theo_regular1', 'theo_regular2', 'theo_regular3',
-                        'pra_regular1', 'pra_regular2', 'pra_regular3',
-                        'mid', 'final', 'avr'
-                    ]
-                });
+            // Kiểm tra đã cảnh báo chưa
+            const isWarningYet = await alertRepo.isWarningYet4Student(courseSection.id, student.student_id);
 
-                // Kiểm tra điều kiện không đạt
-                let isNotPassed = false;
-                if (score) {
-                    // Điều kiện không đạt: final < 3 hoặc avr < 4
-                    if ((score.final !== null && score.final < 3) || (score.avr !== null && score.avr < 4)) {
-                        isNotPassed = true;
-                    }
-                }
+            return {
+                course_section_id: courseSection.id,
+                subjectName: courseSection.subject.name,
+                student_id: student.student_id,
+                studentName: student.name,
+                theo_regular1: score.theo_regular1,
+                theo_regular2: score.theo_regular2,
+                theo_regular3: score.theo_regular3,
+                pra_regular1: score.pra_regular1,
+                pra_regular2: score.pra_regular2,
+                pra_regular3: score.pra_regular3,
+                mid: score.mid,
+                final: score.final,
+                avr: score.avr,
+                parent_id: parent ? parent.parent_id : null,
+                isWarningYet: isWarningYet
+            };
+        });
 
-                // Nếu không đạt, thêm vào danh sách
-                if (isNotPassed) {
-                    // Lấy thông tin sinh viên
-                    const student = await models.Student.findOne({
-                        where: { student_id: scs.student_id },
-                        attributes: ['student_id', 'name']
-                    });
+        failedStudents = await Promise.all(studentCheckPromises);
 
-                    // Lấy thông tin phụ huynh
-                    const parent = await models.Parent.findOne({
-                        where: { student_id: scs.student_id },
-                        attributes: ['parent_id']
-                    });
-
-                    if (student) {
-                        failedStudents.push({
-                            course_section_id: courseSection.id,
-                            subjectName: courseSection.subject.name,
-                            student_id: student.student_id,
-                            studentName: student.name,
-                            theo_regular1: score.theo_regular1,
-                            theo_regular2: score.theo_regular2,
-                            theo_regular3: score.theo_regular3,
-                            pra_regular1: score.pra_regular1,
-                            pra_regular2: score.pra_regular2,
-                            pra_regular3: score.pra_regular3,
-                            mid: score.mid,
-                            final: score.final,
-                            avr: score.avr,
-                            parent_id: parent ? parent.parent_id : null
-                        });
-                    }
-                }
-            }
+        // Lọc theo option
+        if (option === 'notWarningYet') {
+            failedStudents = failedStudents.filter(student => !student.isWarningYet);
         }
 
         // Sắp xếp theo tên sinh viên
         failedStudents.sort((a, b) => {
-            const lastNameA = a.studentName.split(' ').pop();
-            const lastNameB = b.studentName.split(' ').pop();
+            const lastNameA = a.studentName.split(' ').pop() || '';
+            const lastNameB = b.studentName.split(' ').pop() || '';
             const nameComparison = lastNameA.localeCompare(lastNameB, 'vi');
             if (nameComparison !== 0) {
                 return nameComparison;
@@ -1043,10 +1051,10 @@ const getFailedStudentsBySessionAndFaculty = async (session_id, faculty_id, page
         const paginatedStudents = failedStudents.slice(offset, offset + pageSize_num);
 
         // Tạo link phân trang
-        const linkPrev = page_num > 1 ? 
-            `/api/students/failed?session_id=${session_id}&faculty_id=${faculty_id}&page=${page_num - 1}&pageSize=${pageSize_num}` : null;
-        const linkNext = page_num < totalPages ? 
-            `/api/students/failed?session_id=${session_id}&faculty_id=${faculty_id}&page=${page_num + 1}&pageSize=${pageSize_num}` : null;
+        const linkPrev = page_num > 1 ?
+            `/api/students/failed?sessionId=${session_id}&facultyId=${faculty_id}&option=${option}&page=${page_num - 1}&pageSize=${pageSize_num}` : null;
+        const linkNext = page_num < totalPages ?
+            `/api/students/failed?sessionId=${session_id}&facultyId=${faculty_id}&option=${option}&page=${page_num + 1}&pageSize=${pageSize_num}` : null;
 
         // Tạo danh sách 3 trang liên tiếp
         const pages = [];
@@ -1070,7 +1078,115 @@ const getFailedStudentsBySessionAndFaculty = async (session_id, faculty_id, page
     }
 };
 
+/**
+ * Hàm search của getFailedStudentsBySessionAndFaculty (theo stuendent_id)
+ * @param {string} session_id
+ * @param {string} faculty_id
+ * @param {string} student_id
+ * @returns {Object} student info
+ */
+const searchFailedStudentBySessionAndFacultyWithStudentId = async (session_id, faculty_id, student_id) => {
+    try {
+        // Validate input
+        if (!session_id || !faculty_id || !student_id) {
+            throw new Error('session_id, faculty_id, and student_id are required');
+        }
 
+        // Tìm tất cả course_sections theo session_id và faculty_id
+        const courseSections = await models.CourseSection.findAll({
+            where: { session_id },
+            include: [{
+                model: models.Subject,
+                as: 'subject',
+                where: { faculty_id },
+                attributes: []
+            }],
+            attributes: ['id'],
+            raw: true
+        });
+
+        if (courseSections.length === 0) {
+            return {
+                success: false,
+                message: 'Không tìm thấy lớp học phần nào cho khoa và học kỳ này.',
+                student: null
+            };
+        }
+
+        const courseSectionIds = courseSections.map(cs => cs.id);
+
+        // Lấy điểm không đạt của sinh viên trong các lớp học phần đó
+        const failedScores = await models.Score.findAll({
+            where: {
+                student_id,
+                course_section_id: { [Op.in]: courseSectionIds },
+                [Op.or]: [
+                    { mid: { [Op.lt]: 4 } },
+                    { final: { [Op.lt]: 3 } },
+                    { avr: { [Op.lt]: 4 } }
+                ]
+            },
+            attributes: { exclude: ['createdAt', 'updatedAt', 'id', 'student_id'] },
+            include: [
+                { model: models.Student, as: 'student', attributes: ['student_id', 'name'], required: true },
+                {
+                    model: models.CourseSection,
+                    as: 'course_section',
+                    attributes: ['id'],
+                    include: [{ model: models.Subject, as: 'subject', attributes: ['name'] }]
+                }
+            ]
+        });
+
+        if (failedScores.length === 0) {
+            return {
+                success: true,
+                message: 'Sinh viên không có môn nào không đạt trong khoa và học kỳ này.',
+                student: null
+            };
+        }
+
+        // Lấy thông tin phụ huynh
+        const parent = await models.Parent.findOne({ where: { student_id }, attributes: ['parent_id'] });
+
+        // Xử lý và kiểm tra cảnh báo cho từng môn học không đạt
+        const failedSubjects = await Promise.all(
+            failedScores.map(async (score) => {
+                const plain = score.get({ plain: true });
+                const isWarningYet = await alertRepo.isWarningYet4Student(
+                    plain.course_section.id,
+                    student_id
+                );
+
+                return {
+                    course_section_id: plain.course_section.id,
+                    subjectName: plain.course_section.subject.name,
+                    theo_regular1: plain.theo_regular1,
+                    theo_regular2: plain.theo_regular2,
+                    theo_regular3: plain.theo_regular3,
+                    pra_regular1: plain.pra_regular1,
+                    pra_regular2: plain.pra_regular2,
+                    pra_regular3: plain.pra_regular3,
+                    mid: plain.mid,
+                    final: plain.final,
+                    avr: plain.avr,
+                    isWarningYet
+                };
+            })
+        );
+
+        return {
+            student_id: failedScores[0].student.student_id,
+            studentName: failedScores[0].student.name,
+            parent_id: parent ? parent.parent_id : null,
+            failedSubjects
+        };
+
+    } catch (error) {
+        console.error('Error in searchFailedStudentBySessionAndFacultyWithStudentId:', error);
+        throw error;
+    }
+};
 
 module.exports = {
     getStudentsScoreByCourseSectionId4Lecturer,
@@ -1081,5 +1197,6 @@ module.exports = {
     getStudentBasicSchedule,
     getStudentExamSchedule,
     updateStudentAvatar,
-    getFailedStudentsBySessionAndFaculty
+    getFailedStudentsBySessionAndFaculty,
+    searchFailedStudentBySessionAndFacultyWithStudentId
 };

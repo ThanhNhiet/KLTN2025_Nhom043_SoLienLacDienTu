@@ -1,4 +1,5 @@
 const sequelize = require("../config/mariadb.conf");
+const { Op } = require("sequelize");
 const { initModels } = require("../databases/mariadb/model/init-models");
 const models = initModels(sequelize);
 const datetimeFormatter = require("../utils/format/datetime-formatter");
@@ -80,14 +81,14 @@ const createStaff = async (staffData) => {
   }
 };
 
-const addAdmin_id4Staff = async (admin_id, staff_id, position) => {
+const addAdmin_id4Staff = async (admin_id, staff_id, position, transaction) => {
   try {
-    const staff = await models.Staff.findOne({ where: { staff_id } });
+    const staff = await models.Staff.findOne({ where: { staff_id }, transaction });
     if (!staff) throw new Error("Staff not found");
     staff.admin_id = admin_id;
     staff.position = position;
-    await staff.save();
-    return staff;
+    await staff.save({ transaction });
+    return;
   } catch (error) {
     throw error;
   }
@@ -95,19 +96,19 @@ const addAdmin_id4Staff = async (admin_id, staff_id, position) => {
 
 const updateStaff = async (staff_id, staffData) => {
   const transaction = await sequelize.transaction();
-  
+
   try {
     // Tìm staff
-    const staff = await models.Staff.findOne({ 
+    const staff = await models.Staff.findOne({
       where: { staff_id },
-      transaction 
+      transaction
     });
     if (!staff) throw new Error("Staff not found");
 
     // Tìm account tương ứng
-    const account = await models.Account.findOne({ 
+    const account = await models.Account.findOne({
       where: { user_id: staff_id },
-      transaction 
+      transaction
     });
     if (!account) throw new Error("Account not found");
 
@@ -138,7 +139,7 @@ const updateStaff = async (staff_id, staffData) => {
     if (staffData.email || staffData.phone) {
       try {
         const { Chat } = require('../databases/mongodb/schemas/Chat');
-        
+
         const updateFields = {};
         if (staffData.email) {
           updateFields["members.$.email"] = staffData.email;
@@ -146,10 +147,10 @@ const updateStaff = async (staff_id, staffData) => {
         if (staffData.phone) {
           updateFields["members.$.phone"] = staffData.phone;
         }
-        
+
         if (Object.keys(updateFields).length > 0) {
           updateFields.updatedAt = new Date();
-          
+
           await Chat.updateMany(
             { "members.userID": staff_id },
             { $set: updateFields }
@@ -162,7 +163,7 @@ const updateStaff = async (staff_id, staffData) => {
     }
 
     await transaction.commit();
-    
+
     return {
       staff: await staff.reload(),
       account: await account.reload(),
@@ -176,19 +177,19 @@ const updateStaff = async (staff_id, staffData) => {
 
 const updateStaff4Admin = async (admin_id, staffData) => {
   const transaction = await sequelize.transaction();
-  
+
   try {
     // Tìm staff by admin_id
-    const staff = await models.Staff.findOne({ 
+    const staff = await models.Staff.findOne({
       where: { admin_id },
-      transaction 
+      transaction
     });
     if (!staff) throw new Error("Admin staff not found");
 
     // Tìm account tương ứng
-    const account = await models.Account.findOne({ 
+    const account = await models.Account.findOne({
       where: { user_id: admin_id },
-      transaction 
+      transaction
     });
     if (!account) throw new Error("Account not found");
 
@@ -219,7 +220,7 @@ const updateStaff4Admin = async (admin_id, staffData) => {
     if (staffData.email || staffData.phone) {
       try {
         const { Chat } = require('../databases/mongodb/schemas/Chat');
-        
+
         const updateFields = {};
         if (staffData.email) {
           updateFields["members.$.email"] = staffData.email;
@@ -227,10 +228,10 @@ const updateStaff4Admin = async (admin_id, staffData) => {
         if (staffData.phone) {
           updateFields["members.$.phone"] = staffData.phone;
         }
-        
+
         if (Object.keys(updateFields).length > 0) {
           updateFields.updatedAt = new Date();
-          
+
           await Chat.updateMany(
             { "members.userID": admin_id },
             { $set: updateFields }
@@ -243,7 +244,7 @@ const updateStaff4Admin = async (admin_id, staffData) => {
     }
 
     await transaction.commit();
-    
+
     return {
       staff: await staff.reload(),
       account: await account.reload(),
@@ -284,7 +285,7 @@ const uploadAvatar = async (staff_id, file) => {
     const staff = await models.Staff.findOne({ where: { staff_id } });
     if (!staff) throw new Error("Staff not found");
     const folder = 'account_avatar';
-  
+
     // Xóa avatar cũ nếu có
     if (staff.avatar) {
       try {
@@ -294,37 +295,37 @@ const uploadAvatar = async (staff_id, file) => {
         console.log('Warning: Could not delete old avatar:', deleteError.message);
       }
     }
-    
+
     // Upload avatar mới
     const uploadResult = await cloudinaryService.upload2Cloudinary(file.buffer, folder, file.originalname);
     if (!uploadResult.success) {
       throw new Error('Avatar upload failed');
     }
-    
+
     // Cập nhật avatar URL trong database
     staff.avatar = uploadResult.url;
     await staff.save();
-    
+
     // Cập nhật avatar trong tất cả các chat có chứa staff này
     try {
       const { Chat } = require('../databases/mongodb/schemas/Chat');
-      
+
       // Tìm tất cả chat có members chứa userID = staff_id
       const updateResult = await Chat.updateMany(
         { "members.userID": staff_id },
-        { 
-          $set: { 
+        {
+          $set: {
             "members.$.avatar": uploadResult.url,
             updatedAt: new Date()
-          } 
+          }
         }
       );
-      
+
     } catch (chatUpdateError) {
       console.warn('Warning: Could not update avatar in chats:', chatUpdateError.message);
       // Không throw error vì avatar đã được cập nhật thành công trong MariaDB
     }
-    
+
     return {
       staff_id: staff.staff_id,
       name: staff.name,
@@ -342,7 +343,7 @@ const uploadAvatar4Admin = async (admin_id, file) => {
     const staff = await models.Staff.findOne({ where: { admin_id } });
     if (!staff) throw new Error("Admin staff not found");
     const folder = 'account_avatar';
-  
+
     // Xóa avatar cũ nếu có
     if (staff.avatar) {
       try {
@@ -352,37 +353,37 @@ const uploadAvatar4Admin = async (admin_id, file) => {
         console.log('Warning: Could not delete old avatar:', deleteError.message);
       }
     }
-    
+
     // Upload avatar mới
     const uploadResult = await cloudinaryService.upload2Cloudinary(file.buffer, folder, file.originalname);
     if (!uploadResult.success) {
       throw new Error('Avatar upload failed');
     }
-    
+
     // Cập nhật avatar URL trong database
     staff.avatar = uploadResult.url;
     await staff.save();
-    
+
     // Cập nhật avatar trong tất cả các chat có chứa admin staff này
     try {
       const { Chat } = require('../databases/mongodb/schemas/Chat');
-      
+
       // Tìm tất cả chat có members chứa userID = admin_id
       const updateResult = await Chat.updateMany(
         { "members.userID": admin_id },
-        { 
-          $set: { 
+        {
+          $set: {
             "members.$.avatar": uploadResult.url,
             updatedAt: new Date()
-          } 
+          }
         }
       );
-      
+
     } catch (chatUpdateError) {
       console.warn('Warning: Could not update avatar in chats:', chatUpdateError.message);
       // Không throw error vì avatar đã được cập nhật thành công trong MariaDB
     }
-    
+
     return {
       admin_id: staff.admin_id,
       staff_id: staff.staff_id,
@@ -399,14 +400,14 @@ const uploadAvatar4Admin = async (admin_id, file) => {
 const getStaffByID4Admin = async (staff_id) => {
   try {
     // Chỉ lấy staff có admin_id = null (không phải admin)
-    const staff = await models.Staff.findOne({ 
-      where: { 
+    const staff = await models.Staff.findOne({
+      where: {
         staff_id,
         admin_id: null  // Điều kiện admin_id không tồn tại (null)
-      } 
+      }
     });
     if (!staff) throw new Error("Staff not found or is admin");
-    
+
     return {
       staff_id: staff.staff_id,
       admin_id: staff.admin_id,
@@ -416,6 +417,21 @@ const getStaffByID4Admin = async (staff_id) => {
       department: staff.department,
       position: staff.position
     };
+  } catch (error) {
+    throw error;
+  }
+};
+
+const getAllStaffs = async (department) => {
+  try {
+    const staffs = await models.Staff.findAll({
+      where: {
+        admin_id: { [Op.ne]: null },
+        isDeleted: false,
+        department
+      }
+    });
+    return staffs;
   } catch (error) {
     throw error;
   }
@@ -432,5 +448,6 @@ module.exports = {
   deleteStaff4Admin,
   uploadAvatar,
   uploadAvatar4Admin,
-  getStaffByID4Admin
+  getStaffByID4Admin,
+  getAllStaffs
 };

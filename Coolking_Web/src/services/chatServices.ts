@@ -36,6 +36,12 @@ class ChatServices {
         return response.data;
     }
 
+    // POST /api/chats/private/:target_id   
+    async createPrivateChat(target_id: string) {
+        const response = await axiosInstance.post(`/chats/private/${target_id}`);
+        return response.data;
+    }
+
     // DELETE /api/chats/:chatID
     async deleteChat(chatID: string) {
         const response = await axiosInstance.delete(`/chats/${chatID}`);
@@ -151,6 +157,22 @@ class ChatServices {
     // POST /api/chats/private/:target_id (tạo chat riêng với ai đó) - dành cho giảng viên
     async createPrivateChat4AllUser(target_id: string) {
         const response = await axiosInstance.post(`/chats/private/${target_id}`);
+        return response.data;
+    }
+    
+    // GET /api/chats/user-search?keyword=
+    async searchUsersToChat(keyword: string) {
+        const response = await axiosInstance.get(`/chats/user-search`, {
+            params: {
+                keyword
+            }
+        });
+        return response.data;
+    }
+
+    // GET /api/chats/info/:chatID
+    async getChatInfoByID4Admin(chatID: string) {
+        const response = await axiosInstance.get(`/chats/info/${chatID}`);
         return response.data;
     }
 }

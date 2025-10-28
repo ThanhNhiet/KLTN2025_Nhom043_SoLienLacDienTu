@@ -6,6 +6,8 @@ const datetimeFormatter = require("../utils/format/datetime-formatter");
 const emailService = require("../services/email.service");
 const smsService = require("../services/sms.service");
 const redisService = require('../services/redis.service');
+const staffRepo = require("./staff.repo");
+const { password } = require("../config/redis.conf");
 
 const login = async (username, password) => {
   try {
@@ -51,7 +53,6 @@ const login = async (username, password) => {
 const changePassword = async (user_id, oldPassword, newPassword) => {
   try {
     const account = await models.Account.findOne({ where: { user_id } });
-    console.log(account.user_id);
     if (!account) throw new Error("Account not found");
     const isValid = await bcrypt.compare(oldPassword, account.password);
     if (!isValid) throw new Error("Invalid old password");
@@ -183,21 +184,58 @@ const getAccountByUserId = async (user_id) => {
 };
 
 const createAccount = async (accountData) => {
-  try {
-    if (accountData.role === 'ADMIN') {
+  if (accountData.role === 'ADMIN') {
+    const transaction = await sequelize.transaction();
+    try {
       // Tự động sinh user_id cho ADMIN, user_id có định dạng ADMINxxx
       // Đếm số lượng record có role là ADMIN
       const numberOfAdmins = await models.Account.count({ where: { role: 'ADMIN' } });
       const newAdminNumber = numberOfAdmins + 1;
       const paddedNumber = String(newAdminNumber).padStart(3, '0'); // luôn đủ 3 số
-      accountData.user_id = `ADMIN${paddedNumber}`;
+      const admin_id = `ADMIN${paddedNumber}`;
+      if (accountData.email === '') {
+        accountData.email = null;
+      }
+      if (accountData.phone_number === '') {
+        accountData.phone_number = null;
+      }
+      const formAdmin = {
+        user_id: admin_id,
+        password: accountData.password,
+        role: accountData.role,
+        status: accountData.status,
+        email: accountData.email,
+        phone_number: accountData.phone_number,
+      };
+      const newAdmin = await models.Account.create(formAdmin, { transaction });
+      await staffRepo.addAdmin_id4Staff(admin_id, accountData.user_id, accountData.position, transaction);
+      await transaction.commit();
+      return newAdmin;
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
     }
+  } else {
+    // Logic cho các role khác không cần transaction
     if (accountData.email === '') {
       accountData.email = null;
     }
-    return await models.Account.create(accountData);
-  } catch (error) {
-    throw error;
+    if (accountData.phone_number === '') {
+      accountData.phone_number = null;
+    }
+    try {
+      const formUser = {
+        user_id: accountData.user_id,
+        password: accountData.password,
+        role: accountData.role,
+        status: accountData.status,
+        email: accountData.email,
+        phone_number: accountData.phone_number,
+      };
+      return await models.Account.create(formUser);
+    } catch (error) {
+      throw error;
+    }
   }
 };
 

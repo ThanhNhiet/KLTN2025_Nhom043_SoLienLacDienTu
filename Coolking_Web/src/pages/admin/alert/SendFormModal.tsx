@@ -63,7 +63,7 @@ const SendFormModal: React.FC<SendFormModalProps> = ({ isOpen, onClose, onSucces
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg max-w-md w-full mx-4 max-h-[85vh] flex flex-col">
+      <div className="bg-white rounded-lg max-w-xl w-full mx-4 max-h-[85vh] flex flex-col">
         <div className="flex justify-between items-center p-6 border-b border-gray-200 flex-shrink-0">
           <h2 className="text-xl font-semibold text-gray-900">Tạo thông báo hệ thống</h2>
           <button

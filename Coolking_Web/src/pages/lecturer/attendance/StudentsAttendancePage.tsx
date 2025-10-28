@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { useAlert as useAttendance, type Attendance } from '../../../hooks/useAttendance';
+import { useAttendance, type Attendance } from '../../../hooks/useAttendance';
 import HeaderLeCpn from '../../../components/lecturer/HeaderLeCpn';
 import FooterLeCpn from '../../../components/lecturer/FooterLeCpn';
 import CreateAttendanceModal from './CreateAttendanceModal';
@@ -108,8 +108,10 @@ const StudentsAttendancePage: React.FC = () => {
     });
     
     // Initialize students attendance with empty status
-    if (attendanceData?.attendances[0]?.students) {
-      const initialData = attendanceData.attendances[0].students.map(student => ({
+    // Use fallback to attendanceData.students if attendances array is empty
+    const studentList = attendanceData?.attendances[0]?.students || attendanceData?.students || [];
+    if (studentList.length > 0) {
+      const initialData = studentList.map(student => ({
         student_id: student.student_id,
         status: '',
         description: ''
@@ -356,7 +358,7 @@ const StudentsAttendancePage: React.FC = () => {
   }
 
   // Get unique students list from first attendance or create from available data
-  const allStudents = attendanceData.attendances[0]?.students || [];
+  const allStudents = attendanceData.attendances[0]?.students || attendanceData.students || [];
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -433,7 +435,7 @@ const StudentsAttendancePage: React.FC = () => {
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10">MSSV</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-20 bg-gray-50 z-10">Họ tên</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-28 bg-gray-50 z-10">Họ tên</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ngày sinh</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Giới tính</th>
                   
@@ -518,7 +520,7 @@ const StudentsAttendancePage: React.FC = () => {
                       <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-blue-600 sticky left-0 bg-white z-10">
                         {student.student_id}
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 sticky left-20 bg-white z-10">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 sticky left-28 bg-white z-20">
                         {student.name}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">

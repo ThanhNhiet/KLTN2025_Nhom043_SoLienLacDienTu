@@ -7,7 +7,7 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 // Tạo axios instance
 const axiosInstance: AxiosInstance = axios.create({
   baseURL: `${BASE_URL}/api`,
-  timeout: 20000, // 20 seconds
+  timeout: 60000, // 60 seconds
   headers: {
     'Content-Type': 'application/json',
   },
@@ -64,7 +64,7 @@ axiosInstance.interceptors.request.use(
     const isAdminPage = currentPath.startsWith('/admin/');
     const isLecturerPage = currentPath.startsWith('/lecturer/');
     const isLogoutRequest = config.url === '/public/logout';
-    const isProtectedAPI = config.url?.startsWith('/lecturers/') || config.url?.startsWith('/alerts/');
+    const isProtectedAPI = config.url?.startsWith('/lecturers/') || config.url?.startsWith('/alerts/') || config.url?.startsWith('/staffs/');
     
     // Thêm token nếu đang ở trang admin/lecturer hoặc là logout request hoặc gọi API protected
     if (token && (isAdminPage || isLecturerPage || isLogoutRequest || isProtectedAPI)) {

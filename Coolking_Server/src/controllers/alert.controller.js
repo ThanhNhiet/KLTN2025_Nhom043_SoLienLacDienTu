@@ -51,7 +51,7 @@ const sendAlertToPerson = async (req, res) => {
         const authHeader = req.headers['authorization'];
         const token = authHeader && authHeader.split(' ')[1];
         const decoded = jwtUtils.verifyAccessToken(token);
-        if (!decoded || decoded.role !== 'LECTURER') {
+        if (!decoded || decoded.role === 'STUDENT') {
             return res.status(403).json({ message: 'Forbidden' });
         }
 

@@ -1,32 +1,31 @@
 const express = require("express");
 const cors = require("cors");
+const http = require('http');
 const sequelize = require("./src/config/mariadb.conf");
 const initMongoDB = require("./src/databases/mongodb");
 const { authenticateJWT } = require('./src/middlewares/jwt.middleware');
+const { initSocket } = require('./src/utils/socket.utils'); 
+
+// Khởi tạo biến môi trường
 require('dotenv').config();
 
 // Khởi tạo kết nối Redis
 require('./src/services/redis.service');
 
+// Tạo express app
 const app = express();
+const server = http.createServer(app); // Tạo server HTTP từ express app
+
+// Khởi tạo socket và truyền server HTTP vào
+initSocket(server);
 
 // Bật cors cho phép frontend gọi API
 app.use(cors({
-  origin: "*", // domain React (vite)
+  origin: process.env.CLIENT_ORIGIN || '*',
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true, // nếu cần gửi cookie/token
-  // preflightContinue: false,
-  // optionsSuccessStatus: 200
 }));
-
-// // Middleware xử lý empty body trước JSON parser
-// app.use((req, res, next) => {
-//   if (req.method === 'POST' && req.get('content-length') === '0') {
-//     req.body = {};
-//   }
-//   next();
-// });
 
 app.use(express.json());
 
@@ -47,29 +46,30 @@ app.use('/api', authenticateJWT, routes);
 
 const PORT = process.env.PORT || 3000;
 
-// Kết nối DB trước khi start serverrrrr
+// Kết nối DB trước khi start server
 async function startServer() {
   try {
     // Kết nối MariaDB
     await sequelize.authenticate();
     console.log("✅ Connected to MariaDB successfully!");
     // await sequelize.sync();
-    // console.log("✅ MariaDB tables synced");
+    // console.log("MariaDB tables synced");
     // await sequelize.sync({ alter: true }); 
-    // console.log("✅ MariaDB tables updated");
-    
+    // console.log("MariaDB tables updated");
+
     // Kết nối MongoDB
     await initMongoDB();
     console.log("✅ Connected to MongoDB successfully!");
     
-    // Khởi động server sau khi kết nối cả hai database
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running at http://localhost:${PORT}`);
+    // 5. SỬ DỤNG SERVER.LISTEN() THAY VÌ APP.LISTEN()
+    server.listen(PORT, () => {
+      console.log(`Server (Express + Socket.IO) is running at port ${PORT}...`);
     });
   } catch (err) {
-    console.error("❌ Database connection error:", err);
+    console.error("Database connection error:", err);
     process.exit(1);
   }
 }
 
 startServer();
+

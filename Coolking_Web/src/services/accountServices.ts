@@ -73,6 +73,12 @@ class AccountService {
         const response = await axiosInstance.get(`/parents/${parentId}`);
         return response.data;
     }
+
+    // GET /api/staffs/:staff_id
+    async getStaffInfo(staff_id: string) {
+        const response = await axiosInstance.get(`/staffs/${staff_id}`);
+        return response.data;
+    }
 }
 
 // Export singleton instance

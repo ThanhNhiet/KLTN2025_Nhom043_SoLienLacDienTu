@@ -1,29 +1,35 @@
 import React, { useState, useEffect } from 'react';
-import type { StudentWithScore, courseSectionWithStudents } from '../../../hooks/useStudent';
 import { useAlert } from '../../../hooks/useAlert';
-import { useStaff, type Staff } from '../../../hooks/useStaff';
+
+interface StudentWarningData {
+  course_section_id: string;
+  subjectName: string;
+  student_id: string;
+  studentName: string;
+  parent_id?: string;
+  mid?: number | null;
+  final?: number | null;
+  avr?: number | null;
+  // Add other scores if needed for display
+}
 
 interface SendWarningModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  student: StudentWithScore;
-  courseSectionData: courseSectionWithStudents;
+  studentData: StudentWarningData;
 }
-
-const DEPARTMENT_PDT_QLHV = 'pdt-qlhv';
 
 const SendWarningModal: React.FC<SendWarningModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
-  student,
-  courseSectionData
+  studentData
 }) => {
-  const defaultTitle = `Yêu cầu Cảnh báo học vụ - Sinh viên ${student.student_id} - LHP: ${courseSectionData.course_section_id} - Môn: ${courseSectionData.subjectName}`;
-  const defaultContent = `Thông báo đến sinh viên ${student.name} (MSSV: ${student.student_id}) và Quý Phụ huynh.
+  const defaultTitle = `Cảnh báo học vụ - Sinh viên ${studentData.student_id} - LHP: ${studentData.course_section_id} - Môn: ${studentData.subjectName}`;
+  const defaultContent = `Thông báo đến sinh viên ${studentData.studentName} (MSSV: ${studentData.student_id}) và Quý Phụ huynh.
 
-Trong môn học ${courseSectionData.subjectName} (mã lớp học phần: ${courseSectionData.course_section_id}), thuộc lớp ${courseSectionData.className}, học kỳ ${courseSectionData.sessionName}, tôi nhận thấy rằng:
+Trong môn học ${studentData.subjectName} (mã lớp học phần: ${studentData.course_section_id}), tôi nhận thấy rằng:
 
 Kết quả học tập vừa qua của em đang ở mức dưới trung bình. Đây là kết quả rất đáng lo ngại và có ảnh hưởng lớn đến điểm tổng kết của môn học. Kết quả này cho thấy em đang bị hổng kiến thức nghiêm trọng và có nguy cơ rất cao sẽ không đạt môn học này.
 
@@ -35,8 +41,6 @@ Trân trọng.`;
 
   const [title, setTitle] = useState(defaultTitle);
   const [content, setContent] = useState(defaultContent);
-  const [selectedAdmin, setSelectedAdmin] = useState<string>('');
-  const { staffs, loading: staffsLoading, getStaffsAdminByDepartment } = useStaff(); // staffsLoading is now the correct loading state for this operation
 
   const [toast, setToast] = useState<{
     show: boolean;
@@ -47,15 +51,25 @@ Trân trọng.`;
     message: '',
     type: 'success'
   });
-  const { loading, sendAlertPersonal } = useAlert();
+  const { loading, sendAlertPersonal } = useAlert(); // This is from useAlertAD, not useAlert
 
+  // Reset state when modal opens with new data
   useEffect(() => {
-    if (isOpen) {
-      // Reset state before fetching
-      setSelectedAdmin('');
-      void getStaffsAdminByDepartment(DEPARTMENT_PDT_QLHV);
+    if (isOpen && studentData) {
+      setTitle(`Cảnh báo học vụ - Sinh viên ${studentData.student_id} - LHP: ${studentData.course_section_id} - Môn: ${studentData.subjectName}`);
+      setContent(`Thông báo đến sinh viên ${studentData.studentName} (MSSV: ${studentData.student_id}) và Quý Phụ huynh.
+
+Trong môn học ${studentData.subjectName} (mã lớp học phần: ${studentData.course_section_id}), tôi nhận thấy rằng:
+
+Kết quả học tập vừa qua của em đang ở mức dưới trung bình. Đây là kết quả rất đáng lo ngại và có ảnh hưởng lớn đến điểm tổng kết của môn học. Kết quả này cho thấy em đang bị hổng kiến thức nghiêm trọng và có nguy cơ rất cao sẽ không đạt môn học này.
+
+Đề nghị sinh viên nghiêm túc xem lại và củng cố lại toàn bộ kiến thức đã học và bài kiểm tra vừa rồi. Lên kế hoạch học tập chi tiết cho phần còn lại của học kỳ.
+
+Nhà trường và giảng viên luôn tạo điều kiện hỗ trợ, nhưng sự nỗ lực từ chính bản thân em mới là yếu tố quyết định.
+
+Trân trọng.`);
     }
-  }, [isOpen, getStaffsAdminByDepartment]);
+  }, [isOpen, studentData]);
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ show: true, message, type });
@@ -66,14 +80,15 @@ Trân trọng.`;
 
   const handleSend = async () => {
     try {
-      const receiverIDs = [selectedAdmin];
+      const receiverIDs = [studentData.student_id];
+      if (studentData.parent_id) {
+        receiverIDs.push(studentData.parent_id);
+      }
+
       const response = await sendAlertPersonal(title, content, receiverIDs);
       if (response.success) {
-        showToast('Gửi yêu cầu cảnh báo thành công!', 'success');
-        // setTimeout(() => {
-        //   onClose();
-        // }, 1500);
-        onClose();
+        showToast(`Gửi cảnh báo đến ${receiverIDs.join(', ')} thành công!`, 'success');
+        setTimeout(() => { onClose(); }, 1500);
         onSuccess();
       } else {
         showToast(response.error || 'Có lỗi xảy ra khi gửi yêu cầu', 'error');
@@ -81,6 +96,10 @@ Trân trọng.`;
     } catch (err) {
       showToast('Có lỗi xảy ra khi gửi yêu cầu', 'error');
     }
+  };
+
+  const formatScore = (score: number | null | undefined) => {
+    return score !== null && score !== undefined ? score.toFixed(1) : '-';
   };
 
   if (!isOpen) return null;
@@ -112,7 +131,7 @@ Trân trọng.`;
         <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
           {/* Header */}
           <div className="flex justify-between items-center p-6 border-b">
-            <h2 className="text-xl font-semibold text-gray-900">Gửi yêu cầu cảnh báo học vụ</h2>
+            <h2 className="text-xl font-semibold text-gray-900">Gửi cảnh báo học vụ</h2>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -130,36 +149,18 @@ Trân trọng.`;
             <div className="mb-6 p-4 bg-blue-50 rounded-lg">
               <h3 className="font-semibold text-blue-800 mb-2">Thông tin sinh viên</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                <div><span className="font-medium">Họ tên:</span> {student.name}</div>
-                <div><span className="font-medium">MSSV:</span> {student.student_id}</div>
-                <div><span className="font-medium">Ngày sinh:</span> {student.dob}</div>
-                <div><span className="font-medium">Đánh giá:</span> {student.initial_evaluate}</div>
+                <div><span className="font-medium">Họ tên:</span> {studentData.studentName}</div>
+                <div><span className="font-medium">MSSV:</span> {studentData.student_id}</div>
+                <div><span className="font-medium">Môn học:</span> {studentData.subjectName}</div>
+                <div><span className="font-medium">LHP:</span> {studentData.course_section_id}</div>
+              </div>
+              <h3 className="font-semibold text-red-800 mt-4 mb-2">Điểm số đáng chú ý</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+                <div><span className="font-medium">Điểm giữa kỳ:</span> {formatScore(studentData.mid)}</div>
+                <div><span className="font-medium">Điểm cuối kỳ:</span> {formatScore(studentData.final)}</div>
+                <div><span className="font-medium">Điểm trung bình:</span> {formatScore(studentData.avr)}</div>
               </div>
             </div>
-
-            {/* Admin Selection */}
-            <div className="mb-6">
-              <label htmlFor="admin-select" className="block text-sm font-medium text-gray-700 mb-2">
-                Gửi đến <span className="text-red-500">*</span>
-              </label>
-              <select
-                id="admin-select"
-                value={selectedAdmin}
-                onChange={(e) => setSelectedAdmin(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                disabled={loading || staffsLoading}
-              >
-                <option value="" disabled>
-                  {staffsLoading ? 'Đang tải danh sách...' : '-- Chọn quản trị viên --'}
-                </option>
-                {!staffsLoading && staffs.map((admin: Staff) => (
-                  <option key={admin.admin_id} value={admin.admin_id}>
-                    {admin.name} ({admin.admin_id})
-                  </option>
-                ))}
-              </select>
-            </div>
-
 
             {/* Title Input */}
             <div className="mb-6">
@@ -206,7 +207,7 @@ Trân trọng.`;
             </button>
             <button
               onClick={handleSend}
-              disabled={loading || !title.trim() || !content.trim() || !selectedAdmin}
+              disabled={loading || !title.trim() || !content.trim()}
               className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
             >
               {loading && (
@@ -215,7 +216,7 @@ Trân trọng.`;
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
               )}
-              {loading ? 'Đang gửi...' : 'Gửi yêu cầu'}
+              {loading ? 'Đang gửi...' : 'Gửi cảnh báo'}
             </button>
           </div>
         </div>

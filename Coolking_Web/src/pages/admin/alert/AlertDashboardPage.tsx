@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAlert, type Alert } from '../../../hooks/useAlertAD';
 import HeaderAdCpn from '../../../components/admin/HeaderAdCpn';
 import FooterAdCpn from '../../../components/admin/FooterAdCpn';
 import SendFormModal from './SendFormModal';
+import SendWarning4LeReqModal from './SendWarning4LeReqModal';
 import AlertDetailModal from './AlertDetailModal';
 import EditFormModal from './EditFormModal';
 
@@ -17,8 +19,11 @@ const AlertDashboardPage: React.FC = () => {
   const [showSuccessNotification, setShowSuccessNotification] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [showActionMenu, setShowActionMenu] = useState<string | null>(null);
+  const [showSendWarningModal, setShowSendWarningModal] = useState(false);
+  const [alertToSendWarning, setAlertToSendWarning] = useState<Alert | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingAlert, setEditingAlert] = useState<Alert | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     getAlerts(1, 10);
@@ -43,6 +48,12 @@ const AlertDashboardPage: React.FC = () => {
 
   const handleActionClick = (alertId: string) => {
     setShowActionMenu(showActionMenu === alertId ? null : alertId);
+  };
+
+  const handleSendWarningClick = (alert: Alert) => {
+    setAlertToSendWarning(alert);
+    setShowSendWarningModal(true);
+    setShowActionMenu(null);
   };
 
   const handleEditClick = (alert: Alert) => {
@@ -153,6 +164,15 @@ const AlertDashboardPage: React.FC = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                   </svg>
                   <span>Tạo thông báo hệ thống</span>
+                </button>
+                <button
+                  onClick={() => navigate('/admin/alerts/warning-students')}
+                  className="flex items-center gap-2 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg transition-colors duration-200 font-medium"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 13V6a2 2 0 00-2-2H8a2 2 0 00-2 2v7M6 13h12" />
+                  </svg>
+                  <span>Danh sách sinh viên cần cảnh cáo</span>
                 </button>
               </div>
             </div>
@@ -273,6 +293,18 @@ const AlertDashboardPage: React.FC = () => {
                                 <span className="text-red-500">🗑️</span>
                                 <span>Xóa</span>
                               </button>
+                              {alert.isWarningYet !== null && alert.isWarningYet !== false && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSendWarningClick(alert);
+                                  }}
+                                  className="w-full text-left px-4 py-2 hover:bg-yellow-50 text-sm text-gray-700 transition-colors duration-200 flex items-center gap-2"
+                                >
+                                  <span className="text-yellow-500">⚠️</span>
+                                  <span>Gửi cảnh báo học vụ</span>
+                                </button>
+                              )}
                             </div>
                           </div>
                         )}
@@ -387,6 +419,14 @@ const AlertDashboardPage: React.FC = () => {
         isOpen={showSendModal}
         onClose={() => setShowSendModal(false)}
         onSuccess={handleSendSuccess}
+      />
+
+      {/* Send Warning Modal */}
+      <SendWarning4LeReqModal
+        isOpen={showSendWarningModal}
+        onClose={() => setShowSendWarningModal(false)}
+        onSuccess={handleSendSuccess}
+        alert={alertToSendWarning}
       />
 
       {/* Alert Detail Modal */}

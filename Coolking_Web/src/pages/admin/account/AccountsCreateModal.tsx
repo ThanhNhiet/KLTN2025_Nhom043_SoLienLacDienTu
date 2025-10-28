@@ -10,7 +10,7 @@ interface AccountsCreateModalProps {
 interface CreateAccountData {
   user_id: string;
   password: string;
-  role: 'ADMIN' | 'STUDENT' | 'LECTURER' | 'PARENT';
+  role: 'STUDENT' | 'LECTURER' | 'PARENT';
   status: 'ACTIVE';
   email: string;
   phone_number: string;
@@ -56,8 +56,7 @@ const AccountsCreateModal: React.FC<AccountsCreateModalProps> = ({ isOpen, onClo
 
   // Check if user_id is required based on role
   useEffect(() => {
-    const needsUserId = formData.role !== 'ADMIN';
-    setShowUserIdWarning(needsUserId && !formData.user_id);
+    setShowUserIdWarning(!formData.user_id);
   }, [formData.role, formData.user_id]);
 
   const resetForm = () => {
@@ -91,7 +90,7 @@ const AccountsCreateModal: React.FC<AccountsCreateModalProps> = ({ isOpen, onClo
         setSearchNotFound(false);
         
         // Auto-set role based on user ID prefix
-        let role: 'ADMIN' | 'STUDENT' | 'LECTURER' | 'PARENT' = 'STUDENT';
+        let role: 'STUDENT' | 'LECTURER' | 'PARENT' = 'STUDENT';
         if (searchUserId.startsWith('SV')) role = 'STUDENT';
         else if (searchUserId.startsWith('LE')) role = 'LECTURER';
         else if (searchUserId.startsWith('PA')) role = 'PARENT';
@@ -152,7 +151,7 @@ const AccountsCreateModal: React.FC<AccountsCreateModalProps> = ({ isOpen, onClo
 
   const validateForm = () => {
     // Check required fields
-    if (formData.role !== 'ADMIN' && !formData.user_id) return false;
+    if (!formData.user_id) return false;
     
     // Validate password if provided
     if (formData.password && validatePassword(formData.password)) return false;
@@ -175,7 +174,7 @@ const AccountsCreateModal: React.FC<AccountsCreateModalProps> = ({ isOpen, onClo
     setServerError(null);
     try {
       await createAccount(formData as any);
-      onSuccess(`Đã tạo tài khoản ${formData.user_id || 'ADMIN'} thành công!`);
+      onSuccess(`Đã tạo tài khoản ${formData.user_id} thành công!`);
       onClose();
       resetForm();
     } catch (error: any) {
@@ -187,19 +186,11 @@ const AccountsCreateModal: React.FC<AccountsCreateModalProps> = ({ isOpen, onClo
     }
   };
 
-  const handleRoleChange = (role: 'ADMIN' | 'STUDENT' | 'LECTURER' | 'PARENT') => {
+  const handleRoleChange = (role: 'STUDENT' | 'LECTURER' | 'PARENT') => {
     setFormData(prev => ({
       ...prev,
-      role,
-      user_id: role === 'ADMIN' ? '' : prev.user_id
+      role
     }));
-    
-    if (role === 'ADMIN') {
-      setSearchUserId('');
-      setUserInfo(null);
-      setSearchAttempted(false);
-      setSearchNotFound(false);
-    }
   };
 
   if (!isOpen) return null;
@@ -231,7 +222,6 @@ const AccountsCreateModal: React.FC<AccountsCreateModalProps> = ({ isOpen, onClo
               onChange={(e) => handleRoleChange(e.target.value as any)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
             >
-              <option value="ADMIN">ADMIN</option>
               <option value="STUDENT">Sinh Viên</option>
               <option value="LECTURER">Giảng Viên</option>
               <option value="PARENT">Phụ Huynh</option>
@@ -242,8 +232,7 @@ const AccountsCreateModal: React.FC<AccountsCreateModalProps> = ({ isOpen, onClo
           </div>
 
           {/* User ID Search (only for non-ADMIN roles) */}
-          {formData.role !== 'ADMIN' && (
-            <div>
+          <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Tìm kiếm {formData.role}
               </label>
@@ -298,8 +287,7 @@ const AccountsCreateModal: React.FC<AccountsCreateModalProps> = ({ isOpen, onClo
                   </p>
                 </div>
               )}
-            </div>
-          )}
+          </div>
 
           {/* User ID (Read-only when found) */}
           <div>
@@ -311,7 +299,7 @@ const AccountsCreateModal: React.FC<AccountsCreateModalProps> = ({ isOpen, onClo
               value={formData.user_id}
               readOnly
               onChange={(e) => setFormData(prev => ({ ...prev, user_id: e.target.value }))}
-              placeholder={formData.role === 'ADMIN' ? 'Sẽ được tự động tạo' : 'Không nhập'}
+              placeholder="Sẽ được điền sau khi tìm kiếm"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:bg-gray-50"
             />
           </div>

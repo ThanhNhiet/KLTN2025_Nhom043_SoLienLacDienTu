@@ -3,6 +3,7 @@ import { useAccount, type Account } from '../../../hooks/useAccount';
 import HeaderAdCpn from '../../../components/admin/HeaderAdCpn';
 import FooterAdCpn from '../../../components/admin/FooterAdCpn';
 import AccountsCreateModal from './AccountsCreateModal';
+import AdminCreateModal from './AdminCreateModal';
 import AccountsEditModal from './AccountsEditModal';
 
 const AccountsDashboardPage: React.FC = () => {
@@ -14,6 +15,7 @@ const AccountsDashboardPage: React.FC = () => {
   const [showSuccessNotification, setShowSuccessNotification] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showAdminCreateModal, setShowAdminCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
 
@@ -60,6 +62,10 @@ const AccountsDashboardPage: React.FC = () => {
 
   const handleCreateAccount = () => {
     setShowCreateModal(true);
+  };
+
+  const handleAdminCreateAccount = () => {
+    setShowAdminCreateModal(true);
   };
 
   const handleModalSuccess = (message: string) => {
@@ -167,6 +173,13 @@ const AccountsDashboardPage: React.FC = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                   </svg>
                   <span>Tạo mới</span>
+                </button>
+                <button 
+                  onClick={handleAdminCreateAccount}
+                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors duration-200 font-medium"
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" /></svg>
+                  <span>Thêm quản trị viên</span>
                 </button>
               </div>
             </div>
@@ -403,6 +416,12 @@ const AccountsDashboardPage: React.FC = () => {
         onSuccess={handleModalSuccess}
       />
 
+      {/* Create Admin Account Modal */}
+      <AdminCreateModal
+        isOpen={showAdminCreateModal}
+        onClose={() => setShowAdminCreateModal(false)}
+        onSuccess={handleModalSuccess}
+      />
       {/* Edit Account Modal */}
       <AccountsEditModal
         isOpen={showEditModal}

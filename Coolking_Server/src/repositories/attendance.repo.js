@@ -250,7 +250,8 @@ const getAttendanceDetailsByCourseSectionID = async (course_section_id) => {
             facultyName: courseSectionDetail.facultyName,
             sessionName: courseSectionDetail.sessionName,
             lecturerName: courseSectionDetail.lecturerName,
-            attendances: attendances
+            attendances: attendances,
+            students: attendances?.[0]?.students || allStudents
         };
 
     } catch (error) {
@@ -317,8 +318,6 @@ const createAttendanceRecord = async (lecturer_id, course_section_id, attendance
         // Tự động tạo date_attendance theo ngày hiện tại (yyyy-MM-dd)
         const currentDate = new Date();
         const date_attendance = currentDate.toISOString().split('T')[0]; // yyyy-MM-dd format
-
-        console.log(`Creating attendance record for ${students.length} students on ${date_attendance}`);
 
         // Kiểm tra lecturer có tồn tại không
         const existingLecturer = await models.Lecturer.findOne({
@@ -479,8 +478,6 @@ const updateAttendanceRecord = async (attendance_id, attendanceData) => {
         const currentDate = new Date();
         const date_attendance = currentDate.toISOString().split('T')[0]; // yyyy-MM-dd format
 
-        console.log(`Updating attendance record for ${students.length} students on ${date_attendance}`);
-
         // Cập nhật bản ghi Attendance
         await models.Attendance.update({
             date_attendance: date_attendance,
@@ -552,8 +549,6 @@ const updateAttendanceRecord = async (attendance_id, attendanceData) => {
         );
 
         await transaction.commit();
-
-        console.log(`Successfully updated ${updatedRecords.length} attendance student records`);
 
         return {
             success: true,

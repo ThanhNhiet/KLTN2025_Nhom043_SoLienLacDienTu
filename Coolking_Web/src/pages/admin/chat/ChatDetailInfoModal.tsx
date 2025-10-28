@@ -7,6 +7,7 @@ interface Member {
   role: string;
   joinedAt: string;
   muted: boolean;
+  lastReadAt?: string;
 }
 
 interface ChatDetailInfoModalProps {
@@ -55,7 +56,7 @@ const ChatDetailInfoModal: React.FC<ChatDetailInfoModalProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const response = await chatServices.getChatById4AllUser(chat._id);
+      const response = await chatServices.getChatInfoByID4Admin(chat._id);
       
       if (response.success && response.chat) {
         setChatDetail(response.chat);

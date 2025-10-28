@@ -72,6 +72,7 @@ export interface AttendanceData {
     sessionName: string;
     lecturerName: string;
     attendances: Attendance[];
+    students?: StudentRaw[];
 }
 
 export interface Attendance {
@@ -91,7 +92,14 @@ export interface Student {
     description: string;
 }
 
-export const useAlert = () => {
+export interface StudentRaw {
+    student_id: string;
+    name: string;
+    dob: string;
+    gender: boolean;
+}
+
+export const useAttendance = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string>('');
     const [attendanceData, setAttendanceData] = useState<AttendanceData | null>(null);

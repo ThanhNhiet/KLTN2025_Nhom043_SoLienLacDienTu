@@ -155,6 +155,19 @@ export const useAccount = () => {
         }
     }, []);
 
+    const getStaff4Admin = useCallback(async (staff_id: string) => {
+        setLoading(true);
+        setError('');
+        try {
+            const data = await accountService.getStaffInfo(staff_id);
+            return data;
+        } catch (error : any) {
+            setError(error.message || 'Failed to fetch staff information');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     return {
         loading,
         error,
@@ -172,6 +185,7 @@ export const useAccount = () => {
         refreshAccounts,
         createAccount,
         updateAccount,
-        getDetailInfoByID
+        getDetailInfoByID,
+        getStaff4Admin
     };
 };

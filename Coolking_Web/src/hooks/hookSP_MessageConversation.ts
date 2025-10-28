@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useMessage, type Message } from './useMessage';
+import { useSocket } from '../contexts/SocketContext';
 import type { ChatMember } from './useChat';
 
 interface ReplyState {
@@ -37,6 +38,9 @@ export const useMessageConversation = (selectedChatId?: string, currentUserId?: 
     const messagesContainerRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // Socket
+    const { socket } = useSocket();
+
     // Hook
     const {
         loading,
@@ -73,6 +77,27 @@ export const useMessageConversation = (selectedChatId?: string, currentUserId?: 
         }
     }, [selectedChatId, clearMessages]);
 
+    // Lắng nghe sự kiện pin/unpin từ socket
+    useEffect(() => {
+        if (socket && selectedChatId) {
+            const handlePinUpdate = (data: { chat_id: string }) => {
+                if (data.chat_id === selectedChatId) {
+                    // Khi có sự kiện pin hoặc unpin từ người khác, tải lại danh sách
+                    loadPinnedMessages();
+                }
+            };
+
+            socket.on('receive_pin_message', handlePinUpdate);
+            socket.on('receive_unpin_message', handlePinUpdate);
+
+            return () => {
+                socket.off('receive_pin_message', handlePinUpdate);
+                socket.off('receive_unpin_message', handlePinUpdate);
+            };
+        }
+    }, [socket, selectedChatId]);
+
+
     // Update allMessages when new messages arrive  
     useEffect(() => {
         if (messages.length > 0) {
@@ -91,15 +116,6 @@ export const useMessageConversation = (selectedChatId?: string, currentUserId?: 
             }
         }
     }, [messages, messagesPage]);
-
-    // Auto scroll to bottom for new messages
-    useEffect(() => {
-        // Always scroll to bottom when allMessages changes and we're on page 1
-        // or when new messages are added (not from pagination)
-        if (allMessages.length > 0 && messagesPage === 1) {
-            scrollToBottom(true); // Use smooth scroll for auto updates
-        }
-    }, [allMessages, messagesPage]);
 
     // Auto load more messages when scrolling to top
     useEffect(() => {
@@ -128,6 +144,9 @@ export const useMessageConversation = (selectedChatId?: string, currentUserId?: 
         if (!selectedChatId) return;
         try {
             await getLatestMessagesInChat(selectedChatId);
+            // Đảm bảo cuộn xuống cuối sau khi tin nhắn ban đầu được tải
+            // Hàm scrollToBottom đã có setTimeout bên trong
+            scrollToBottom(false); // Sử dụng 'auto' cho lần tải ban đầu để cuộn tức thì
         } catch (error) {
             console.error('Error loading messages:', error);
         }
@@ -184,7 +203,11 @@ export const useMessageConversation = (selectedChatId?: string, currentUserId?: 
     };
 
     const scrollToBottom = (smooth: boolean = true) => {
-        messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
+        // Thêm một độ trễ nhỏ để đảm bảo DOM đã được cập nhật hoàn toàn trước khi cuộn.
+        // Điều này khắc phục vấn đề không cuộn đến tin nhắn cuối cùng khi mới tải chat.
+        setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
+        }, 100);
     };
 
     const scrollToMessage = (messageId: string) => {
@@ -192,9 +215,9 @@ export const useMessageConversation = (selectedChatId?: string, currentUserId?: 
         if (messageElement) {
             messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
             // Highlight message briefly
-            messageElement.classList.add('bg-yellow-200');
+            messageElement.classList.add('bg-yellow-50');
             setTimeout(() => {
-                messageElement.classList.remove('bg-yellow-200');
+                messageElement.classList.remove('bg-yellow-50');
             }, 2000);
         }
     };
@@ -273,10 +296,14 @@ export const useMessageConversation = (selectedChatId?: string, currentUserId?: 
     const handleSendMessage = async () => {
         if (!selectedChatId || (!messageText.trim() && selectedFiles.length === 0)) return;
 
+        let lastNewMessage: Message | null = null;
+
         try {
             const replyTo = replyState.isReplying && replyState.message ? {
                 messageID: replyState.message._id,
-                senderID: replyState.message.senderInfo?.userID || replyState.message.senderID || '',
+                // Truyền cả senderID và senderInfo để client có thể sử dụng
+                senderID: replyState.message.senderInfo?.userID || replyState.message.senderID || '', 
+                senderInfo: replyState.message.senderInfo,
                 type: replyState.message.type,
                 content: replyState.message.content
             } : undefined;
@@ -287,26 +314,26 @@ export const useMessageConversation = (selectedChatId?: string, currentUserId?: 
 
                 if (replyTo) {
                     if (imageFiles.length > 0) {
-                        await sendReplyImageMessage(selectedChatId, imageFiles, replyTo);
+                        lastNewMessage = await sendReplyImageMessage(selectedChatId, imageFiles, replyTo);
                     }
                     if (otherFiles.length > 0) {
-                        await sendReplyFileMessage(selectedChatId, otherFiles, replyTo);
+                        lastNewMessage = await sendReplyFileMessage(selectedChatId, otherFiles, replyTo);
                     }
                 } else {
                     if (imageFiles.length > 0) {
-                        await sendImageMessage(selectedChatId, imageFiles);
+                        lastNewMessage = await sendImageMessage(selectedChatId, imageFiles);
                     }
                     if (otherFiles.length > 0) {
-                        await sendFileMessage(selectedChatId, otherFiles);
+                        lastNewMessage = await sendFileMessage(selectedChatId, otherFiles);
                     }
                 }
             }
 
             if (messageText.trim()) {
                 if (replyTo) {
-                    await sendReplyTextMessage(selectedChatId, messageText, replyTo);
+                    lastNewMessage = await sendReplyTextMessage(selectedChatId, messageText, replyTo);
                 } else {
-                    await sendTextMessage(selectedChatId, messageText);
+                    lastNewMessage = await sendTextMessage(selectedChatId, messageText);
                 }
             }
 
@@ -314,53 +341,15 @@ export const useMessageConversation = (selectedChatId?: string, currentUserId?: 
             setMessageText('');
             setSelectedFiles([]);
             clearReply();
-            
+
             // Update last read message
             await updateLastReadMessage(selectedChatId);
-            
-            // Refresh messages after sending
-            await getLatestMessagesInChat(selectedChatId);
-            
-            // Scroll to bottom immediately after sending message
-            setTimeout(() => {
-                scrollToBottom(false); // Scroll without animation for immediate response
-            }, 100);
-            
-            // Then scroll smoothly after a brief delay for better UX
-            setTimeout(() => {
-                scrollToBottom(true);
-            }, 300);
-            
-            // Update lastMessage in ChatList after successful send
-            if (onLastMessageUpdate) {
-                const originalMessageText = messageText;
-                const originalSelectedFiles = [...selectedFiles];
-                
-                // Wait a bit for the message to be processed
-                setTimeout(() => {
-                    let content = originalMessageText;
-                    
-                    // Format content based on message type
-                    if (originalSelectedFiles.length > 0) {
-                        const imageFiles = originalSelectedFiles.filter(f => f.file.type.startsWith('image/'));
-                        const otherFiles = originalSelectedFiles.filter(f => !f.file.type.startsWith('image/'));
-                        
-                        if (imageFiles.length > 0) {
-                            content = imageFiles.length > 1 ? `🖼️ ${imageFiles.length} hình ảnh` : '🖼️ Hình ảnh';
-                        } else if (otherFiles.length > 0) {
-                            content = otherFiles.length > 1 ? `📁 ${otherFiles.length} files` : '📁 File';
-                        }
-                    }
-                    
-                    onLastMessageUpdate(selectedChatId, {
-                        content,
-                        createdAt: new Date().toLocaleString(),
-                        unread: false
-                    });
-                }, 500);
+
+            if (lastNewMessage && onLastMessageUpdate) {
+                onLastMessageUpdate(selectedChatId, lastNewMessage);
             }
-            
-            // Không hiển thị thông báo thành công
+
+            return lastNewMessage;
         } catch (error) {
             console.error('Error sending message:', error);
             showToast('Lỗi khi gửi tin nhắn', 'error');
@@ -396,7 +385,13 @@ export const useMessageConversation = (selectedChatId?: string, currentUserId?: 
     const handlePinMessage = async (message: Message) => {
         if (!currentUserId) return;
         try {
-            await pinMessage(message._id, currentUserId);
+            const pinnedMessage = await pinMessage(message._id, currentUserId);
+            // Fetch lại danh sách pinned messages cho client hiện tại
+            await loadPinnedMessages();
+            // Emit sự kiện cho các client khác
+            if (socket && selectedChatId && pinnedMessage) {
+                socket.emit('pin_message', { chat_id: selectedChatId, pinnedMessage });
+            }
             // Không hiển thị thông báo thành công
             closeContextMenu();
         } catch (error) {
@@ -407,8 +402,13 @@ export const useMessageConversation = (selectedChatId?: string, currentUserId?: 
 
     const handleUnpinMessage = async (messageId: string) => {
         try {
-            await unpinMessage(messageId);
-            // Không hiển thị thông báo thành công
+            const unpinnedMessage = await unpinMessage(messageId);
+            // Fetch lại danh sách pinned messages cho client hiện tại
+            await loadPinnedMessages();
+            // Emit sự kiện cho các client khác
+            if (socket && selectedChatId && unpinnedMessage) {
+                socket.emit('unpin_message', { chat_id: selectedChatId, unpinnedMessage_id: messageId });
+            }
         } catch (error) {
             console.error('Error unpinning message:', error);
             showToast('Lỗi khi gỡ ghim tin nhắn', 'error');
@@ -418,10 +418,16 @@ export const useMessageConversation = (selectedChatId?: string, currentUserId?: 
     const handleDeleteMessage = async (messageId: string) => {
         try {
             await deleteMessage(messageId);
+            // Kiểm tra pinned messages có tồn tại message này không, nếu có thì xóa và cập nhật lại
+            const isPinned = pinnedMessages.some(msg => msg._id === messageId);
+            if (isPinned) {
+                await handleUnpinMessage(messageId); // Hàm này giờ đã emit socket event
+            }
+
             // Không hiển thị thông báo thành công
             closeContextMenu();
-            // Refresh messages
-            loadInitialMessages();
+            // Không cần refresh messages ở đây.
+            // Component cha sẽ cập nhật UI ngay lập tức và emit socket event.
         } catch (error) {
             console.error('Error deleting message:', error);
             showToast('Lỗi khi thu hồi tin nhắn', 'error');
@@ -499,7 +505,9 @@ export const useMessageConversation = (selectedChatId?: string, currentUserId?: 
         scrollToMessage,
         loadMoreMessages,
         getSenderName,
+        scrollToBottom, // Expose scrollToBottom
         showToast,
+        loadPinnedMessages,
 
         // Computed
         canLoadMore: !!linkPrev,

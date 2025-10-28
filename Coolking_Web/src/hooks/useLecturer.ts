@@ -36,16 +36,11 @@ export const useLecturer = () => {
     }, []);
 
     // Cập nhật thông tin giảng viên
-    const updateLecturerInfo = useCallback(async (name: string, dob: string, gender: boolean, phone: string, email: string, address: string) => {
+    const updateLecturerInfo = useCallback(async (phone: string, email: string, address: string) => {
         try {
             setLoading(true);
             setError('');
-            const response = await lecturerService.updateLecturerInfo(name, dob, gender, phone, email, address);
-            if (response.success) {
-                await getLecturerInfo();
-                const leName_local = localStorage.getItem('lecturer_name');
-                if (leName_local) localStorage.setItem('lecturer_name', name);
-            }
+            const response = await lecturerService.updateLecturerInfo(phone, email, address);
             return response;
         } catch (error: any) {
             setError(error.message);

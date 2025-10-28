@@ -16,7 +16,9 @@ const datetimeFormatter = require("../utils/format/datetime-formatter");
  */
 const formatLastMessageContent = (message) => {
     if (!message) return '';
-
+    if (message.isDeleted === true) {
+        return '[Tin nhắn đã bị thu hồi]';
+    }
     switch (message.type) {
         case MessageType.TEXT:
         case MessageType.LINK:
@@ -39,11 +41,10 @@ const getLastMessage = async (chatID) => {
     try {
         const lastMessage = await Message.findOne({ chatID })
             .sort({ createdAt: -1 })
-            .select('senderID type content filename createdAt')
+            .select('senderID type content filename createdAt isDeleted')
             .lean();
 
         if (!lastMessage) return null;
-
         return {
             senderID: lastMessage.senderID,
             type: lastMessage.type,
@@ -1863,6 +1864,51 @@ const getChatInfoById = async (userID, chatID) => {
 };
 
 /**
+ * Lấy thông tin chat theo chatID (dành cho admin)
+ * @param {string} chatID - ID của chat
+ * @returns {Promise<Object>} - Thông tin chat đã được format
+ */
+const getChatInfoById4Admin = async (chatID) => {
+    try {
+        const chat = await Chat.findOne({ _id: chatID }).lean();
+        if (!chat) {
+            return {
+                success: false,
+                message: 'Không tìm thấy cuộc trò chuyện'
+            };
+        }
+        // Format thông tin chat
+        const formattedChat = {
+            _id: chat._id,
+            type: chat.type,
+            name: chat.name,
+            avatar: chat.avatar,
+            course_section_id: chat.course_section_id || null,
+            createdBy: chat.createdBy,
+            updatedBy: chat.updatedBy,
+            createdAt: datetimeFormatter.formatDateTimeVN(chat.createdAt),
+            updatedAt: datetimeFormatter.formatDateTimeVN(chat.updatedAt),
+            members: chat.members.map(member => ({
+                userID: member.userID,
+                userName: member.userName,
+                role: member.role || 'member',
+                avatar: member.avatar,
+                joinedAt: datetimeFormatter.formatDateTimeVN(member.joinedAt),
+                muted: member.muted,
+                lastReadAt: member.lastReadAt ? datetimeFormatter.formatDateTimeVN(member.lastReadAt) : null
+            }))
+        };
+        return {
+            success: true,
+            chat: formattedChat
+        };
+    } catch (error) {
+        console.error('Error getting chat info by ID for admin:', error);
+        throw new Error(`Failed to get chat info by ID for admin: ${error.message}`);
+    }
+};
+
+/**
  * Tìm kiếm user theo keyword tìm kiếm chính xác (dành cho admin)
  * @param {string} keyword - Từ khóa tìm kiếm (userID, email, phone)
  */
@@ -2122,6 +2168,7 @@ module.exports = {
     createBulkGroupChatsForSession,
     getNonChatCourseSectionsBySession,
     getChatInfoById,
+    getChatInfoById4Admin,
 
     searchUserByKeyword,
     searchUserByKeyword4Parent,

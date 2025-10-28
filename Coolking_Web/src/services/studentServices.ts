@@ -12,6 +12,29 @@ class StudentServices {
         const response = await axiosInstance.get(`/students/info-view-le-ad/${studentId}`);
         return response.data;
     }
+
+    // GET /api/students/warn-list?sessionId=&facultyId=&option=all&page=1&pageSize=10
+    // option: all, notWarningYet
+    async getStudentsWarningList(params: {
+        sessionId: string;
+        facultyId: string;
+        option: string;
+        page: number;
+        pageSize: number;
+    }) {
+        const response = await axiosInstance.get('/students/warn-list', { params });
+        return response.data;
+    }
+
+    // GET /api/students/warn-list/search?sessionId=&facultyId=&studentId=
+    async searchStudentWarningSubject(params: {
+        sessionId: string;
+        facultyId: string;
+        studentId: string;
+    }) {
+        const response = await axiosInstance.get('/students/warn-list/search', { params });
+        return response.data;
+    }
 };
 export const studentServices = new StudentServices();
 export default StudentServices;

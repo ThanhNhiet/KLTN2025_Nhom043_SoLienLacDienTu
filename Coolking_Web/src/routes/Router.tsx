@@ -17,6 +17,10 @@ import StudentListWithScorePage from '../pages/lecturer/studentscrore/StudentLis
 import AlertListPage from '../pages/lecturer/alert/AlertListPage';
 import StudentsAttendancePage from '../pages/lecturer/attendance/StudentsAttendancePage';
 import ChatMainPage from '../pages/chatfeature/ChatMainPage';
+import ChatMainPageAD from '../pages/chatfeature/ChatMainPageAD';
+import NotFoundPage from '../components/shared/NotFoundPage'
+import ProfileADInfoPage from '../pages/admin/profile/ProfileInfoPage';
+import WarningStudentsPage from '../pages/admin/alert/WarningStudentsPage';
 
 const Router: React.FC = () => {
   return (
@@ -28,6 +32,7 @@ const Router: React.FC = () => {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/otp-confirm" element={<OTPConfirmPage />} />
         <Route path="/change-password" element={<ChangePasswordPage />} />
+        <Route path="/not-found" element={<NotFoundPage />} />
         
         {/* Admin routes - cần bearer token và role admin */}
         <Route 
@@ -69,6 +74,30 @@ const Router: React.FC = () => {
               <StatisticsMainPage />
             </ProtectedRoute>
           } 
+        />
+        <Route 
+          path="/admin/chat" 
+          element={
+            <ProtectedRoute requiredRole="ADMIN">
+              <ChatMainPageAD />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/admin/profile" 
+          element={
+            <ProtectedRoute requiredRole="ADMIN">
+              <ProfileADInfoPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route 
+          path="/admin/alerts/warning-students" 
+          element={
+            <ProtectedRoute requiredRole="ADMIN">
+              <WarningStudentsPage />
+            </ProtectedRoute>
+          }
         />
 
         {/* Lecturer routes - cần bearer token và role lecturer */}
@@ -132,7 +161,7 @@ const Router: React.FC = () => {
         />
 
         {/* Redirect any unknown routes to login */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/not-found" replace />} />
       </Routes>
     </BrowserRouter>
   );

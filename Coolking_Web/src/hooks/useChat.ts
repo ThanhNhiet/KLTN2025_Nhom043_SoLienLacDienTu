@@ -118,8 +118,8 @@ export const useChat = () => {
             setLinkNext(data.linkNext);
             setPages(data.pages);
             return data;
-        } catch (error) {
-            setError('Failed to fetch chats');
+        } catch (error: any) {
+            setError(error.message || 'Failed to fetch chats');
         } finally {
             setLoading(false);
         }
@@ -139,8 +139,8 @@ export const useChat = () => {
             setLinkNext(data.linkNext);
             setPages(data.pages);
             return data;
-        } catch (error) {
-            setError('Failed to fetch course sections');
+        } catch (error: any) {
+            setError(error.message || 'Failed to fetch course sections');
         } finally {
             setLoading(false);
         }
@@ -160,8 +160,8 @@ export const useChat = () => {
             setLinkNext(data.linkNext);
             setPages(data.pages);
             return data;
-        } catch (error) {
-            setError('Failed to search chats');
+        } catch (error: any) {
+            setError(error.message || 'Failed to search chats');
         } finally {
             setLoading(false);
         }
@@ -181,8 +181,8 @@ export const useChat = () => {
             setLinkNext(data.linkNext);
             setPages(data.pages);
             return data;
-        } catch (error) {
-            setError('Failed to search non-chat course sections');
+        } catch (error: any) {
+            setError(error.message || 'Failed to search non-chat course sections');
         } finally {
             setLoading(false);
         }
@@ -192,10 +192,24 @@ export const useChat = () => {
     const createGroupChat = useCallback(async (course_section_id: string, nameGroup: string) => {
         try {
             setLoading(true);
+            setError('');
             const data = await chatServices.createGroupChat(course_section_id, nameGroup);
             return data;
-        } catch (error) {
-            setError('Failed to create group chat');
+        } catch (error: any) {
+            setError(error.message || 'Failed to create group chat');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    // Tạo chat riêng
+    const createPrivateChat = useCallback(async (target_id: string) => {
+        try {
+            setLoading(true);
+            const data = await chatServices.createPrivateChat(target_id);
+            return data;
+        } catch (error: any) {
+            setError(error.message || 'Failed to create private chat');
         } finally {
             setLoading(false);
         }
@@ -207,8 +221,8 @@ export const useChat = () => {
             setLoading(true);
             const data = await chatServices.AddMembers2GroupChat(chatID, name, students, lecturers);
             return data;
-        } catch (error) {
-            setError('Failed to add members to group chat');
+        } catch (error: any) {
+            setError(error.message || 'Failed to add members to group chat');
         } finally {
             setLoading(false);
         }
@@ -220,8 +234,8 @@ export const useChat = () => {
             setLoading(true);
             const data = await chatServices.deleteChat(chatID);
             return data;
-        } catch (error) {
-            setError('Failed to delete chat');
+        } catch (error: any) {
+            setError(error.message || 'Failed to delete chat');
         } finally {
             setLoading(false);
         }
@@ -233,8 +247,8 @@ export const useChat = () => {
             setLoading(true);
             const data = await chatServices.cleanupInactiveChats();
             return data;
-        } catch (error) {
-            setError('Failed to cleanup inactive chats');
+        } catch (error: any) {
+            setError(error.message || 'Failed to cleanup inactive chats');
         } finally {
             setLoading(false);
         }
@@ -247,8 +261,8 @@ export const useChat = () => {
             const data = await chatServices.getStudentInfo(studentId);
             setStudent(data || null);
             return data;
-        } catch (error) {
-            setError('Failed to get student info');
+        } catch (error: any) {
+            setError(error.message || 'Failed to get student info');
         } finally {
             setLoading(false);
         }
@@ -261,8 +275,8 @@ export const useChat = () => {
             const data = await chatServices.getLecturerInfo(lecturerId);
             setLecturer(data || null);
             return data;
-        } catch (error) {
-            setError('Failed to get lecturer info');
+        } catch (error: any) {
+            setError(error.message || 'Failed to get lecturer info');
         } finally {
             setLoading(false);
         }
@@ -274,8 +288,8 @@ export const useChat = () => {
             setLoading(true);
             const data = await chatServices.getGroupChatInfo(course_section_id);
             return data;
-        } catch (error) {
-            setError('Failed to get group chat info');
+        } catch (error: any) {
+            setError(error.message || 'Failed to get group chat info');
         } finally {
             setLoading(false);
         }
@@ -288,8 +302,8 @@ export const useChat = () => {
             setError('');
             const data = await chatServices.createGroupChatWithHomeroomLecturer(lecturer_id);
             return data;
-        } catch (error) {
-            setError('Failed to create group chat with homeroom lecturer');
+        } catch (error: any) {
+            setError(error.message || 'Failed to create group chat with homeroom lecturer');
         } finally {
             setLoading(false);
         }
@@ -302,8 +316,8 @@ export const useChat = () => {
             setError('');
             const data = await chatServices.cleanupGroupChatsOfCompletedCourseSections(session_id);
             return data;
-        } catch (error) {
-            setError('Failed to cleanup group chats of completed course sections');
+        } catch (error: any) {
+            setError(error.message || 'Failed to cleanup group chats of completed course sections');
         } finally {
             setLoading(false);
         }
@@ -371,7 +385,35 @@ export const useChat = () => {
             const data = await chatServices.muteChat4AllUser(chatID);
             return data;
         } catch (error: any) {
-            setError('Failed to mute chat for all users');
+            setError(error.message || 'Failed to mute chat for all users');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    // Tìm kiếm user để tạo chat
+    const searchUser = useCallback(async (keyword: string) => {
+        try {
+            setLoading(true);
+            setError('');
+            const data = await chatServices.searchUsersToChat(keyword);
+            return data;
+        } catch (error: any) {
+            setError(error.message || 'Failed to search user');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    // Lấy thông tin chat theo chatID cho admin
+    const getChatInfoByID4Admin = useCallback(async (chatID: string) => {
+        try {
+            setLoading(true);
+            setError('');
+            const data = await chatServices.getChatInfoByID4Admin(chatID);
+            return data;
+        } catch (error: any) {
+            setError(error.message || 'Failed to get chat info by ID for admin');
         } finally {
             setLoading(false);
         }
@@ -397,6 +439,7 @@ export const useChat = () => {
         searchChats,
         searchNonChatCourseSections,
         createGroupChat,
+        createPrivateChat,
         addMembers2GroupChat,
         deleteChat,
         cleanupInactiveChats,
@@ -408,6 +451,8 @@ export const useChat = () => {
         getChatById4AllUser,
         getChats4AllUser,
         searchChats4AllUser,
-        muteChat4AllUser
+        muteChat4AllUser,
+        searchUser,
+        getChatInfoByID4Admin
     };
 };

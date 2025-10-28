@@ -148,7 +148,10 @@ class MessageServices {
         try {
             const formData = new FormData();
             formData.append('chatID', chatID);
-            formData.append('replyTo', JSON.stringify(replyTo));
+            formData.append('replyTo[messageID]', replyTo.messageID);
+            formData.append('replyTo[senderID]', replyTo.senderID);
+            formData.append('replyTo[type]', replyTo.type);
+            formData.append('replyTo[content]', replyTo.content);
             images.forEach((file) => {
                 formData.append('files', file);
             });
@@ -169,7 +172,10 @@ class MessageServices {
         try {
             const formData = new FormData();
             formData.append('chatID', chatID);
-            formData.append('replyTo', JSON.stringify(replyTo));
+            formData.append('replyTo[messageID]', replyTo.messageID);
+            formData.append('replyTo[senderID]', replyTo.senderID);
+            formData.append('replyTo[type]', replyTo.type);
+            formData.append('replyTo[content]', replyTo.content);
             files.forEach((file) => {
                 formData.append('files', file);
             });
