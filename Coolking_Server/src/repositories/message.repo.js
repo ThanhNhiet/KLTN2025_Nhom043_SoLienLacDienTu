@@ -139,13 +139,13 @@ const createMessageImage = async ({ chatID, senderID, images }) => {
         }
 
         const links = uploadResults.map(result => result.url);
-        
+
         const newMessage = new Message({
             _id: uuidv4(),
-          
+
             chatID,
             senderID,
-            content: links.join(','), 
+            content: links.join(','),
             type: MessageType.IMAGE,
             status: MessageStatus.SENDING,
             filename: null,
@@ -314,12 +314,12 @@ const createMessageImageReply = async ({ chatID, senderID, replyTo, images }) =>
         }
 
         const links = uploadResults.map(result => result.url);
-       
+
         const newMessage = new Message({
             _id: uuidv4(),
             chatID,
             senderID,
-            content: links.join(','), 
+            content: links.join(','),
             type: MessageType.IMAGE,
             status: MessageStatus.SENDING,
             filename: null,
@@ -367,7 +367,14 @@ const createdMessagePinned = async ({ messageID, pinnedBy }) => {
             pinnedDate: new Date()
         };
         await message.save();
-        return message;
+
+        const messageObject = message.toObject();
+        if (messageObject.pinnedInfo && messageObject.pinnedInfo.pinnedDate) {
+            messageObject.pinnedInfo.pinnedDate = datetimeFormatter.formatDateTimeVN(
+                messageObject.pinnedInfo.pinnedDate
+            );
+        }
+        return messageObject;
     } catch (error) {
         console.error("Error creating pinned message:", error);
         throw error;
@@ -377,7 +384,7 @@ const createdMessagePinned = async ({ messageID, pinnedBy }) => {
 const unPinMessage = async (messageID) => {
     try {
         // const message = await Message.findOne({ chatID, messageID });
-        const message = await Message.findById({_id: messageID });
+        const message = await Message.findById({ _id: messageID });
         if (!message) {
             throw new Error("Message not found");
         }
@@ -426,7 +433,7 @@ const getMessagesByChatID = async (chatID, page, pageSize) => {
 
         // Get messages with pagination
         const messages = await Message.find({ chatID })
-            .sort({ createdAt: -1 }) 
+            .sort({ createdAt: -1 })
             .skip(skip)
             .limit(pageSize_num)
             .lean();
@@ -480,7 +487,7 @@ const getMessagesByChatID = async (chatID, page, pageSize) => {
                     pinnedInfo: {
                         messageID: msg.pinnedInfo?.messageID || null,
                         pinnedByinfo: rep,
-                        pinnedDate: msg.pinnedInfo?.pinnedDate ? 
+                        pinnedDate: msg.pinnedInfo?.pinnedDate ?
                             datetimeFormatter.formatDateTimeVN(msg.pinnedInfo?.pinnedDate) : null
                     }
                 } : null),
