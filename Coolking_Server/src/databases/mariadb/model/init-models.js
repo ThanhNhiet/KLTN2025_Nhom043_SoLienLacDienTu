@@ -127,8 +127,8 @@ function initModels(sequelize) {
   Session.hasMany(CourseSection, { as: "course_sections", foreignKey: "session_id" });
 
   // Student - Parent
-  Parent.belongsTo(Student, { as: "student", foreignKey: "student_id", targetKey: "student_id" });
-  Student.hasMany(Parent, { as: "parents", foreignKey: "student_id", sourceKey: "student_id" });
+  Student.belongsTo(Parent, { as: "parent", foreignKey: "parent_id", targetKey: "parent_id" });
+  Parent.hasMany(Student, { as: "students", foreignKey: "parent_id", sourceKey: "parent_id" });
 
   // Student - Score
   Score.belongsTo(Student, { as: "student", foreignKey: "student_id", targetKey: "student_id" });
