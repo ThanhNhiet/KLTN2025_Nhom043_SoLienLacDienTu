@@ -589,9 +589,8 @@ const pickMultipleImages = async () => {
                             ref={flatListRef}
                             data={messages}
                             renderItem={renderMessageItem}
-                            keyExtractor={item => item._id}
+                            keyExtractor={(item,index) => `${item._id}-${index}`}
                             style={styles.messageList}
-                      
                             contentContainerStyle={styles.listContentContainer}
                             onEndReached={loadMoreMessages}
                             onEndReachedThreshold={0.5}
