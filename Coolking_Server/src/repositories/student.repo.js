@@ -324,7 +324,7 @@ const getStudentInfoById4Lecturer = async (student_id) => {
         //Lấy thông tin liên lạc của phụ huynh từ bảng Parent theo student_id (sử dụng student_id string)
         const parent = await models.Parent.findOne({
             attributes: ['parent_id', 'name', 'gender', 'phone', 'email'],
-            where: { student_id: student.student_id }
+            where: { parent_id: student.parent_id }
         });
 
         let genderParent = null;
@@ -978,7 +978,7 @@ const getFailedStudentsBySessionAndFaculty = async (session_id, faculty_id, opti
                 {
                     model: models.Student,
                     as: 'student',
-                    attributes: ['student_id', 'name'],
+                    attributes: ['student_id', 'name', 'parent_id'],
                     required: true
                 },
                 {
@@ -1000,10 +1000,10 @@ const getFailedStudentsBySessionAndFaculty = async (session_id, faculty_id, opti
             const courseSection = score.course_section;
 
             // Lấy thông tin phụ huynh
-            const parent = await models.Parent.findOne({
-                where: { student_id: student.student_id },
-                attributes: ['parent_id']
-            });
+            // const parent = await models.Parent.findOne({
+            //     where: { parent_id: student.parent_id },
+            //     attributes: ['parent_id']
+            // });
 
             // Kiểm tra đã cảnh báo chưa
             const isWarningYet = await alertRepo.isWarningYet4Student(courseSection.id, student.student_id);
@@ -1022,7 +1022,7 @@ const getFailedStudentsBySessionAndFaculty = async (session_id, faculty_id, opti
                 mid: score.mid,
                 final: score.final,
                 avr: score.avr,
-                parent_id: parent ? parent.parent_id : null,
+                parent_id: student.parent_id || null,
                 isWarningYet: isWarningYet
             };
         });
@@ -1128,7 +1128,7 @@ const searchFailedStudentBySessionAndFacultyWithStudentId = async (session_id, f
             },
             attributes: { exclude: ['createdAt', 'updatedAt', 'id', 'student_id'] },
             include: [
-                { model: models.Student, as: 'student', attributes: ['student_id', 'name'], required: true },
+                { model: models.Student, as: 'student', attributes: ['student_id', 'name', 'parent_id'], required: true },
                 {
                     model: models.CourseSection,
                     as: 'course_section',
@@ -1145,9 +1145,6 @@ const searchFailedStudentBySessionAndFacultyWithStudentId = async (session_id, f
                 student: null
             };
         }
-
-        // Lấy thông tin phụ huynh
-        const parent = await models.Parent.findOne({ where: { student_id }, attributes: ['parent_id'] });
 
         // Xử lý và kiểm tra cảnh báo cho từng môn học không đạt
         const failedSubjects = await Promise.all(
@@ -1178,7 +1175,7 @@ const searchFailedStudentBySessionAndFacultyWithStudentId = async (session_id, f
         return {
             student_id: failedScores[0].student.student_id,
             studentName: failedScores[0].student.name,
-            parent_id: parent ? parent.parent_id : null,
+            parent_id: failedScores[0].student.parent_id || null,
             failedSubjects
         };
 

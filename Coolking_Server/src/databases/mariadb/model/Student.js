@@ -56,6 +56,16 @@ module.exports = function(sequelize, DataTypes) {
         key: 'id'
       }
     },
+    parent_id: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      references: {
+        model: 'parents',
+        key: 'parent_id'
+      },
+      onUpdate: 'CASCADE',
+      onDelete: 'SET NULL'
+    },
     isDeleted: {
       type: DataTypes.BOOLEAN,
       allowNull: false
@@ -93,6 +103,13 @@ module.exports = function(sequelize, DataTypes) {
         using: "BTREE",
         fields: [
           { name: "major_id" },
+        ]
+      },
+      {
+        name: "student_parent_id_fk",
+        using: "BTREE",
+        fields: [
+          { name: "parent_id" },
         ]
       },
     ]

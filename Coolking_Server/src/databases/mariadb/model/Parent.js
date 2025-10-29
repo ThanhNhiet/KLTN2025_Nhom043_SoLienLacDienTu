@@ -12,14 +12,6 @@ module.exports = function(sequelize, DataTypes) {
       allowNull: false,
       unique: "parents_ibfk_1"
     },
-    student_id: {
-      type: DataTypes.STRING(255),
-      allowNull: false,
-      references: {
-        model: 'students',
-        key: 'student_id'
-      }
-    },
     name: {
       type: DataTypes.STRING(255),
       allowNull: false
@@ -71,13 +63,6 @@ module.exports = function(sequelize, DataTypes) {
         using: "BTREE",
         fields: [
           { name: "parent_id" },
-        ]
-      },
-      {
-        name: "student_id",
-        using: "BTREE",
-        fields: [
-          { name: "student_id" },
         ]
       },
     ]
