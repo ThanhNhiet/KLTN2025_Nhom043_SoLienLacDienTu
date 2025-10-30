@@ -8,6 +8,7 @@ const cloudinaryUtils = require("../utils/cloudinary.utils");
 const { Chat, ChatType, MemberRole } = require('../databases/mongodb/schemas/Chat');
 const mongoose = require('mongoose');
 const alertRepo = require("./alert.repo");
+const { where } = require("../databases/mongodb/schemas/Alert");
 
 /**
  *  Lấy danh sách sinh viên + điểm số bằng course_section_id - dùng cho giảng viên
@@ -289,11 +290,17 @@ const updateStudentAvatar = async (student_id, file) => {
 const getStudentInfoById4Lecturer = async (student_id) => {
     try {
         const student = await models.Student.findOne({
-            attributes: {
-                exclude: ['id', 'isDeleted', 'clazz_id', 'major_id', 'createdAt', 'updatedAt']
-            },
+            attributes: { exclude: ['id', 'isDeleted', 'clazz_id', 'major_id', 'createdAt', 'updatedAt'] },
             where: { student_id, isDeleted: false },
             include: [
+                // use the actual association alias defined in your models (singular 'parent' per error)
+                {
+                    model: models.Parent,
+                    as: 'parent',
+                    attributes: ['parent_id', 'name', 'phone', 'email', 'gender', 'address', 'dob'],
+                    where: { isDeleted: false },
+                    required: false
+                },
                 {
                     model: models.Clazz,
                     as: 'clazz',
@@ -319,23 +326,29 @@ const getStudentInfoById4Lecturer = async (student_id) => {
 
         if (!student) throw new Error("Student not found");
 
-        const genderStudent = student.gender == "1" ? "Nam" : "Nữ";
+        const genderStudent = (student.gender === true || student.gender === '1' || student.gender === 1) ? "Nam" : "Nữ";
 
-        //Lấy thông tin liên lạc của phụ huynh từ bảng Parent theo student_id (sử dụng student_id string)
-        const parent = await models.Parent.findOne({
-            attributes: ['parent_id', 'name', 'gender', 'phone', 'email'],
-            where: { parent_id: student.parent_id }
+        // Normalize parent(s) to array regardless of alias ('parent' or 'parents')
+        const parentsField = student.parent || student.parents || null;
+        const parentsArr = parentsField ? (Array.isArray(parentsField) ? parentsField : [parentsField]) : [];
+
+        const parentInforList = parentsArr.map(parent => {
+            const genderParent = (parent.gender === true || parent.gender === '1' || parent.gender === 1) ? "Nam" : "Nữ";
+            return {
+                parent_id: parent.parent_id,
+                name: parent.name,
+                dob: parent.dob ? datetimeFormatter.formatDateVN(parent.dob) : null,
+                gender: genderParent,
+                phone: parent.phone,
+                email: parent.email,
+                address: parent.address
+            };
         });
-
-        let genderParent = null;
-        if (parent) {
-            genderParent = parent.gender == "1" ? "Nam" : "Nữ";
-        }
 
         return {
             student_id: student.student_id,
             name: student.name,
-            dob: datetimeFormatter.formatDateVN(student.dob),
+            dob: student.dob ? datetimeFormatter.formatDateVN(student.dob) : null,
             gender: genderStudent,
             avatar: student.avatar,
             phone: student.phone,
@@ -344,18 +357,14 @@ const getStudentInfoById4Lecturer = async (student_id) => {
             className: student.clazz ? student.clazz.name : null,
             facultyName: student.clazz && student.clazz.faculty ? student.clazz.faculty.name : null,
             majorName: student.major ? student.major.name : null,
-            parent: {
-                parent_id: parent?.parent_id || null,
-                name: parent?.name || null,
-                gender: genderParent,
-                phone: parent?.phone || null,
-                email: parent?.email || null
-            }
+            parents: parentInforList
         };
     } catch (error) {
+        console.error("Error in getStudentInfoById4Lecturer:", error);
         throw error;
     }
 };
+
 
 const getStudentByStudent_id = async (student_id) => {
     try {

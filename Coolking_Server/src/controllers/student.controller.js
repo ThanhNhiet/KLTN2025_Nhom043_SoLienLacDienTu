@@ -25,13 +25,23 @@ exports.getStudentInfoViewByLecturer = async (req, res) => {
         const authHeader = req.headers['authorization'];
         const token = authHeader && authHeader.split(' ')[1];
         const decoded = jwtUtils.verifyAccessToken(token);
-        if (!decoded || (decoded.role === 'ADMIN' && decoded.role === 'LECTURER')) {
+
+        // Allow only ADMIN or LECTURER
+        if (!decoded || (decoded.role == 'ADMIN' && decoded.role == 'LECTURER')) {
             return res.status(403).json({ message: 'Forbidden' });
         }
+
         const studentId = req.params.student_id;
+        if (!studentId) {
+            return res.status(400).json({ message: 'student_id is required' });
+        }
+
         const studentInfo = await studentRepo.getStudentInfoById4Lecturer(studentId);
+        if (!studentInfo) return res.status(404).json({ message: 'Sinh viên không tồn tại' });
+
         res.status(200).json(studentInfo);
     } catch (err) {
+        console.error('Error in getStudentInfoViewByLecturer:', err);
         res.status(500).json({ message: err.message });
     }
 };
