@@ -664,7 +664,7 @@ const deleteMessageByID = async (messageID, userID) => {
 //Lấy tất cả các tin nhắn đã được ghim trong chat
 const getPinnedMessagesInChat = async (chatID) => {
     try {
-        const messages = await Message.find({ chatID, 'pinnedInfo.messageID': { $ne: null } }).lean();
+        const messages = await Message.find({ chatID, 'pinnedInfo.messageID': { $ne: null }, isDeleted: false }).lean();
         // Format createdAt and updatedAt fields
         messages.forEach(msg => {
             msg.createdAt = datetimeFormatter.formatDateTimeVN(msg.createdAt);
