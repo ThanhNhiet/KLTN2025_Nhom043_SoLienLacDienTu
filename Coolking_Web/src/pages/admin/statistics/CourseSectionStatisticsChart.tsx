@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import CourseSectionStatisticsDetailModal from './CourseSectionStatisticsDetailModal';
+import ReactDOM from 'react-dom';
 
 interface GradeDistribution {
   excellent: number;
@@ -207,7 +208,7 @@ const CourseSectionStatisticsChart: React.FC<Props> = ({ data }) => {
       {/* Grade Distribution Overview */}
       <div className="bg-white rounded-lg shadow-sm border p-6">
         <h3 className="text-lg font-semibold text-gray-800 mb-6">Phân bố điểm số tổng quan</h3>
-        
+
         <div className="space-y-4 mb-6">
           {[
             { key: 'excellent', label: 'Xuất sắc (8.5-10)', color: 'bg-green-500', count: faculty_summary.grade_distribution.excellent },
@@ -242,7 +243,7 @@ const CourseSectionStatisticsChart: React.FC<Props> = ({ data }) => {
               Thống kê từng môn học
             </h3>
           </div>
-          
+
           {/* Search */}
           <div className="flex items-center gap-3 max-w-md">
             <input
@@ -304,9 +305,8 @@ const CourseSectionStatisticsChart: React.FC<Props> = ({ data }) => {
                   <tr
                     key={cs.course_section_id}
                     onClick={() => handleCourseSectionClick(cs)}
-                    className={`${
-                      (startIndex + index) % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                    } hover:bg-blue-50 cursor-pointer transition-colors duration-200`}
+                    className={`${(startIndex + index) % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                      } hover:bg-blue-50 cursor-pointer transition-colors duration-200`}
                   >
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
                       {cs.course_section_id.substring(0, 8)}...
@@ -332,26 +332,24 @@ const CourseSectionStatisticsChart: React.FC<Props> = ({ data }) => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          cs.student_statistics.pass_rate >= 80
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${cs.student_statistics.pass_rate >= 80
                             ? 'bg-green-100 text-green-800'
                             : cs.student_statistics.pass_rate >= 60
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}
                       >
                         {cs.student_statistics.pass_rate}%
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          cs.score_statistics.average_score >= 7
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${cs.score_statistics.average_score >= 7
                             ? 'bg-green-100 text-green-800'
                             : cs.score_statistics.average_score >= 5.5
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}
                       >
                         {cs.score_statistics.average_score.toFixed(2)}
                       </span>
@@ -379,11 +377,10 @@ const CourseSectionStatisticsChart: React.FC<Props> = ({ data }) => {
                 <button
                   key={page}
                   onClick={() => handlePageChange(page)}
-                  className={`px-3 py-1 text-sm rounded-md transition-colors duration-200 ${
-                    page === currentPage
+                  className={`px-3 py-1 text-sm rounded-md transition-colors duration-200 ${page === currentPage
                       ? 'bg-blue-600 text-white'
                       : 'bg-white border border-gray-300 hover:bg-gray-50'
-                  }`}
+                    }`}
                 >
                   {page}
                 </button>
@@ -402,14 +399,16 @@ const CourseSectionStatisticsChart: React.FC<Props> = ({ data }) => {
       </div>
 
       {/* Course Section Detail Modal */}
-      <CourseSectionStatisticsDetailModal
-        isOpen={showDetailModal}
-        onClose={() => {
-          setShowDetailModal(false);
-          setSelectedCourseSection(null);
-        }}
-        data={selectedCourseSection}
-      />
+      {ReactDOM.createPortal(
+        <CourseSectionStatisticsDetailModal
+          isOpen={showDetailModal}
+          onClose={() => {
+            setShowDetailModal(false);
+            setSelectedCourseSection(null);
+          }}
+          data={selectedCourseSection}
+        />,
+        document.body)}
     </div>
   );
 };
