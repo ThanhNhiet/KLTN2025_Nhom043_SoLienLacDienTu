@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useStatistics } from '../../../hooks/useStatistics';
 import LecturerStatisticsDetailModal from './LecturerStatisticsDetailModal';
+import ReactDOM from 'react-dom';
 
 interface LecturerData {
   lecturer_id: string;
@@ -183,7 +184,7 @@ const LecturerStatisticsChart: React.FC<Props> = ({ data, sessionId }) => {
               Thống kê từng giảng viên trong học kỳ {session_name}
             </h3>
           </div>
-          
+
           {/* Search */}
           <div className="flex items-center gap-3 max-w-md">
             <input
@@ -242,9 +243,8 @@ const LecturerStatisticsChart: React.FC<Props> = ({ data, sessionId }) => {
                   <tr
                     key={lecturer.lecturer_id}
                     onClick={() => handleLecturerClick(lecturer)}
-                    className={`${
-                      (startIndex + index) % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                    } hover:bg-blue-50 cursor-pointer transition-colors duration-200`}
+                    className={`${(startIndex + index) % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                      } hover:bg-blue-50 cursor-pointer transition-colors duration-200`}
                   >
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
                       {lecturer.lecturer_id}
@@ -263,26 +263,24 @@ const LecturerStatisticsChart: React.FC<Props> = ({ data, sessionId }) => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          lecturer.pass_rate >= 80
-                            ? 'bg-green-100 text-green-800'
-                            : lecturer.pass_rate >= 60
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${lecturer.pass_rate >= 80
+                          ? 'bg-green-100 text-green-800'
+                          : lecturer.pass_rate >= 60
                             ? 'bg-yellow-100 text-yellow-800'
                             : 'bg-red-100 text-red-800'
-                        }`}
+                          }`}
                       >
                         {lecturer.pass_rate}%
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          lecturer.attendance_rate >= 80
-                            ? 'bg-green-100 text-green-800'
-                            : lecturer.attendance_rate >= 60
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${lecturer.attendance_rate >= 80
+                          ? 'bg-green-100 text-green-800'
+                          : lecturer.attendance_rate >= 60
                             ? 'bg-yellow-100 text-yellow-800'
                             : 'bg-red-100 text-red-800'
-                        }`}
+                          }`}
                       >
                         {lecturer.attendance_rate}%
                       </span>
@@ -310,11 +308,10 @@ const LecturerStatisticsChart: React.FC<Props> = ({ data, sessionId }) => {
                 <button
                   key={page}
                   onClick={() => handlePageChange(page)}
-                  className={`px-3 py-1 text-sm rounded-md transition-colors duration-200 ${
-                    page === currentPage
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-white border border-gray-300 hover:bg-gray-50'
-                  }`}
+                  className={`px-3 py-1 text-sm rounded-md transition-colors duration-200 ${page === currentPage
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white border border-gray-300 hover:bg-gray-50'
+                    }`}
                 >
                   {page}
                 </button>
@@ -333,7 +330,7 @@ const LecturerStatisticsChart: React.FC<Props> = ({ data, sessionId }) => {
       </div>
 
       {/* Loading Modal Overlay */}
-      {loadingDetail && (
+      {loadingDetail && ReactDOM.createPortal(
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6">
             <div className="flex items-center">
@@ -344,18 +341,21 @@ const LecturerStatisticsChart: React.FC<Props> = ({ data, sessionId }) => {
               <span>Đang tải thông tin chi tiết...</span>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Lecturer Detail Modal */}
-      <LecturerStatisticsDetailModal
-        isOpen={showDetailModal}
-        onClose={() => {
-          setShowDetailModal(false);
-          setSelectedLecturerData(null);
-        }}
-        data={selectedLecturerData}
-      />
+      {ReactDOM.createPortal(
+        <LecturerStatisticsDetailModal
+          isOpen={showDetailModal}
+          onClose={() => {
+            setShowDetailModal(false);
+            setSelectedLecturerData(null);
+          }}
+          data={selectedLecturerData}
+        />,
+        document.body)}
     </div>
   );
 };

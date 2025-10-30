@@ -80,15 +80,15 @@ const AlertDashboardPage: React.FC = () => {
         // Xóa thông báo person: cần createdAt và senderID
         await deleteAlert('', alertToDelete.createdAt, alertToDelete.senderID);
       }
-      
+
       setSuccessMessage('Đã xóa thông báo thành công!');
       setShowSuccessNotification(true);
       setShowConfirmModal(false);
       setAlertToDelete(null);
-      
+
       // Refresh data
       await getAlerts(currentPage, 10);
-      
+
       // Auto hide success notification after 3 seconds
       setTimeout(() => {
         setShowSuccessNotification(false);
@@ -108,7 +108,7 @@ const AlertDashboardPage: React.FC = () => {
     setShowSuccessNotification(true);
     // Refresh data
     getAlerts(currentPage, 10);
-    
+
     // Auto hide success notification after 3 seconds
     setTimeout(() => {
       setShowSuccessNotification(false);
@@ -127,13 +127,13 @@ const AlertDashboardPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <HeaderAdCpn />
-      
+
       <main className="flex-1 max-w-7xl mx-auto px-6 py-8 w-full">
         <div className="bg-white rounded-lg shadow-sm border relative">
           {/* Header */}
           <div className="px-6 py-4 border-b border-gray-200">
             <h1 className="text-2xl font-bold text-gray-800 mb-4 text-center">Quản lý Thông Báo</h1>
-            
+
             {/* Search and Actions */}
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3 flex-1 max-w-md">
@@ -154,9 +154,9 @@ const AlertDashboardPage: React.FC = () => {
                   </svg>
                 </button>
               </div>
-              
+
               <div className="flex gap-3">
-                <button 
+                <button
                   onClick={() => setShowSendModal(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 font-medium"
                 >
@@ -169,9 +169,6 @@ const AlertDashboardPage: React.FC = () => {
                   onClick={() => navigate('/admin/alerts/warning-students')}
                   className="flex items-center gap-2 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg transition-colors duration-200 font-medium"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 13V6a2 2 0 00-2-2H8a2 2 0 00-2 2v7M6 13h12" />
-                  </svg>
                   <span>Danh sách sinh viên cần cảnh cáo</span>
                 </button>
               </div>
@@ -219,8 +216,8 @@ const AlertDashboardPage: React.FC = () => {
                   </tr>
                 ) : (
                   alerts.map((alert, index) => (
-                    <tr 
-                      key={alert._id} 
+                    <tr
+                      key={alert._id}
                       className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 cursor-pointer transition-colors duration-200 select-none`}
                       onClick={(e) => {
                         // Only trigger detail if not clicking on action buttons and no text is selected
@@ -265,13 +262,13 @@ const AlertDashboardPage: React.FC = () => {
                             <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
                           </svg>
                         </button>
-                        
+
                         {showActionMenu === alert._id && (
-                          <div className="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-[60] w-48" 
-                               style={{
-                                 top: `${(document.querySelector(`[data-alert-id="${alert._id}"]`) as HTMLElement)?.getBoundingClientRect()?.bottom + 5 || 0}px`,
-                                 right: `${window.innerWidth - (document.querySelector(`[data-alert-id="${alert._id}"]`) as HTMLElement)?.getBoundingClientRect()?.right || 0}px`
-                               }}>
+                          <div className="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-[60] w-48"
+                            style={{
+                              top: `${(document.querySelector(`[data-alert-id="${alert._id}"]`) as HTMLElement)?.getBoundingClientRect()?.bottom + 5 || 0}px`,
+                              right: `${window.innerWidth - (document.querySelector(`[data-alert-id="${alert._id}"]`) as HTMLElement)?.getBoundingClientRect()?.right || 0}px`
+                            }}>
                             <div className="py-1">
                               <button
                                 onClick={(e) => {
@@ -327,21 +324,20 @@ const AlertDashboardPage: React.FC = () => {
                 >
                   &lt;
                 </button>
-                
+
                 {pages.map((page) => (
                   <button
                     key={page}
                     onClick={() => handlePageChange(page)}
-                    className={`px-3 py-1 text-sm rounded-md transition-colors duration-200 ${
-                      page === currentPage
+                    className={`px-3 py-1 text-sm rounded-md transition-colors duration-200 ${page === currentPage
                         ? 'bg-blue-600 text-white'
                         : 'bg-white border border-gray-300 hover:bg-gray-50'
-                    }`}
+                      }`}
                   >
                     {page}
                   </button>
                 ))}
-                
+
                 <button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === pages[pages.length - 1]}
@@ -408,8 +404,8 @@ const AlertDashboardPage: React.FC = () => {
 
       {/* Click outside to close action menu */}
       {showActionMenu && (
-        <div 
-          className="fixed inset-0 z-40" 
+        <div
+          className="fixed inset-0 z-40"
           onClick={() => setShowActionMenu(null)}
         />
       )}
