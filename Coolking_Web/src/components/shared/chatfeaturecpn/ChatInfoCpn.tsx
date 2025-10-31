@@ -316,12 +316,12 @@ const ChatInfoCpn: React.FC<ChatInfoCpnProps> = ({
                                                         {member.userName}
                                                     </p>
                                                     <p className="text-xs text-gray-500">
-                                                        {member.role === 'admin'
+                                                        {member.role === 'admin' || member.role === 'lecturer'
                                                             ? 'Giảng viên'
                                                             : 'Sinh viên'}
                                                     </p>
                                                 </div>
-                                                {member.role === 'admin' && (
+                                                {member.role === 'admin' || member.role === 'lecturer' && (
                                                     <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
                                                         Giảng viên
                                                     </span>
