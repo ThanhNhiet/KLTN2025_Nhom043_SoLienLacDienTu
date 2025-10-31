@@ -10,6 +10,7 @@ const ChatType = {
 // Define MemberRole enum
 const MemberRole = {
   ADMIN: 'admin',
+  LECTURER: 'lecturer',
   MEMBER: 'member'
 };
 

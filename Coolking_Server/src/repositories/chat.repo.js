@@ -97,7 +97,7 @@ const createGroupChat4Admin = async (admin_id, nameGroup, course_section_id) => 
                     userID: lcs.lecturer.lecturer_id,
                     userName: lcs.lecturer.name,
                     avatar: lcs.lecturer?.avatar || 'https://res.cloudinary.com/dplg9r6z1/image/upload/v1758809711/privateavatar_hagxki.png',
-                    role: MemberRole.ADMIN,
+                    role: MemberRole.LECTURER,
                     joinedAt: now,
                     muted: false
                 });
@@ -187,12 +187,12 @@ const createGroupChatWithHomeroomLecturer = async (admin_id, lecturer_id) => {
         // Tạo nhóm chat với giảng viên chủ nhiệm
         const members = [];
         const now = new Date();
-        // Thêm giảng viên chủ nhiệm với role admin
+        // Thêm giảng viên chủ nhiệm với role lecturer
         members.push({
             userID: lecturer.lecturer_id,
             userName: lecturer.name,
             avatar: lecturer?.avatar || 'https://res.cloudinary.com/dplg9r6z1/image/upload/v1758809711/privateavatar_hagxki.png',
-            role: MemberRole.ADMIN,
+            role: MemberRole.LECTURER,
             joinedAt: now,
             muted: false
         });
@@ -781,13 +781,13 @@ const updateGroupChat4Admin = async (admin_id, chatID, data) => {
         const now = new Date();
         const membersToAdd = [];
 
-        // Thêm lecturers với role admin (chỉ thêm nếu chưa có)
+        // Thêm lecturers với role lecturer (chỉ thêm nếu chưa có)
         lectureDetails.forEach(lecturer => {
             if (!existingUserIDs.includes(lecturer.lecturer_id)) {
                 membersToAdd.push({
                     userID: lecturer.lecturer_id,
                     userName: lecturer.name,
-                    role: MemberRole.ADMIN,
+                    role: MemberRole.LECTURER,
                     joinedAt: now,
                     muted: false
                 });
@@ -838,7 +838,7 @@ const updateGroupChat4Admin = async (admin_id, chatID, data) => {
         if (membersToAdd.length === 0) {
             message = 'Tất cả thành viên đã có trong nhóm chat';
         } else {
-            const addedLecturers = membersToAdd.filter(m => m.role === MemberRole.ADMIN).length;
+            const addedLecturers = membersToAdd.filter(m => m.role === MemberRole.LECTURER).length;
             const addedStudents = membersToAdd.filter(m => m.role === MemberRole.MEMBER).length;
             message = `Đã thêm ${membersToAdd.length} thành viên mới vào nhóm chat`;
             if (addedLecturers > 0 && addedStudents > 0) {
