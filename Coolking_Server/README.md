@@ -9,7 +9,6 @@
 - Node.js (phiên bản 18.x trở lên)
 - NPM (thường đi kèm với Node.js) hoặc Yarn
 - MariaDB (hoặc MySQL)
-- MongoDB
 
 ## Hướng dẫn cài đặt 🚀
 
@@ -20,13 +19,13 @@ Thực hiện các bước sau để cài đặt và khởi chạy server.
 Clone repository này về máy của bạn:
 
 ```bash
-git clone https://github.com/ThanhNhiet/E-Contact-Book-CoolKing.git
+git clone https://github.com/ThanhNhiet/KLTN2025_Nhom043_SoLienLacDienTu.git
 ```
 
 Di chuyển vào thư mục của server:
 
 ```bash
-cd E-Contact-Book-CoolKing/Coolking_Server
+cd KLTN2025_Nhom043_SoLienLacDienTu/Coolking_Server
 ```
 
 ### 2. Cài đặt dependencies
@@ -60,9 +59,3 @@ npm run start
 ```
 
 Sau khi chạy thành công, server sẽ lắng nghe tại địa chỉ http://localhost:3000 (có thể thay đổi địa chỉ PORT ở file server.js)
-
-Để tạo dữ liệu mẫu, bạn có thể chạy file seeder:
-
-```bash
-node src/seeders/fake-data.js
-```
