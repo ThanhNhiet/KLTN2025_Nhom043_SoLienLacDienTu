@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import authService from '../services/authService';
 import { SOCKET_URL, SOCKET_OPTIONS } from '../configs/socketConf';
@@ -25,67 +25,50 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const [socket, setSocket] = useState<Socket | null>(null);
     const [isConnected, setIsConnected] = useState(false);
 
+    // useEffect để duy trì socket connection xuyên suốt app lifecycle
     useEffect(() => {
-        const newSocket = io(SOCKET_URL, SOCKET_OPTIONS); 
-
-        newSocket.on('connect', () => {
-            console.log('Socket connected:', newSocket.id);
-            setIsConnected(true);
-
-            // Đăng ký user với socket server sau khi kết nối
-            try {
-                const tokenData = authService.parseToken();
-                if (tokenData && tokenData.user_id) {
-                    newSocket.emit('register', tokenData.user_id);
-                }
-            } catch (err) {
-                console.error('Error parsing token for socket registration:', err);
-            }
-        });
-
-        newSocket.on('disconnect', () => {
-            console.log('Socket disconnected!');
-            setIsConnected(false);
-        });
-
-        setSocket(newSocket);
+        // Kiểm tra xem có token hợp lệ không
+        if (authService.isValidToken()) {
+            connectInternal();
+        } else {
+            console.log('useEffect: No valid token, skipping socket creation');
+        }
 
         // Cleanup khi unmount
         return () => {
-            newSocket.disconnect();
-            newSocket.close();
+            if (socket) {
+                socket.disconnect();
+                socket.close();
+            }
         };
-    }, []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Chỉ chạy 1 lần khi mount
 
-    const connect = () => {
+    const connectInternal = () => {
         // Nếu đã có socket connected, không tạo lại
         if (socket && socket.connected) {
-            console.log('🔌 Socket already connected');
             return;
         }
 
         // Disconnect socket cũ nếu có
         if (socket) {
-            console.log('🔌 Disconnecting old socket...');
             socket.disconnect();
             socket.close();
+            setSocket(null);
+            setIsConnected(false);
         }
-
-        console.log('🔌 Creating new socket connection...');
         const newSocket = io(SOCKET_URL, SOCKET_OPTIONS);
 
         newSocket.on('connect', () => {
-            console.log('🔌 Socket connected:', newSocket.id);
             setIsConnected(true);
 
             // Đăng ký user với socket server sau khi kết nối
             try {
                 const tokenData = authService.parseToken();
                 if (tokenData && tokenData.user_id) {
-                    console.log('🔌 Registering user:', tokenData.user_id);
                     newSocket.emit('register', tokenData.user_id);
                 } else {
-                    console.warn('🔌 No valid token found for registration');
+                    console.warn('No valid token found for registration');
                 }
             } catch (err) {
                 console.error('🔌 Error parsing token for socket registration:', err);
@@ -93,18 +76,30 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         });
 
         newSocket.on('disconnect', () => {
-            console.log('🔌 Socket disconnected!');
             setIsConnected(false);
         });
 
         setSocket(newSocket);
     };
 
+    const connect = () => {
+        // Kiểm tra token hợp lệ trước khi kết nối  
+        const hasToken = authService.isValidToken();
+        
+        if (!hasToken) {
+            return;
+        }
+
+        // Gọi connect internal để tạo socket
+        connectInternal();
+    };
+
     const disconnect = () => {
         if (socket) {
-            console.log('🔌 Disconnecting socket...');
             socket.disconnect();
             socket.close();
+            setSocket(null);
+            setIsConnected(false);
         }
     };
 

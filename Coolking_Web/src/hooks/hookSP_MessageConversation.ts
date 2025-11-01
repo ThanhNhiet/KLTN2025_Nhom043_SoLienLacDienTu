@@ -105,14 +105,7 @@ export const useMessageConversation = (selectedChatId?: string, currentUserId?: 
                 // First load: set messages directly
                 setAllMessages(messages);
             } else {
-                // For subsequent loads from linkPrev, we handle in loadMoreMessages directly
-                // But we still need to check if there are new messages to append
-                const existingIds = new Set(allMessages.map(msg => msg._id));
-                const newMessages = messages.filter(msg => !existingIds.has(msg._id));
-                if (newMessages.length > 0) {
-                    // Append new messages to the end (they are newer)
-                    setAllMessages(prev => [...prev, ...newMessages]);
-                }
+                console.log('Subsequent load - messages handled in loadMoreMessages');
             }
         }
     }, [messages, messagesPage]);
@@ -466,6 +459,26 @@ export const useMessageConversation = (selectedChatId?: string, currentUserId?: 
         return senderID || 'Unknown User';
     };
 
+    // Function để thêm tin nhắn real-time
+    const addRealtimeMessage = (message: Message) => {
+        setAllMessages(prev => {
+            // Kiểm tra tin nhắn đã tồn tại chưa
+            if (prev.some(msg => msg._id === message._id)) {
+                return prev;
+            }
+            return [...prev, message];
+        });
+    };
+
+    // Function để update tin nhắn (cho delete)
+    const updateRealtimeMessage = (messageId: string, updates: Partial<Message>) => {
+        setAllMessages(prev =>
+            prev.map(msg =>
+                msg._id === messageId ? { ...msg, ...updates } : msg
+            )
+        );
+    };
+
     // Get latest pinned message
     const latestPinnedMessage = pinnedMessages[0] || null;
 
@@ -512,6 +525,10 @@ export const useMessageConversation = (selectedChatId?: string, currentUserId?: 
         // Computed
         canLoadMore: !!linkPrev,
         hasSelectedFiles: selectedFiles.length > 0,
-        isAutoLoading
+        isAutoLoading,
+
+        // Real-time functions
+        addRealtimeMessage,
+        updateRealtimeMessage
     };
 };

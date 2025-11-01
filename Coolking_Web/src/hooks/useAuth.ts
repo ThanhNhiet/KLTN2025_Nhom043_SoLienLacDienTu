@@ -65,6 +65,9 @@ export const useAuth = () => {
       // Lưu tokens
       authService.saveTokens(data.access_token, data.refresh_token);
       
+      // Đảm bảo token đã được lưu trước khi kết nối socket
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // Redirect dựa trên role
       const role = getUserRole();
       if (role === 'ADMIN') {
