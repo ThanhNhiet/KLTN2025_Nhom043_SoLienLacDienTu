@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useAlert } from '../../hooks/useAlert';
+import { useMessageNotification } from '../../hooks/hookMessageNotification';
 import type { Alert } from '../../hooks/useAlert';
 import AlertDetailModal from './AlertDetailModal';
 import logoImg from '../../assets/img/logo.png';
@@ -10,6 +11,7 @@ import noImage from '../../assets/img/no-image.jpg';
 const HeaderLECpn: React.FC = () => {
     const navigate = useNavigate();
     const { logout } = useAuth();
+    const { newMessNav, markAsRead } = useMessageNotification();
     const { 
         getMyAlerts, 
         alerts, 
@@ -327,8 +329,12 @@ const HeaderLECpn: React.FC = () => {
                             </a>
                             <a
                                 href="/lecturer/chat"
-                                className="text-gray-700 hover:text-blue-600 font-medium transition-colors duration-200 px-3 py-2 rounded-md hover:bg-gray-50"
+                                onClick={markAsRead}
+                                className="text-gray-700 hover:text-blue-600 font-medium transition-colors duration-200 px-3 py-2 rounded-md hover:bg-gray-50 relative"
                             >
+                                {newMessNav && (
+                                    <span className="absolute -left-1 top-1/2 transform -translate-y-1/2 w-2 h-2 bg-red-500 rounded-full"></span>
+                                )}
                                 Nhắn tin
                             </a>
                             
@@ -530,10 +536,16 @@ const HeaderLECpn: React.FC = () => {
                                 Gửi thông báo
                             </button>
                             <button
-                                onClick={closeMobileMenu}
-                                className="block w-full text-left px-3 py-2 text-gray-700 hover:text-blue-600 hover:bg-gray-50 rounded-md font-medium"
+                                onClick={() => {
+                                    markAsRead();
+                                    handleNavigation('/lecturer/chat');
+                                }}
+                                className="block w-full text-left px-3 py-2 text-gray-700 hover:text-blue-600 hover:bg-gray-50 rounded-md font-medium relative"
                             >
-                                Nhắn tin
+                                {newMessNav && (
+                                    <span className="absolute left-0 top-1/2 transform -translate-y-1/2 w-2 h-2 bg-red-500 rounded-full"></span>
+                                )}
+                                <span className={newMessNav ? "ml-3" : ""}>Nhắn tin</span>
                             </button>
                         </div>
                     </div>
