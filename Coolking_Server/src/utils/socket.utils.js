@@ -1,4 +1,5 @@
 const { Server } = require('socket.io');
+const { getAllChatIdsForUser } = require('../repositories/chat.repo');
 
 let io;
 // Map<userId, Set<socket.id>>
@@ -40,7 +41,7 @@ const initSocket = (httpServer) => {
         });
 
         // Logic register để xử lý nhiều tab/thiết bị
-        socket.on('register', (user_id) => {
+        socket.on('register', async (user_id) => {
             // Gắn user_id vào socket để dễ truy xuất khi disconnect
             socket.user_id = user_id;
 
@@ -51,6 +52,12 @@ const initSocket = (httpServer) => {
 
             console.log(`📝 User ${user_id} registered with socket ${socket.id}`);
             console.log('Online users map:', userSockets);
+
+            const userChatIds = await getAllChatIdsForUser(user_id);
+            userChatIds.forEach(chatId => {
+                socket.join(chatId);
+                console.log(`Socket ${socket.id} tự động tham gia phòng ${chatId}`);
+            });
         });
 
         // logic unregister khi ngắt kết nối

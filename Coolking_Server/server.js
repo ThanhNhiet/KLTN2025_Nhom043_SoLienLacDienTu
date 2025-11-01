@@ -61,7 +61,6 @@ async function startServer() {
     await initMongoDB();
     console.log("✅ Connected to MongoDB successfully!");
     
-    // 5. SỬ DỤNG SERVER.LISTEN() THAY VÌ APP.LISTEN()
     server.listen(PORT, () => {
       console.log(`Server (Express + Socket.IO) is running at port ${PORT}...`);
     });
