@@ -110,7 +110,7 @@ const  getScoreStudentBySession = async (studentId) =>{
 }
 
 
-const  getScoreParentStudentBySession = async (ParentId) =>{
+const  getScoreParentStudentBySession = async (ParentId, studentID) =>{
     try {
         const query = `
       WITH ScoreData AS (
@@ -149,8 +149,8 @@ const  getScoreParentStudentBySession = async (ParentId) =>{
         INNER JOIN course_sections cs ON g.course_section_id = cs.id AND cs.isCompleted = false
         INNER JOIN subjects sub ON cs.subject_id = sub.subject_id AND sub.isDeleted = false
         INNER JOIN sessions sem ON cs.session_id = sem.id
-        INNER JOIN parents ps ON s.student_id = ps.student_id
-        WHERE ps.parent_id = :ParentId
+        INNER JOIN parents p ON s.parent_id = p.parent_id
+        WHERE p.parent_id = :ParentId AND s.student_id = :studentID
       )
       SELECT 
         student_id,
@@ -188,7 +188,7 @@ const  getScoreParentStudentBySession = async (ParentId) =>{
       ORDER BY academic_year DESC, semester ASC`;
 
     const results = await sequelize.query(query, {
-      replacements: { ParentId },
+      replacements: { ParentId, studentID },
       type: QueryTypes.SELECT
     });
 

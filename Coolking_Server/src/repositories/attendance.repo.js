@@ -740,157 +740,153 @@ const getAttendanceByStudentBySubject = async (student_id, subject_id, course_se
 /**
  * Lấy thông tin điểm danh của con em theo parent_id có phân trang
  * @param {string} parent_id - Mã phụ huynh
+ * @param {string} studentId - Mã sinh viên của con em
  * @param {number} page - Số trang
  * @param {number} pageSize - Số lượng bản ghi trên một trang
  * @returns {Object} Thông tin điểm danh của các con em có phân trang
  */
-const getAttendanceByStudentBySubjectByParent = async (parent_id, page, pageSize) => {
+const getAttendanceByStudentBySubjectByParent = async (parent_id, studentId, page, pageSize) => {
     try {
         if (!parent_id) {
             throw new Error('parent_id is required');
+        }
+
+        if (!studentId) {
+            throw new Error('studentId is required');
         }
 
         const page_num = parseInt(page) || 1;
         const pageSize_num = parseInt(pageSize) || 10;
         const offset = (page_num - 1) * pageSize_num;
 
-        // Lấy tổng số con em của phụ huynh
-        const totalChildren = await models.Parent.count({
-            where: { parent_id }
+        // Lấy thông tin sinh viên cụ thể
+        const student = await models.Student.findOne({
+            where: { 
+                student_id: studentId,
+                parent_id: parent_id,
+                isDeleted: false 
+            }
         });
 
-        // Lấy danh sách con em của phụ huynh có phân trang
-        const children = await models.Parent.findAll({
-            where: { parent_id },
+        if (!student) {
+            return {
+                success: false,
+                message: 'Không tìm thấy thông tin sinh viên của phụ huynh này'
+            };
+        }
+
+        // Lấy các lớp học phần của sinh viên
+        const courseSections = await models.StudentCourseSection.findAll({
+            where: { student_id: studentId },
             include: [
                 {
-                    model: models.Student,
-                    as: 'student',
-                    attributes: ['student_id', 'name'],
-                    where: { isDeleted: false }
+                    model: models.CourseSection,
+                    as: 'course_section',
+                    include: [
+                        {
+                            model: models.Subject,
+                            as: 'subject',
+                            attributes: ['name'],
+                            include: [
+                                {
+                                    model: models.Faculty,
+                                    as: 'faculty',
+                                    attributes: ['name']
+                                }
+                            ]
+                        },
+                        {
+                            model: models.Session,
+                            as: 'session',
+                            attributes: ['name', 'years']
+                        }
+                    ]
                 }
             ],
             offset: offset,
             limit: pageSize_num
         });
 
-        if (!children || children.length === 0) {
-            return {
-                success: false,
-                message: 'Không tìm thấy thông tin con em của phụ huynh này'
-            };
-        }
+        const totalCourses = await models.StudentCourseSection.count({
+            where: { student_id: studentId }
+        });
 
         const attendanceResults = [];
+        const courseAttendances = [];
 
-        // Lấy thông tin điểm danh cho từng con
-        for (const child of children) {
-            // Lấy các lớp học phần của học sinh
-            const courseSections = await models.StudentCourseSection.findAll({
-                where: { student_id: child.student.student_id },
-                include: [
-                    {
-                        model: models.CourseSection,
-                        as: 'course_section',
-                        include: [
-                            {
-                                model: models.Subject,
-                                as: 'subject',
-                                attributes: ['name'],
-                                include: [
-                                    {
-                                        model: models.Faculty,
-                                        as: 'faculty',
-                                        attributes: ['name']
-                                    }
-                                ]
-                            },
-                            {
-                                model: models.Session,
-                                as: 'session',
-                                attributes: ['name', 'years']
-                            }
-                        ]
-                    }
-                ]
+        for (const cs of courseSections) {
+            const attendances = await models.Attendance.findAll({
+                where: { course_section_id: cs.course_section.id },
+                attributes: ['id', 'date_attendance', 'start_lesson', 'end_lesson'],
+                order: [['date_attendance', 'ASC'], ['start_lesson', 'ASC']]
             });
 
-            const courseAttendances = [];
+            const attendanceDetails = [];
+            let stats = { total: 0, present: 0, absent: 0, late: 0 };
 
-            for (const cs of courseSections) {
-                const attendances = await models.Attendance.findAll({
-                    where: { course_section_id: cs.course_section.id },
-                    attributes: ['id', 'date_attendance', 'start_lesson', 'end_lesson'],
-                    order: [['date_attendance', 'ASC'], ['start_lesson', 'ASC']]
+            for (const attendance of attendances) {
+                const studentAttendance = await models.AttendanceStudent.findOne({
+                    where: {
+                        attendance_id: attendance.id,
+                        student_id: studentId
+                    },
+                    attributes: ['status', 'description']
                 });
 
-                const attendanceDetails = [];
-                let stats = { total: 0, present: 0, absent: 0, late: 0 };
+                stats.total++;
+                if (studentAttendance?.status === 'PRESENT') stats.present++;
+                if (studentAttendance?.status === 'ABSENT') stats.absent++;
+                if (studentAttendance?.status === 'LATE') stats.late++;
 
-                for (const attendance of attendances) {
-                    const studentAttendance = await models.AttendanceStudent.findOne({
-                        where: {
-                            attendance_id: attendance.id,
-                            student_id: child.student.student_id
-                        },
-                        attributes: ['status', 'description']
-                    });
-
-                    stats.total++;
-                    if (studentAttendance?.status === 'PRESENT') stats.present++;
-                    if (studentAttendance?.status === 'ABSENT') stats.absent++;
-                    if (studentAttendance?.status === 'LATE') stats.late++;
-
-                    attendanceDetails.push({
-                        date: datetimeFormatter.formatDateVN(attendance.date_attendance),
-                        start_lesson: attendance.start_lesson,
-                        end_lesson: attendance.end_lesson,
-                        status: studentAttendance?.status || 'ABSENT',
-                        description: studentAttendance?.description || ''
-                    });
-                }
-
-                courseAttendances.push({
-                    subject_info:{
-                        course_section_id: cs.course_section.id,
-                        subject_name: cs.course_section.subject?.name || 'N/A',
-                        faculty_name: cs.course_section.subject?.faculty?.name || 'N/A',
-                        session: `${cs.course_section.session.name} ${cs.course_section.session.years}`,
-                    },
-                    statistics: {
-                        total_sessions: stats.total,
-                        present: stats.present,
-                        absent: stats.absent,
-                        late: stats.late,
-                        attendance_rate: stats.total ? 
-                            ((stats.present + stats.late) / stats.total * 100).toFixed(1) + '%' : '0%'
-                    },
-                    attendance_details: attendanceDetails
+                attendanceDetails.push({
+                    date: datetimeFormatter.formatDateVN(attendance.date_attendance),
+                    start_lesson: attendance.start_lesson,
+                    end_lesson: attendance.end_lesson,
+                    status: studentAttendance?.status || 'ABSENT',
+                    description: studentAttendance?.description || ''
                 });
             }
 
-            attendanceResults.push({
-                student_id: child.student.student_id,
-                student_name: child.student.name,
-                course_sections: courseAttendances
+            courseAttendances.push({
+                subject_info: {
+                    course_section_id: cs.course_section.id,
+                    subject_name: cs.course_section.subject?.name || 'N/A',
+                    faculty_name: cs.course_section.subject?.faculty?.name || 'N/A',
+                    session: `${cs.course_section.session.name} ${cs.course_section.session.years}`,
+                },
+                statistics: {
+                    total_sessions: stats.total,
+                    present: stats.present,
+                    absent: stats.absent,
+                    late: stats.late,
+                    attendance_rate: stats.total ? 
+                        ((stats.present + stats.late) / stats.total * 100).toFixed(1) + '%' : '0%'
+                },
+                attendance_details: attendanceDetails
             });
         }
 
+        attendanceResults.push({
+            student_id: student.student_id,
+            student_name: student.name,
+            course_sections: courseAttendances
+        });
+
         // Tính toán thông tin phân trang
-        const totalPages = Math.ceil(totalChildren / pageSize_num);
+        const totalPages = Math.ceil(totalCourses / pageSize_num);
         const hasNext = page_num < totalPages;
         const hasPrev = page_num > 1;
 
         return {
-                pagination: {
-                    total: totalChildren,
-                    page: page_num,
-                    pageSize: pageSize_num,
-                    totalPages: totalPages,
-                    hasNext: hasNext,
-                    hasPrev: hasPrev
-                },
-                children: attendanceResults
+            pagination: {
+                total: totalCourses,
+                page: page_num,
+                pageSize: pageSize_num,
+                totalPages: totalPages,
+                hasNext: hasNext,
+                hasPrev: hasPrev
+            },
+            data: attendanceResults[0] // Return single student data
         };
 
     } catch (error) {

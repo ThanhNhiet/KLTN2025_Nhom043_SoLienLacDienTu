@@ -188,20 +188,37 @@ exports.getAttendanceByStudentByCourseIDByParent = async (req, res) => {
         const authHeader = req.headers['authorization'];
         const token = authHeader && authHeader.split(' ')[1];
         const decoded = jwtUtils.verifyAccessToken(token);
+        
         if (!decoded || decoded.role !== 'PARENT') {
             return res.status(403).json({ message: 'Forbidden' });
         }
+
         const parentId = decoded.user_id;
-        const { page , pageSize} = req.query;
-        const attendanceRecords = await attendanceRepo.getAttendanceByStudentBySubjectByParent(parentId,page, pageSize);
+        const { studentId } = req.params;
+        const { page, pagesize } = req.query;
+
+        if (!studentId) {
+            return res.status(400).json({   
+                success: false,
+                message: 'Mã sinh viên (studentId) là bắt buộc'
+            });
+        }
+
+        const attendanceRecords = await attendanceRepo.getAttendanceByStudentBySubjectByParent(
+            parentId, 
+            studentId, 
+            parseInt(page), 
+            parseInt(pagesize)
+        );
+
         return res.status(200).json(attendanceRecords);
 
     } catch (error) {
-        console.error('Error in getAttendanceByStudentBySubjectByParent:', error);
+        console.error('Error in getAttendanceByStudentByCourseIDByParent:', error);
         return res.status(500).json({
             success: false,
             message: 'Internal Server Error',
             error: error.message
         });
     }
-}
+};

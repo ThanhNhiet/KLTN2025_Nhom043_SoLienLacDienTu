@@ -34,10 +34,11 @@ exports.getParentStudentScoresBySemester = async (req, res) => {
             return res.status(403).json({ message: 'Forbidden' });
         }
         const parentId = req.params.id;
+        const studentId = req.params.studentId;
         if (decoded.role === 'PARENT' && decoded.user_id !== parentId) {
             return res.status(403).json({ message: 'You can only access your own scores' });
         }
-        const scores = await scoreRepo.getScoreParentStudentBySession(parentId);
+        const scores = await scoreRepo.getScoreParentStudentBySession(parentId, studentId);
         if (!scores) {
             return res.status(404).json({ message: 'Scores not found' });
         }

@@ -8,8 +8,8 @@ router.get('/students/:course_section_id', attendanceController.getAttendanceDet
 // GET /attendances/student/:course_section_id
 router.get('/student', attendanceController.getAttendanceByStudentByCourseID);
 
-// GET /attendances/parent
-router.get('/parent', attendanceController.getAttendanceByStudentByCourseIDByParent);
+// GET /attendances/parent/:studentId
+router.get('/parent/:studentId', attendanceController.getAttendanceByStudentByCourseIDByParent);
 
 // POST /attendances/students/:course_section_id
 router.post('/students/:course_section_id', attendanceController.createAttendanceStudents);
