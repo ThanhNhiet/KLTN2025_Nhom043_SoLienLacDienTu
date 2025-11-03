@@ -51,7 +51,6 @@ class ChatServices {
     // PUT /api/chats/group/:chatID
     // body: { name: string, "students":  ["SVxxx", "SVxxx"], "lecturers": ["KExxx", "LExxx"] }
     async AddMembers2GroupChat(chatID: string, name: string, students: string[], lecturers: string[]) {
-        console.log('Adding members to group chat with chatID:', chatID, 'name:', name, 'students:', students, 'lecturers:', lecturers);
         const response = await axiosInstance.put(`/chats/group/${chatID}`, {
             name,
             students,

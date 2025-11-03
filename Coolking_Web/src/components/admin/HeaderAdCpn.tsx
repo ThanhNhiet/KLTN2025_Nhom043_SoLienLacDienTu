@@ -1,10 +1,12 @@
 import React from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { useMessageNotification } from '../../hooks/hookMessageNotification';
 import logoImg from '../../assets/img/logo.png';
 import noImage from '../../assets/img/no-image.jpg';
 
 const HeaderAdCpn: React.FC = () => {
   const { logout } = useAuth();
+  const { newMessNav, markAsRead } = useMessageNotification();
   const admin_name = localStorage.getItem('admin_name');
   const admin_avatar_url = localStorage.getItem('admin_avatar_url');
 
@@ -54,8 +56,12 @@ const HeaderAdCpn: React.FC = () => {
               </a>
               <a
                 href="/admin/chat"
-                className="text-gray-700 hover:text-blue-600 font-medium transition-colors duration-200 px-3 py-2 rounded-md hover:bg-gray-50"
+                onClick={markAsRead}
+                className="text-gray-700 hover:text-blue-600 font-medium transition-colors duration-200 px-3 py-2 rounded-md hover:bg-gray-50 relative"
               >
+                {newMessNav && (
+                  <span className="absolute -left-1 top-1/2 transform -translate-y-1/2 w-2 h-2 bg-red-500 rounded-full"></span>
+                )}
                 Nhắn tin
               </a>
             </nav>

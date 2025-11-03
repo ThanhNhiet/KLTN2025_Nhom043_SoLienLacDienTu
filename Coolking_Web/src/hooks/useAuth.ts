@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import authService from '../services/authService';
 import lecturerService from '../services/lecturerServices';
 import staffService from '../services/staffServices';
+import { useSocket } from '../contexts/SocketContext';
 
 export interface UserInfo {
   id: string;
@@ -18,6 +19,7 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const navigate = useNavigate();
+  const { connect, disconnect } = useSocket();
 
   // Kiểm tra trạng thái authentication
   const isAuthenticated = useCallback((): boolean => {
@@ -63,17 +65,22 @@ export const useAuth = () => {
       // Lưu tokens
       authService.saveTokens(data.access_token, data.refresh_token);
       
+      // Đảm bảo token đã được lưu trước khi kết nối socket
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // Redirect dựa trên role
       const role = getUserRole();
       if (role === 'ADMIN') {
         const adminInfo = await staffService.getStaffInfo();
         localStorage.setItem('admin_name', adminInfo.name || '');
         localStorage.setItem('admin_avatar_url', adminInfo.avatar || '');
+        connect();
         navigate('/admin/accounts');
       } else if (role === 'LECTURER') {
         const lecturerInfo = await lecturerService.getLecturerInfo();
         localStorage.setItem('lecturer_name', lecturerInfo.name || '');
         localStorage.setItem('lecturer_avatar_url', lecturerInfo.avatar || '');
+        connect();
         navigate('/lecturer/schedule');
       } else {
         const errorMessage = 'Phiên bản web hiện tại chỉ hỗ trợ Admin và Giảng viên. Vui lòng sử dụng ứng dụng di động để đăng nhập với tài khoản Sinh viên hoặc Phụ huynh.';
@@ -89,7 +96,7 @@ export const useAuth = () => {
     } finally {
       setLoading(false);
     }
-  }, [navigate, getUserRole]);
+  }, [navigate, getUserRole, connect]);
 
   // Đăng xuất
   const logout = useCallback(async () => {
@@ -99,7 +106,7 @@ export const useAuth = () => {
       
       // Gọi API logout
       const data = await authService.logout();
-      
+      disconnect();
       // Xóa tokens
       authService.clearTokens();
       

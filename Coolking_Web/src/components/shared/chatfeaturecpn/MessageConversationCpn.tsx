@@ -67,18 +67,13 @@ const MessageConversationCpn: React.FC<MessageConversationCpnProps> = ({
         hasSelectedFiles, // Thêm getSenderName
         isAutoLoading,
         getSenderName,
-        loadPinnedMessages
+        loadPinnedMessages,
+        addRealtimeMessage,
+        updateRealtimeMessage
     } = useMessageConversation(selectedChatId, current_user_id, onLastMessageUpdate); // socket is now used inside the hook
 
-    // Khởi tạo state cho tin nhắn để quản lý real time
-    const [localMessages, setLocalMessages] = useState<Message[]>([]);
-
-    // Đồng bộ allMessages từ hook vào localMessages khi chat thay đổi
-    useEffect(() => {
-        if (Array.isArray(allMessages)) {
-            setLocalMessages(allMessages);
-        }
-    }, [allMessages]);
+    // Sử dụng trực tiếp allMessages từ hook thay vì localMessages
+    // Điều này sẽ tránh được vấn đề sync phức tạp
 
     // Tham gia phòng chat và lắng nghe socket events
     useEffect(() => {
@@ -95,13 +90,10 @@ const MessageConversationCpn: React.FC<MessageConversationCpnProps> = ({
                 }
 
                 if (chat_id === selectedChatId) {
-                    // Chỉ thêm tin nhắn nếu nó chưa tồn tại (tránh trùng lặp cho người gửi)
-                    setLocalMessages(prev => {
-                        if (prev.some(msg => msg._id === newMessage._id)) {
-                            return prev;
-                        }
-                        return [...prev, newMessage];
-                    });
+                    // Chỉ thêm tin nhắn từ người khác (tin nhắn của mình đã được thêm optimistically)
+                    if ((newMessage.senderInfo?.userID || newMessage.senderID) !== current_user_id) {
+                        addRealtimeMessage(newMessage);
+                    }
 
                     // Chỉ cuộn xuống nếu người dùng đang ở cuối cuộc trò chuyện
                     const container = messagesContainerRef.current;
@@ -119,13 +111,10 @@ const MessageConversationCpn: React.FC<MessageConversationCpnProps> = ({
             //Nhận sự kiện xóa tin nhắn
             const handleRenderMessage = ({ chat_id, message_id }: { chat_id: string, message_id: string }) => {
                 if (chat_id === selectedChatId) {
-                    setLocalMessages(prev =>
-                        prev.map(msg =>
-                            msg._id === message_id
-                                ? { ...msg, isDeleted: true, content: "[Tin nhắn đã bị thu hồi]" }
-                                : msg
-                        )
-                    );
+                    updateRealtimeMessage(message_id, { 
+                        isDeleted: true, 
+                        content: "[Tin nhắn đã bị thu hồi]" 
+                    });
                 }
             };
 
@@ -239,12 +228,11 @@ const MessageConversationCpn: React.FC<MessageConversationCpnProps> = ({
                     }
                 }
 
-                // 4. Cập nhật UI ngay lập tức cho người gửi
-                setLocalMessages(prev => [...prev, messageToEmit]);
+                // 4. Thêm tin nhắn vào UI ngay lập tức (optimistic update)
+                addRealtimeMessage(messageToEmit);
 
                 // 5. Emit tin nhắn đã có senderInfo qua socket
                 socket.emit('send_message', { chat_id: selectedChatId, newMessage: messageToEmit });
-                console.log('Emitted new message via socket:', messageToEmit);
 
                 // 6. Cuộn xuống tin nhắn vừa gửi (smooth scroll)
                 scrollToBottom(true);
@@ -263,14 +251,11 @@ const MessageConversationCpn: React.FC<MessageConversationCpnProps> = ({
             // Gọi API xóa (bên trong hook)
             await hookHandleDeleteMessage(messageId);
             
-            // Cập nhật local state ngay lập tức
-             setLocalMessages(prev =>
-                prev.map(msg =>
-                    msg._id === messageId
-                        ? { ...msg, isDeleted: true, content: "[Tin nhắn đã bị thu hồi]" }
-                        : msg
-                )
-            );
+            // Cập nhật UI ngay lập tức
+            updateRealtimeMessage(messageId, { 
+                isDeleted: true, 
+                content: "[Tin nhắn đã bị thu hồi]" 
+            });
 
             // Emit sự kiện xóa
             socket.emit('del_message', { chat_id: selectedChatId, message_id: messageId });
@@ -389,7 +374,7 @@ const MessageConversationCpn: React.FC<MessageConversationCpnProps> = ({
     const renderReplyReference = (replyTo: any) => {
         let replyContent = replyTo.content;
         // const originalMessage = allMessages.find(msg => msg._id === replyTo.messageID);
-        const originalMessage = localMessages.find(msg => msg._id === replyTo.messageID);
+        const originalMessage = allMessages.find(msg => msg._id === replyTo.messageID);
         if (originalMessage?.isDeleted) {
             replyContent = 'Tin nhắn đã bị thu hồi';
         } else {
@@ -607,8 +592,7 @@ const MessageConversationCpn: React.FC<MessageConversationCpnProps> = ({
                         </div>
                     )}
 
-                    {/* {allMessages.map((message) => renderMessage(message))} */}
-                    {localMessages.map((message) => renderMessage(message))}
+                    {allMessages.map((message) => renderMessage(message))}
                     <div ref={messagesEndRef} />
                 </div>
 

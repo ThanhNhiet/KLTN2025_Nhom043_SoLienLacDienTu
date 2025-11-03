@@ -270,7 +270,7 @@ const ChatDetailInfoModal: React.FC<ChatDetailInfoModalProps> = ({
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap">
                                 <span className={getRoleBadge(member.role)}>
-                                  {member.role === 'admin' ? 'Quản trị' : 'Thành viên'}
+                                  {member.role === 'admin' ? 'Quản trị' : member.role === 'lecturer' ? 'Giảng viên' : 'Thành viên'}
                                 </span>
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">

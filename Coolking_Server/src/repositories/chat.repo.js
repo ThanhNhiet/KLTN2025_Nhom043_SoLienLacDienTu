@@ -97,7 +97,7 @@ const createGroupChat4Admin = async (admin_id, nameGroup, course_section_id) => 
                     userID: lcs.lecturer.lecturer_id,
                     userName: lcs.lecturer.name,
                     avatar: lcs.lecturer?.avatar || 'https://res.cloudinary.com/dplg9r6z1/image/upload/v1758809711/privateavatar_hagxki.png',
-                    role: MemberRole.ADMIN,
+                    role: MemberRole.LECTURER,
                     joinedAt: now,
                     muted: false
                 });
@@ -187,12 +187,12 @@ const createGroupChatWithHomeroomLecturer = async (admin_id, lecturer_id) => {
         // Tạo nhóm chat với giảng viên chủ nhiệm
         const members = [];
         const now = new Date();
-        // Thêm giảng viên chủ nhiệm với role admin
+        // Thêm giảng viên chủ nhiệm với role lecturer
         members.push({
             userID: lecturer.lecturer_id,
             userName: lecturer.name,
             avatar: lecturer?.avatar || 'https://res.cloudinary.com/dplg9r6z1/image/upload/v1758809711/privateavatar_hagxki.png',
-            role: MemberRole.ADMIN,
+            role: MemberRole.LECTURER,
             joinedAt: now,
             muted: false
         });
@@ -416,7 +416,6 @@ const getUserChats = async (userID, roleAccount, page = 1, pageSize = 10) => {
     try {
         const page_num = Math.max(1, parseInt(page) || 1);
         const pageSize_num = Math.max(1, parseInt(pageSize) || 10);
-        const skip = (page_num - 1) * pageSize_num;
 
         let chatFilter = {
             "members.userID": userID
@@ -454,19 +453,12 @@ const getUserChats = async (userID, roleAccount, page = 1, pageSize = 10) => {
             };
         }
 
-        // Đếm tổng số chat
-        const total = await Chat.countDocuments(chatFilter);
-        const totalPages = Math.ceil(total / pageSize_num);
-
-        // Lấy dữ liệu với phân trang
-        const chats = await Chat.find(chatFilter)
-            .sort({ updatedAt: -1 }) // Sắp xếp theo thời gian cập nhật gần nhất
-            .skip(skip)
-            .limit(pageSize_num)
+        // Lấy tất cả chats trước (không phân trang)
+        const allChats = await Chat.find(chatFilter)
             .lean(); // Sử dụng lean() để tăng performance
 
-        // Xử lý dữ liệu trả về
-        const processedChats = await Promise.all(chats.map(async (chat) => {
+        // Xử lý dữ liệu và lấy tin nhắn cuối cùng cho tất cả chats
+        const processedChats = await Promise.all(allChats.map(async (chat) => {
             const result = {
                 _id: chat._id,
                 type: chat.type,
@@ -497,6 +489,9 @@ const getUserChats = async (userID, roleAccount, page = 1, pageSize = 10) => {
                 }
             }
 
+            // Lưu thời gian tin nhắn cuối cùng để sort (trước khi format)
+            result.lastMessageTime = result.lastMessage ? new Date(result.lastMessage.createdAt) : new Date(0);
+
             if (result.lastMessage) {
                 result.lastMessage.createdAt = result.lastMessage.createdAt
                     ? datetimeFormatter.formatDateTimeVN(result.lastMessage.createdAt)
@@ -506,12 +501,24 @@ const getUserChats = async (userID, roleAccount, page = 1, pageSize = 10) => {
             return result;
         }));
 
+        // Sort theo thời gian tin nhắn cuối cùng (mới nhất trước)
+        processedChats.sort((a, b) => b.lastMessageTime - a.lastMessageTime);
+
+        // Xóa field lastMessageTime khỏi response (không cần thiết cho client)
+        processedChats.forEach(chat => delete chat.lastMessageTime);
+
+        // Tính toán phân trang sau khi sort
+        const total = processedChats.length;
+        const totalPages = Math.ceil(total / pageSize_num);
+        const skip = (page_num - 1) * pageSize_num;
+        const paginatedChats = processedChats.slice(skip, skip + pageSize_num);
+
         return {
             total: total,
             page: page_num,
             pageSize: pageSize_num,
             totalPages,
-            chats: processedChats,
+            chats: paginatedChats,
             linkPrev: page_num > 1 ? `/chats?page=${page_num - 1}&pageSize=${pageSize_num}` : null,
             linkNext: page_num < totalPages ? `/chats?page=${page_num + 1}&pageSize=${pageSize_num}` : null,
             pages: Array.from({ length: Math.min(3, totalPages - page_num + 1) }, (_, i) => page_num + i)
@@ -520,6 +527,21 @@ const getUserChats = async (userID, roleAccount, page = 1, pageSize = 10) => {
     } catch (error) {
         console.error('Error getting user chats:', error);
         throw new Error(`Failed to get user chats: ${error.message}`);
+    }
+};
+
+/**
+ * Lấy tất cả chatID của user, dùng để join socket rooms khi đăng nhập
+ * @param {string} userID - ID của user
+ * @returns {Promise<Array>} - Mảng chatID
+ */
+const getAllChatIdsForUser = async (userID) => {
+    try {
+        const chats = await Chat.find({ 'members.userID': userID }).select('_id').lean();
+        return chats.map(chat => chat._id.toString());
+    } catch (error) {
+        console.error('Error getting chat IDs for user:', error);
+        throw new Error(`Failed to get chat IDs for user: ${error.message}`);
     }
 };
 
@@ -781,13 +803,13 @@ const updateGroupChat4Admin = async (admin_id, chatID, data) => {
         const now = new Date();
         const membersToAdd = [];
 
-        // Thêm lecturers với role admin (chỉ thêm nếu chưa có)
+        // Thêm lecturers với role lecturer (chỉ thêm nếu chưa có)
         lectureDetails.forEach(lecturer => {
             if (!existingUserIDs.includes(lecturer.lecturer_id)) {
                 membersToAdd.push({
                     userID: lecturer.lecturer_id,
                     userName: lecturer.name,
-                    role: MemberRole.ADMIN,
+                    role: MemberRole.LECTURER,
                     joinedAt: now,
                     muted: false
                 });
@@ -838,7 +860,7 @@ const updateGroupChat4Admin = async (admin_id, chatID, data) => {
         if (membersToAdd.length === 0) {
             message = 'Tất cả thành viên đã có trong nhóm chat';
         } else {
-            const addedLecturers = membersToAdd.filter(m => m.role === MemberRole.ADMIN).length;
+            const addedLecturers = membersToAdd.filter(m => m.role === MemberRole.LECTURER).length;
             const addedStudents = membersToAdd.filter(m => m.role === MemberRole.MEMBER).length;
             message = `Đã thêm ${membersToAdd.length} thành viên mới vào nhóm chat`;
             if (addedLecturers > 0 && addedStudents > 0) {
@@ -2173,5 +2195,7 @@ module.exports = {
     searchUserByKeyword,
     searchUserByKeyword4Parent,
     searchUserByKeyword4Student,
-    searchUserByKeyword4Lecturer
+    searchUserByKeyword4Lecturer,
+
+    getAllChatIdsForUser //not served api
 };

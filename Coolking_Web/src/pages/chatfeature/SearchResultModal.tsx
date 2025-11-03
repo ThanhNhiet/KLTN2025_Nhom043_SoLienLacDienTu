@@ -166,7 +166,7 @@ const SearchResultModal: React.FC<SearchResultModalProps> = ({
                                                         </span>
                                                         <div className="flex items-center space-x-1 text-xs text-gray-500">
                                                             <span>Người gửi: {getSenderName(message.senderID)}</span>
-                                                            {getSenderInfo(message.senderID)?.role === 'admin' && (
+                                                            {getSenderInfo(message.senderID)?.role === 'admin' || getSenderInfo(message.senderID)?.role === 'lecturer' && (
                                                                 <span className="text-xs bg-yellow-100 text-yellow-800 px-1 py-0.5 rounded">
                                                                     Giảng viên
                                                                 </span>
