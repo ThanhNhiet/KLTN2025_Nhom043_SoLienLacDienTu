@@ -14,19 +14,11 @@ import BottomNavigation from "@/src/components/navigations/BottomNavigations";
 import TopNavigations_Attendance from "@/src/components/navigations/TopNavigations_Attendance";
 import { useAttendance_Parent } from "@/src/services/useapi/attendance/UseAttendance_Parent";
 
-interface ApiResponse { 
-    children: ChildData[]; 
-}
-interface ChildData { 
-    student_id: string; 
-    student_name: string; 
-    course_sections: CourseSection[]; 
-}
+
 interface CourseSection { 
     subject_info: SubjectInfo; 
     statistics: Statistics; 
-    attendance_details: 
-    AttendanceDetail[]; 
+    attendance_details: AttendanceDetail[]; 
 }
 interface SubjectInfo { 
     course_section_id: string; 
@@ -39,10 +31,13 @@ interface Statistics {
     attendance_rate: 
     string; late: number; 
     present: number; 
-    total_sessions: number; }
+    total_sessions: number; 
+}
+
 interface AttendanceDetail { 
-    date: string; description: 
-    string; end_lesson: number; 
+    date: string; 
+    description: string; 
+    end_lesson: number; 
     start_lesson: number; 
     status: string; 
 }
@@ -77,11 +72,12 @@ const CourseSectionCard = ({ item }: { item: CourseSection }) => {
 // --- Màn hình chính ---
 export default function AttendanceScreen_Parent() {
     const navigation = useNavigation<any>();
-    const { attendanceDetails, loading, error, page, setPage, totalPages } = useAttendance_Parent();
+    const [studentId, setStudentId] = useState<string | null>(null);
+    const { attendanceDetails, loading, error, page, setPage, totalPages, fetchAttendanceDetails, pageSize } = useAttendance_Parent(studentId);
 
-    const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
-    
-    // ... Toàn bộ logic không thay đổi ...
+    const handleFetchAttendance = (id: string) => {
+        fetchAttendanceDetails(id, page, pageSize);
+    }
     const handlePageChange = (newPage: number) => {
         if (totalPages !== null && newPage >= 1 && newPage <= totalPages) {
             setPage(newPage);
@@ -96,24 +92,25 @@ export default function AttendanceScreen_Parent() {
 
 
     // xu ly du lieu
-    const children = useMemo(() => attendanceDetails?.children || [], [attendanceDetails]);
-    const selectedStudentData = useMemo(() => {
-        if (children.length === 0) return null;
-        const studentIdToFind = selectedStudentId || children[0]?.student_id;
-        if (!studentIdToFind) return null;
-        return children.find(child => child.student_id === studentIdToFind);
-    }, [children, selectedStudentId]);
-
     const sections = useMemo(() => {
-        if (!selectedStudentData) return [];
-        const grouped = selectedStudentData.course_sections.reduce((acc, course) => {
+        console.log("Processing sections with data:", attendanceDetails?.data);
+        if (!attendanceDetails?.data?.course_sections) {
+            console.log("No course sections found");
+            return [];
+        }
+        
+        const grouped = attendanceDetails.data.course_sections.reduce((acc, course) => {
             const session = course.subject_info.session;
             if (!acc[session]) acc[session] = [];
             acc[session].push(course);
             return acc;
         }, {} as Record<string, CourseSection[]>);
-        return Object.keys(grouped).map(session => ({ title: session, data: grouped[session] }));
-    }, [selectedStudentData]);
+        
+        return Object.keys(grouped).map(session => ({ 
+            title: session, 
+            data: grouped[session] 
+        }));
+    }, [attendanceDetails?.data]);
 
     if (loading) {
         return (
@@ -123,19 +120,19 @@ export default function AttendanceScreen_Parent() {
             </View>
         );
     }
-    if (error || children.length === 0) {
-        return (
-            <SafeAreaProvider>
-                <SafeAreaView style={styles.safeArea}>
-                    <TopNavigations_Attendance />
-                    <View style={styles.centeredContainer}>
-                        <Text style={styles.infoText}>Không thể tải dữ liệu.</Text>
-                    </View>
-                    <View style={styles.bottomWrapper}><BottomNavigation navigation={navigation} /></View>
-                </SafeAreaView>
-            </SafeAreaProvider>
-        );
-    }
+    // if (error || children.length === 0) {
+    //     return (
+    //         <SafeAreaProvider>
+    //             <SafeAreaView style={styles.safeArea}>
+    //                 <TopNavigations_Attendance />
+    //                 <View style={styles.centeredContainer}>
+    //                     <Text style={styles.infoText}>Không thể tải dữ liệu.</Text>
+    //                 </View>
+    //                 <View style={styles.bottomWrapper}><BottomNavigation navigation={navigation} /></View>
+    //             </SafeAreaView>
+    //         </SafeAreaProvider>
+    //     );
+    // }
 
     const renderPagination = () => {
         if (!totalPages || totalPages < 1) return null;
@@ -162,46 +159,44 @@ export default function AttendanceScreen_Parent() {
         <SafeAreaProvider>
             <SafeAreaView style={styles.safeArea}>
                 <StatusBar barStyle="dark-content" backgroundColor="#f0f0f0" />
-                <TopNavigations_Attendance />
-                
-                {children.length > 1 && (
-                    <View style={styles.studentSelector}>
-                        {children.map((child: ChildData) => (
-                            <TouchableOpacity
-                                key={child.student_id}
-                                style={[(selectedStudentId || children[0].student_id) === child.student_id ? styles.activeTab : styles.studentTab]}
-                                onPress={() => setSelectedStudentId(child.student_id)}
-                            >
-                                <Text style={[(selectedStudentId || children[0].student_id) === child.student_id ? styles.activeTabText : styles.studentTabText]}>
-                                    {child.student_name}
+                <TopNavigations_Attendance 
+                    setStudentId={setStudentId} 
+                    handleFetchAttendance={handleFetchAttendance}
+                />
+                {studentId ? (
+                    <>
+                        {/* Change condition to check for course sections */}
+                        {attendanceDetails?.data?.course_sections ? (
+                            <SectionList
+                                sections={sections}
+                                keyExtractor={(item) => item.subject_info.course_section_id}
+                                renderItem={({ item }) => <CourseSectionCard item={item} />}
+                                renderSectionHeader={({ section: { title } }) => (
+                                    <Text style={styles.sectionHeader}>{title}</Text>
+                                )}
+                                contentContainerStyle={styles.listContainer}
+                                ListHeaderComponent={
+                                    <Text style={styles.studentNameHeader}>
+                                        Bảng chuyên cần của: {attendanceDetails.data.student_name}
+                                    </Text>
+                                }
+                                ListFooterComponent={renderPagination}
+                            />
+                        ) : (
+                            <View style={styles.centeredContainer}>
+                                <Text style={styles.infoText}>
+                                    {loading ? "Đang tải dữ liệu..." : "Không có dữ liệu chuyên cần."}
                                 </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                )}
-
-                {selectedStudentData ? (
-                    <SectionList
-                        sections={sections}
-                        keyExtractor={(item) => item.subject_info.course_section_id}
-                        renderItem={({ item }) => <CourseSectionCard item={item} />}
-                        renderSectionHeader={({ section: { title } }) => (
-                            <Text style={styles.sectionHeader}>{title}</Text>
+                            </View>
                         )}
-                        contentContainerStyle={styles.listContainer}
-                        ListHeaderComponent={
-                            <Text style={styles.studentNameHeader}>
-                                Bảng chuyên cần của: {selectedStudentData.student_name}
-                            </Text>
-                        }
-                        ListFooterComponent={renderPagination}
-                    />
-                ) : (
+                    </>) : (
                     <View style={styles.centeredContainer}>
-                        <Text style={styles.infoText}>Không có dữ liệu chuyên cần.</Text>
+                        {/* Nếu là phụ huynh mà không có học sinh nào */}
+                        <Text style={styles.infoText}>
+                            Vui lòng chọn học sinh để xem điểm danh.
+                        </Text>
                     </View>
                 )}
-
                 <View style={styles.bottomWrapper}>
                     <BottomNavigation navigation={navigation} />
                 </View>

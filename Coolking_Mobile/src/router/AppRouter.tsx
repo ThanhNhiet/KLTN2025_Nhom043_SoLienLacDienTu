@@ -23,6 +23,7 @@ import AttendanceScreen_Parent from "@/src/screens/attendance/AttendanceScreen_P
 
 //import page calendar
 import CalendarScreen from "@/src/screens/calendar/CalendarScreen";
+import CalendarScreen_Parent from "@/src/screens/calendar/CalendarScreen_Parent";
 
 //import page profile
 import ProfileScreen from "@/src/screens/profile/ProfileSceen";
@@ -37,6 +38,7 @@ import FullImageScreen from "../screens/chat/FullImageScreen";
 
 // import score 
 import ScoreScreen from "../screens/score/ScoreScreen";
+import ScoreScreen_Parent from "../screens/score/ScoreScreen_Parent";
 
 const Stack = createNativeStackNavigator();
 
@@ -114,6 +116,13 @@ export default function AppRouter() {
                     headerShown: false,
                 }}
             />
+            <Stack.Screen
+                name="CalendarScreen_Parent"
+                component={CalendarScreen_Parent}
+                options={{
+                    headerShown: false,
+                }}
+            />
             {/*Profile Screen*/}
             <Stack.Screen
                 name="ProfileScreen"
@@ -170,6 +179,13 @@ export default function AppRouter() {
             <Stack.Screen
                 name="ScoreScreen"
                 component={ScoreScreen}
+                options={{
+                    headerShown: false,
+                }}
+            />
+            <Stack.Screen
+                name="ScoreScreen_Parent"
+                component={ScoreScreen_Parent}
                 options={{
                     headerShown: false,
                 }}

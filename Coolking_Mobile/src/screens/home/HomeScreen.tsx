@@ -43,25 +43,51 @@ const features = [
 
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
-  const { profileNavigation } = useProfile();
+  const { profileNavigation, role } = useProfile();
   const { loading, getSchedulesByDate } = useCalendar();
+  const isParent = role === "PARENT";
 
   const todayStr = dayjs().format("YYYY-MM-DD");
 
    const handleNavigate = async (screen: string) => {
-    if (screen === "AttendanceScreen") {
-      const role = await AsyncStorage.getItem("role");
-      if (!role) {
-        console.warn("Role not found in AsyncStorage");
+    try {
+      const rawRole = await AsyncStorage.getItem("role");
+      const role = rawRole ? rawRole.toUpperCase() : undefined;
+
+      // Define routes that depend on role
+      const roleBasedRoutes: Record<string, Partial<Record<'STUDENT' | 'PARENT', string>>> = {
+        AttendanceScreen: { STUDENT: "AttendanceScreen", PARENT: "AttendanceScreen_Parent" },
+        CalendarScreen: { STUDENT: "CalendarScreen", PARENT: "CalendarScreen_Parent" },
+        ScoreScreen: { STUDENT: "ScoreScreen", PARENT: "ScoreScreen_Parent" },
+      };
+
+      // If screen has role-specific variants, pick appropriately
+      if (roleBasedRoutes[screen]) {
+        const routes = roleBasedRoutes[screen];
+        if (!role) {
+          // No role: fallback to STUDENT route if available, otherwise first available route
+          const fallback = routes.STUDENT ?? Object.values(routes)[0];
+          if (fallback) {
+            navigation.navigate(fallback as any);
+          } else {
+            console.warn(`No route available for screen "${screen}"`);
+          }
+          return;
+        }
+
+        const target = (routes as any)[role] ?? routes.STUDENT;
+        if (target) {
+          navigation.navigate(target as any);
+        } else {
+          console.warn(`No route mapping for role "${role}" and screen "${screen}"`);
+        }
         return;
       }
-      if (role === "STUDENT") {
-        navigation.navigate("AttendanceScreen");
-      } else if (role === "PARENT") {
-        navigation.navigate("AttendanceScreen_Parent");
-      }
-    } else {
-      navigation.navigate(screen);
+
+      // Default: navigate to the provided screen
+      navigation.navigate(screen as any);
+    } catch (error) {
+      console.warn("handleNavigate failed:", error);
     }
   };
 
@@ -141,6 +167,7 @@ export default function HomeScreen() {
         {/* Nội dung chính */}
         <View style={styles.content}>
           {/* Card Lịch học hôm nay */}
+          {isParent ? null : (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Text style={styles.title}>Lịch học hôm nay</Text>
@@ -162,7 +189,7 @@ export default function HomeScreen() {
                 showsVerticalScrollIndicator={false}
               />
             )}
-          </View>
+          </View>)}
 
           {/* Card Chức năng (mẫu, tuỳ bạn bind data) */}
           <View style={styles.card}>

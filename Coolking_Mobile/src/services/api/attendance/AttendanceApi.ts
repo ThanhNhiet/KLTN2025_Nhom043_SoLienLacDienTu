@@ -31,9 +31,14 @@ export const getAttendanceByStudentBySubject = async (courseSectionId: string, s
     }
 };
 
-export const getAttendanceByStudentBySubject_Parent = async (page:number,pageSize:number) => {
+///api/attendances/parent/SV2100001?page=1&pagesize=10
+export const getAttendanceByStudentBySubject_Parent = async (stID: string , page:number, pageSize:number) => {
     try {
-        const response = await axiosInstance.get(`/api/attendances/parent?page=${page}&pageSize=${pageSize}`);
+        // Sửa ở đây: pageSize -> pagesize
+        const response = await axiosInstance.get(
+            `/api/attendances/parent/${stID}?page=${page}&pagesize=${pageSize}` 
+        );
+        
         if(!response.data){
             throw new Error("No data received");
         }

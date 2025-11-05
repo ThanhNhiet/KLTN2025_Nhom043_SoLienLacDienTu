@@ -1,13 +1,20 @@
 import {getAttendanceByStudentBySubject_Parent} from "@/src/services/api/attendance/AttendanceApi";
 import { useEffect,useState,useCallback } from "react";
-
+import AsyncStorage from "@react-native-async-storage/async-storage";
 interface ApiResponse {
-    children: ChildData[];
-}
-interface ChildData {
-    student_id: string;
-    student_name: string;
-    course_sections: CourseSection[]; // Sửa từ 'course_section' thành 'course_sections'
+    pagination: {
+        total: number;
+        page: number;
+        pageSize: number;
+        totalPages: number;
+        hasNext: boolean;
+        hasPrev: boolean;
+    };
+    data: {
+        student_id: string;
+        student_name: string;
+        course_sections: CourseSection[];
+    };
 }
 interface CourseSection {
     subject_info: SubjectInfo; // Sửa từ 'subject_infor' thành 'subject_info'
@@ -37,41 +44,52 @@ interface AttendanceDetail {
 
 
 
-export const useAttendance_Parent = () => {
+export const useAttendance_Parent = (stID: string | null) => {
     const [attendanceDetails, setAttendanceDetails] = useState<ApiResponse | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [page, setPage] = useState<number>(1);
     const [totalPages, setTotalPages] = useState<number | null>(null);
     const pageSize = 10;
+    const [role, setRole] = useState<string | null>(null);
 
-    const fetchAttendanceDetails = useCallback(async (page: number, pageSize: number) => {
+    useEffect(() => {
+        const fetchRole = async () => {
+            const storedRole = await AsyncStorage.getItem("role");
+            setRole(storedRole);
+        };
+
+        fetchRole();
+    }, []);
+
+    const fetchAttendanceDetails = useCallback(async (studentID: string, page: number, pageSize: number) => {
+       
         setLoading(true);
         setError(null);
         try {
-            const data = await getAttendanceByStudentBySubject_Parent(page, pageSize);
-
+            const data = await getAttendanceByStudentBySubject_Parent(studentID, page, pageSize);
             setAttendanceDetails(data);
 
-            // Nếu bạn chắc chắn API luôn trả về totalPages, có thể giữ dòng này.
-            // Nếu không, nên kiểm tra trước:
             if (data && data.pagination.totalPages) {
                 setTotalPages(data.pagination.totalPages);
             }
-
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : "Failed to fetch attendance details";
             setError(errorMessage);
         } finally {
             setLoading(false);
         }
-
     }, []);
 
     useEffect(() => {
-        fetchAttendanceDetails(page, pageSize);
-    }, [fetchAttendanceDetails, page, pageSize]);
-
+        if (stID) {
+            fetchAttendanceDetails(stID, page, pageSize);
+        } else {
+            // Nếu không có stID (ví dụ: mới vào màn hình), reset state
+            setAttendanceDetails(null);
+            setLoading(false);
+        }
+    }, [fetchAttendanceDetails, stID, page, pageSize]); // pageSize là hằng số, nhưng để đây cho rõ ràng
 
     return {
         attendanceDetails,
@@ -80,5 +98,8 @@ export const useAttendance_Parent = () => {
         page,
         setPage,
         totalPages,
+        role,
+        fetchAttendanceDetails,
+        pageSize,
     };
 }

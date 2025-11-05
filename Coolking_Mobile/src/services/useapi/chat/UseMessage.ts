@@ -6,9 +6,26 @@ import {
     sendMessageFile as apiSendMessageFile, 
     replyToMessage,
     getPinnedMessage,
+    pinMessage,
+    unpinMessage,
+    apiReplayToMessageText,
+    apiReplayToMessageFile,
+    apiReplayToMessageImage,
+    deleteMessage
+    
 } from "../../api/chat/MessageApi";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { set } from "date-fns";
+import {API_URL} from "@env";
+
+import { io } from 'socket.io-client';
+const socket = io(API_URL, { transports: ['websocket'] });
+
+
+
+
+
+
 // --- CẬP NHẬT: Hàm parseCustomDate ổn định hơn ---
 const parseCustomDate = (dateString: string): Date => {
     // Input format: "DD/MM/YYYY HH:mm:ss"
@@ -101,15 +118,17 @@ type ItemMessage = { _id: string;
 
 type File = { uri: string; name?: string; mimeType?: string; }
 
-interface MessagesApiResponse { messages: ItemMessage[]; hasMore: boolean; }
+interface MessagesApiResponse { messages: ItemMessage[]; hasMore: boolean; pages: any[]; total: number; page: number; pageSize: number; }
 
 // --- Custom Hook ---
 export const useMessages = (chatId: string) => {
     const [messages, setMessages] = useState<ItemMessage[]>([]);
-   // const [pinnedMessages, setPinnedMessages] = useState<ItemMessage[]>([]);
+    const [pinnedMessages, setPinnedMessages] = useState<ItemMessage[]>([]);
     const  [pinnedIDs, setPinnedIDs] = useState<string[]>([]);
     const [newMessage, setNewMessage] = useState<string>('');
     const [replyingTo, setReplyingTo] = useState<ItemMessage | null>(null);
+    const [deletingMessage, setDeletingMessage] = useState<ItemMessage | null>(null);
+    const [pinnedTo, setPinnedTo] = useState<ItemMessage | null>(null);
     const [page, setPage] = useState(1);
     const pageSize = 15;
     const [loadingInitial, setLoadingInitial] = useState(false);
@@ -149,11 +168,15 @@ export const useMessages = (chatId: string) => {
                     const uniqueNewMessages = sortedNewMessages.filter(m => !existingIds.has(m._id));
                     updatedMessages = [...uniqueNewMessages, ...prevMessages]; // Prepend older
                 }
-                
                 return updatedMessages;
             });
-
-            setHasMore(response.hasMore ?? false);
+            const { total, page, pageSize } = response;
+            let calculatedHasMore = (page * pageSize) < total;
+            if (!calculatedHasMore) {
+                setHasMore(false);
+            } else {
+                setHasMore(true);
+            }
 
         } catch (err) {
             console.error("Error fetching messages:", err);
@@ -183,9 +206,10 @@ export const useMessages = (chatId: string) => {
      // Effect fetch khi page thay đổi (cho phân trang)
     useEffect(() => {
         if (page > 1 && chatId) {
+            
             fetchMessages(chatId, page, pageSize);
         }
-    }, [page, chatId, fetchMessages, pageSize]); // Thêm fetchMessages và pageSize
+    }, [page, chatId, fetchMessages, pageSize]); 
 
     useEffect(() => {
         const fetchUserId = async () => {
@@ -210,6 +234,115 @@ export const useMessages = (chatId: string) => {
         }
     }, [userId, messages]);
 
+        // receive_message listener scoped to current chatId
+        useEffect(() => {
+            if (!socket) return;
+            const onReceive = ({ chat_id, newMessage }: { chat_id: string; newMessage: ItemMessage }) => {
+                if (!newMessage) return;
+                // Only handle messages for this chat
+                if (chat_id && chat_id !== chatId) return;
+                console.log('Received new message via socket:', newMessage);
+                setMessages(prev => {
+                    if (prev.some(m => m._id === newMessage._id)) return prev;
+                    return [...prev, newMessage]; // oldest -> newest ordering
+                });
+            };
+            const onReceivePin = ({ chat_id, newMessage }: { chat_id: string; newMessage: ItemMessage }) => {
+                if (!newMessage) return;
+                // Only handle messages for this chat
+                if (chat_id && chat_id !== chatId) return;
+                console.log('Received new message via socket:', newMessage);
+                setMessages((prev) => {
+                    const exists = prev.some(msg => msg._id === newMessage._id);
+                    if (exists) {
+                        return prev.map(msg => msg._id === newMessage._id ? newMessage : msg);
+                    }
+                    return [ ...prev, newMessage];
+                });
+                setPinnedMessages((prev) => {
+                    const exists = prev.some(msg => msg._id === newMessage._id);
+                    if (exists) {
+                        return prev; // Không thêm nếu đã tồn tại
+                    }
+                    return [...prev, newMessage]; // Thêm tin nhắn mới vào cuối danh sách
+                });
+            setPinnedIDs((prev) => {
+                if (prev.includes(newMessage._id)) {
+                    return prev;
+                }
+                return [...prev, newMessage._id];
+            });
+            };
+            const onReceiveUnpin = ({ chat_id, unpinnedMessage_id }: { chat_id: string; unpinnedMessage_id: string }) => {
+                if (!unpinnedMessage_id) return;
+                // Only handle messages for this chat
+                if (chat_id && chat_id !== chatId) return;
+                console.log('Received unpinned message via socket:', unpinnedMessage_id);
+                setPinnedMessages((prev) => {
+                    return prev.filter(msg => msg._id !== unpinnedMessage_id);
+                });
+                setPinnedIDs((prev) => {
+                    return prev.filter(id => id !== unpinnedMessage_id);
+                });
+            };
+            const onReceiveDelete = ({ chat_id, message_id }: { chat_id: string; message_id: string }) => {
+                if (!message_id) return;
+                // Only handle messages for this chat
+                if (chat_id && chat_id !== chatId) return;
+                console.log('Received deleted message via socket:', message_id);
+                setMessages((prev) => {
+                    return prev.map(msg => {
+                        if (msg._id === message_id) {
+                            // Mark as deleted
+                            return { ...msg, deleted: true };
+                        }
+                        return msg;
+                    });
+                });
+            };
+
+            socket.on('receive_message', onReceive);
+            socket.on('pin_message', onReceivePin);
+            socket.on('unpin_message', onReceiveUnpin);
+            socket.on ('del_message',onReceiveDelete);
+            return () => {
+                socket.off('receive_message', onReceive);
+                socket.off('pin_message', onReceivePin);
+                socket.off('unpin_message', onReceiveUnpin);
+                socket.off('del_message', onReceiveDelete);
+            };
+        }, [socket, chatId]);
+        
+        // join/register when socket is connected and we have userId + chatId
+        useEffect(() => {
+            if (!socket) return;
+            if (!userId || !chatId) return;
+
+            const joinRoom = () => {
+                if (!socket.connected) return;
+                try {
+                    socket.emit('register', userId);
+                    socket.emit('join_chat', chatId);
+                } catch (e) {
+                    console.warn('Socket join error:', e);
+                }
+            };
+
+            if (socket.connected) {
+                joinRoom();
+                return () => {
+                    try { socket.emit('leave_chat', chatId); } catch (_) {}
+                };
+            } else {
+                const onConnect = () => joinRoom();
+                socket.on('connect', onConnect);
+                return () => {
+                    socket.off('connect', onConnect);
+                    try { socket.emit('leave_chat', chatId); } catch (_) {}
+                };
+            }
+        }, [socket, userId, chatId]);
+ 
     const fetchPinnedMessages = useCallback( async (chatId: string) => {
         try {
 
@@ -231,7 +364,7 @@ export const useMessages = (chatId: string) => {
     }, [chatId, fetchPinnedMessages]);
 
      // --- Lọc danh sách tin nhắn đã ghim ---
-        const pinnedMessages = useMemo(() => {
+        const pinned = useMemo(() => {
             return messages
                 .filter(msg => pinnedIDs.includes(msg._id))
                 .sort((a, b) => {
@@ -241,6 +374,10 @@ export const useMessages = (chatId: string) => {
                      return dateB.getTime() - dateA.getTime();
                 });
         }, [messages]); 
+
+        useEffect(() => {
+            setPinnedMessages(pinned);
+        }, [pinned]);
 
     const loadMoreMessages = useCallback(() => {
         if (!loadingMore && hasMore) {
@@ -252,118 +389,535 @@ export const useMessages = (chatId: string) => {
 
 
 
-    const sendMessageText = async (chatId: string, content: string) => {
-        try {
-            const data = await apiSendMessageText(chatId, content);
-            if (data == null) {
-                throw new Error("No data received");
-            }
-            return data;
-        } catch (error) {
-            console.error("Error sending text message:", error);
-            throw error;
-        }
-
-    };
-    const sendMessageImage = async (chatId: string, images: File[]) => {
-        try {
-            const data = await apiSendMessageImage(chatId, images);
-            if (data == null) {
-                throw new Error("No data received");
-            }
-            return data;
-        } catch (error) {
-            console.error("Error sending text message:", error);
-            throw error;
-        }
-
-    };
-
-    // Hàm xử lý gửi tin nhắn văn bản
-    const handleSendMessageText = async (chatID :string , content:string) => {
-        if (content.trim() === '') return;
-
-        const  newMsg = await sendMessageText(chatID, content);
-        if (newMsg) {
-        const  newLastMsg : ItemMessage = {
-            _id: newMsg._id,
-            chatID: newMsg.chatID,
-            type: newMsg.type,
-            content: newMsg.content,
-            filename: newMsg.filename,
-            status: newMsg.status,
-            isDeleted: newMsg.isDeleted,
-            senderInfo: senderInfo!,
-            pinnedInfo: newMsg.pinnedInfo,
-            replyTo: newMsg.replyTo,
-            createdAt: newMsg.createdAt,
-            updatedAt: newMsg.updatedAt,
-        };
-        setMessages(prevMessages => [newLastMsg, ...prevMessages]);
-        setNewMessage('');
-        await fetchMessages(chatID, 1, pageSize);
-
-      } 
-    };
-    // Hàm xử lý gửi tin nhắn hình ảnh
-    const handleSendMessageImage = async (chatID: string, images: File[]) => {
-        if (images.length === 0) return;
-
-        const newMsg = await sendMessageImage(chatID, images);
-        if (newMsg) {
-            const newLastMsg: ItemMessage = {
-                _id: newMsg._id,
-                chatID: newMsg.chatID,
-                type: newMsg.type,
-                content: newMsg.content,
-                filename: newMsg.filename,
-                status: newMsg.status,
-                isDeleted: newMsg.isDeleted,
-                senderInfo: senderInfo!,
-                pinnedInfo: newMsg.pinnedInfo,
-                replyTo: newMsg.replyTo,
-                createdAt: newMsg.createdAt,
-                updatedAt: newMsg.updatedAt,
-            };
-            setMessages(prevMessages => [newLastMsg, ...prevMessages]);
-            setImage(null);
-            setImageName(null);
-            await fetchMessages(chatID, 1, pageSize);
-        }
-    };
-
-     const handleSendReply = async (chatID:string ,content:string) => {
-        if (content.trim() === '' || !senderInfo) return; // Need senderInfo too
-
-        // Create base message object
-        const newMsg: ItemMessage = {
-            _id: `temp_${Date.now()}`,
-            chatID: chatID,
-            type: 'text',
-            content: content.trim(),
-            filename: null,
-            status: 'sending',
-            isDeleted: false,
-            replyTo: null,
-            pinnedInfo: null,
-            senderInfo: senderInfo!,
-            createdAt: new Intl.DateTimeFormat('vi-VN', {
-                 day: '2-digit', month: '2-digit', year: 'numeric',
-                 hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
-            }).format(new Date()).replace(',', ''),
-            updatedAt: new Intl.DateTimeFormat('vi-VN', {
-                 day: '2-digit', month: '2-digit', year: 'numeric',
-                 hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
-            }).format(new Date()).replace(',', ''),
-        };
     
+
+    
+    // Hàm xử lý gửi tin nhắn văn bản
+    const handleSendMessageText = async (chatID: string, content: string) => {
+        if (content.trim() === '') return;
+        // optimistic message (temp)
+        const tempId = `temp_${Date.now()}`;
+        const safeSenderInfo = senderInfo ?? {
+            userID: "unknown",
+            name: "Bạn",
+            avatar: null,
+            role: "",
+            muted: false,
+        };
         try {
-        
+            const serverMsg = await apiSendMessageText(chatID, content);
+            if (!serverMsg) throw new Error("No data from API");
+
+            const finalMsg: ItemMessage = {
+                _id: serverMsg._id,
+                chatID: serverMsg.chatID,
+                type: serverMsg.type,
+                content: serverMsg.content,
+                filename: serverMsg.filename,
+                status: serverMsg.status,
+                isDeleted: serverMsg.isDeleted,
+                senderInfo: safeSenderInfo,
+                pinnedInfo: serverMsg.pinnedInfo,
+                replyTo: serverMsg.replyTo,
+                createdAt: serverMsg.createdAt,
+                updatedAt: serverMsg.updatedAt,
+            };
+
+            // Replace temp message with final server message (or append if not found)
+            setMessages(prev => {
+                const exists = prev.some(m => m._id === finalMsg._id);
+                if (exists) {
+                    // remove temp if present
+                    return prev.map(m => m._id === tempId ? finalMsg : m);
+                }
+                return prev.map(m => m._id === tempId ? finalMsg : m);
+            });
+
+            // emit to server/other clients
+            try {
+                socket.emit('send_message', { chat_id: chatID, newMessage: finalMsg });
+                 setNewMessage('');
+            } catch (emitErr) {
+                console.warn("Socket emit failed:", emitErr);
+            }
         } catch (err) {
             console.error("Send message failed:", err);
-           
+            // mark temp message as failed
+            setMessages(prev => prev.map(m => m._id === tempId ? { ...m, status: "failed" } : m));
         }
     };
+
+
+
+    // Hàm xử lý gửi tin nhắn hình ảnh
+    const handleSendMessageImage = async (chatID: string, imagesArr: File[]) => {
+        if (!imagesArr || imagesArr.length === 0) return;
+
+        const tempId = `temp_img_${Date.now()}`;
+        const safeSenderInfo = senderInfo ?? {
+            userID: "unknown",
+            name: "Bạn",
+            avatar: null,
+            role: "",
+            muted: false,
+        };
+
+        try {
+            const serverMsg = await apiSendMessageImage(chatID, imagesArr);
+            if (!serverMsg) throw new Error("No data from API");
+            const finalMsg: ItemMessage = {
+                _id: serverMsg._id,
+                chatID: serverMsg.chatID,
+                type: serverMsg.type,
+                content: serverMsg.content,
+                filename: serverMsg.filename,
+                status: serverMsg.status,
+                isDeleted: serverMsg.isDeleted,
+                senderInfo: safeSenderInfo,
+                pinnedInfo: serverMsg.pinnedInfo,
+                replyTo: serverMsg.replyTo,
+                createdAt: serverMsg.createdAt,
+                updatedAt: serverMsg.updatedAt,
+            };
+             // Replace temp message with final server message (or append if not found)
+            setMessages(prev => {
+                const exists = prev.some(m => m._id === finalMsg._id);
+                if (exists) {
+                    // remove temp if present
+                    return prev.map(m => m._id === tempId ? finalMsg : m);
+                }
+                return prev.map(m => m._id === tempId ? finalMsg : m);
+            });
+            // emit to server/other clients
+            try {
+                socket.emit('send_message', { chat_id: chatID, newMessage: finalMsg });
+                setImage(null);
+                setImageName(null);
+            } catch (emitErr) {
+                console.warn("Socket emit failed:", emitErr);
+            }
+        } catch (err) {
+            console.error("Error sending image message:", err);
+            setMessages(prev => prev.map(m => m._id === tempId ? { ...m, status: "failed" } : m));
+        }
+    };
+
+    // Hàm xử lý gửi tin nhắn hình ảnh
+    const handleSendMessageFile = async (chatID: string, filesArr: File[]) => {
+        if (!filesArr || filesArr.length === 0) return;
+
+        const tempId = `temp_file_${Date.now()}`;
+        const safeSenderInfo = senderInfo ?? {
+            userID: "unknown",
+            name: "Bạn",
+            avatar: null,
+            role: "",
+            muted: false,
+            joninDate: null,
+            lastReadAt: null,
+        };
+        try {
+            const serverMsg = await apiSendMessageFile(chatID, filesArr);
+            if (!serverMsg) throw new Error("No data from API");
+            const finalMsg: ItemMessage = {
+                _id: serverMsg._id,
+                chatID: serverMsg.chatID,
+                type: serverMsg.type,
+                content: serverMsg.content,
+                filename: serverMsg.filename,
+                status: serverMsg.status,
+                isDeleted: serverMsg.isDeleted,
+                senderInfo: safeSenderInfo,
+                pinnedInfo: serverMsg.pinnedInfo,
+                replyTo: serverMsg.replyTo,
+                createdAt: serverMsg.createdAt,
+                updatedAt: serverMsg.updatedAt,
+            };
+             // Replace temp message with final server message (or append if not found)
+            setMessages(prev => {
+                const exists = prev.some(m => m._id === finalMsg._id);
+                if (exists) {
+                    // remove temp if present
+                    return prev.map(m => m._id === tempId ? finalMsg : m);
+                }
+                return prev.map(m => m._id === tempId ? finalMsg : m);
+            });
+
+            // emit to server/other clients
+            try {
+                socket.emit('send_message', { chat_id: chatID, newMessage: finalMsg });
+                setFile(null);
+                setFileName(null);
+            } catch (emitErr) {
+                console.warn("Socket emit failed:", emitErr);
+            }
+        } catch (err) {
+            console.error("Error sending image message:", err);
+            setMessages(prev => prev.map(m => m._id === tempId ? { ...m, status: "failed" } : m));
+        }
+    };
+
+     const handleSendReplyText = async (chatID:string ,content:string,message:ItemMessage) => {
+        if (content.trim() === '' || !senderInfo) return; 
+        // Build API payload (simple shape) and a typed reply object for local state
+        const apiReplyPayload = {
+            messageID: message._id,
+            senderID: message.senderInfo.userID,
+            content: message.content,
+            type: message.type,
+        };
+        const replyToTyped: ItemReplyInfo = {
+            messageID: message._id,
+            senderInfo: {
+                userID: message.senderInfo.userID,
+                userName: message.senderInfo.name,
+                avatar: message.senderInfo.avatar,
+                role: message.senderInfo.role,
+                muted: message.senderInfo.muted,
+                joninDate: message.senderInfo.joninDate,
+                lastReadAt: message.senderInfo.lastReadAt,
+            },
+            content: message.content,
+            type: message.type,
+        };
+        const tempId = `temp_file_${Date.now()}`;
+        const safeSenderInfo = senderInfo ?? {
+            userID: "unknown",
+            name: "Bạn",
+            avatar: null,
+            role: "",
+            muted: false,
+            joninDate: null,
+            lastReadAt: null,
+        };
+        try {
+            const serverMsg = await apiReplayToMessageText(chatID, content, apiReplyPayload);
+            if (!serverMsg) throw new Error("No data from API");
+            const finalMsg: ItemMessage = {
+                _id: serverMsg._id,
+                chatID: serverMsg.chatID,
+                type: serverMsg.type,
+                content: serverMsg.content,
+                filename: serverMsg.filename,
+                status: serverMsg.status,
+                isDeleted: serverMsg.isDeleted,
+                senderInfo: safeSenderInfo,
+                pinnedInfo: serverMsg.pinnedInfo,
+                replyTo: replyToTyped,
+                createdAt: serverMsg.createdAt,
+                updatedAt: serverMsg.updatedAt,
+            };
+            // Insert or replace message in state (similar to other send handlers)
+            setMessages(prev => {
+                const exists = prev.some(m => m._id === finalMsg._id);
+                if (exists) {
+                    return prev.map(m => m._id === tempId ? finalMsg : m);
+                }
+                return prev.map(m => m._id === tempId ? finalMsg : m);
+            });
+            setNewMessage('');
+            try {
+                socket.emit('send_message', { chat_id: chatID, newMessage: finalMsg });
+                setReplyingTo(null);
+            } catch (emitErr) {
+                console.warn("Socket emit failed:", emitErr);
+            }
+        } catch (err) {
+            console.error("Send message failed:", err);
+            // mark temp message as failed if needed
+            setMessages(prev => prev.map(m => m._id === tempId ? { ...m, status: "failed" } : m));
+        }
+    };
+
+    const handleSendReplyFile = async (chatID:string ,files:File[],message:ItemMessage) => {
+        if (files.length === 0 || !senderInfo) return; 
+        // Build API payload (simple shape) and a typed reply object for local state
+        const apiReplyPayload = {
+            messageID: message._id,
+            senderID: message.senderInfo.userID,
+            content: message.content,
+            type: message.type,
+        };
+        const replyToTyped: ItemReplyInfo = {
+            messageID: message._id,
+            senderInfo: {
+                userID: message.senderInfo.userID,
+                userName: message.senderInfo.name,
+                avatar: message.senderInfo.avatar,
+                role: message.senderInfo.role,
+                muted: message.senderInfo.muted,
+                joninDate: message.senderInfo.joninDate,
+                lastReadAt: message.senderInfo.lastReadAt,
+            },
+            content: message.content,
+            type: message.type,
+        };
+        const tempId = `temp_file_${Date.now()}`;
+        const safeSenderInfo = senderInfo ?? {
+            userID: "unknown",
+            name: "Bạn",
+            avatar: null,
+            role: "",
+            muted: false,
+            joninDate: null,
+            lastReadAt: null,
+        };
+        try {
+            const serverMsg = await apiReplayToMessageFile(chatID, files, apiReplyPayload);
+            if (!serverMsg) throw new Error("No data from API");
+            const finalMsg: ItemMessage = {
+                _id: serverMsg._id,
+                chatID: serverMsg.chatID,
+                type: serverMsg.type,
+                content: serverMsg.content,
+                filename: serverMsg.filename,
+                status: serverMsg.status,
+                isDeleted: serverMsg.isDeleted,
+                senderInfo: safeSenderInfo,
+                pinnedInfo: serverMsg.pinnedInfo,
+                replyTo: replyToTyped,
+                createdAt: serverMsg.createdAt,
+                updatedAt: serverMsg.updatedAt,
+            };
+            // Insert or replace message in state (similar to other send handlers)
+            setMessages(prev => {
+                const exists = prev.some(m => m._id === finalMsg._id);
+                if (exists) {
+                    return prev.map(m => m._id === tempId ? finalMsg : m);
+                }
+                return prev.map(m => m._id === tempId ? finalMsg : m);
+            });
+            try {
+                socket.emit('send_message', { chat_id: chatID, newMessage: finalMsg });
+                setReplyingTo(null);
+            } catch (emitErr) {
+                console.warn("Socket emit failed:", emitErr);
+            }
+        } catch (err) {
+            console.error("Send message failed:", err);
+            // mark temp message as failed if needed
+            setMessages(prev => prev.map(m => m._id === tempId ? { ...m, status: "failed" } : m));
+        }
+    };
+
+    const handleSendReplyImage = async (chatID:string ,images:File[],message:ItemMessage) => {
+        if (images.length === 0 || !senderInfo) return; 
+        // Build API payload (simple shape) and a typed reply object for local state
+        const apiReplyPayload = {
+            messageID: message._id,
+            senderID: message.senderInfo.userID,
+            content: message.content,
+            type: message.type,
+        };
+        const replyToTyped: ItemReplyInfo = {
+            messageID: message._id,
+            senderInfo: {
+                userID: message.senderInfo.userID,
+                userName: message.senderInfo.name,
+                avatar: message.senderInfo.avatar,
+                role: message.senderInfo.role,
+                muted: message.senderInfo.muted,
+                joninDate: message.senderInfo.joninDate,
+                lastReadAt: message.senderInfo.lastReadAt,
+            },
+            content: message.content,
+            type: message.type,
+        };
+        const tempId = `temp_file_${Date.now()}`;
+        const safeSenderInfo = senderInfo ?? {
+            userID: "unknown",
+            name: "Bạn",
+            avatar: null,
+            role: "",
+            muted: false,
+            joninDate: null,
+            lastReadAt: null,
+        };
+        try {
+            const serverMsg = await apiReplayToMessageImage(chatID, images, apiReplyPayload);
+            if (!serverMsg) throw new Error("No data from API");
+            const finalMsg: ItemMessage = {
+                _id: serverMsg._id,
+                chatID: serverMsg.chatID,
+                type: serverMsg.type,
+                content: serverMsg.content,
+                filename: serverMsg.filename,
+                status: serverMsg.status,
+                isDeleted: serverMsg.isDeleted,
+                senderInfo: safeSenderInfo,
+                pinnedInfo: serverMsg.pinnedInfo,
+                replyTo: replyToTyped,
+                createdAt: serverMsg.createdAt,
+                updatedAt: serverMsg.updatedAt,
+            };
+            // Insert or replace message in state (similar to other send handlers)
+            setMessages(prev => {
+                const exists = prev.some(m => m._id === finalMsg._id);
+                if (exists) {
+                    return prev.map(m => m._id === tempId ? finalMsg : m);
+                }
+                return prev.map(m => m._id === tempId ? finalMsg : m);
+            });
+            try {
+                socket.emit('send_message', { chat_id: chatID, newMessage: finalMsg });
+                setReplyingTo(null);
+            } catch (emitErr) {
+                console.warn("Socket emit failed:", emitErr);
+            }
+        } catch (err) {
+            console.error("Send message failed:", err);
+            // mark temp message as failed if needed
+            setMessages(prev => prev.map(m => m._id === tempId ? { ...m, status: "failed" } : m));
+        }
+    };
+
+   const  handlePinMessage = async (message : ItemMessage,userID: string) => {
+        try {
+            const newMessage = await pinMessage(message._id, userID);
+            if (newMessage == null) {
+                throw new Error("No data received");
+            }
+            const safeSenderInfo = senderInfo ?? {
+                userID: "unknown",
+                name: "Bạn",
+                avatar: null,
+                role: "",
+                muted: false,
+                joninDate: '',
+                lastReadAt: ''
+            };
+            const pinnedInfo: ItemPinnedInfo = {
+                messageID: newMessage._id,
+                pinnedByinfo: {
+                    userID: userID,
+                    userName: safeSenderInfo.name,
+                    avatar: safeSenderInfo.avatar,
+                    role: safeSenderInfo.role,
+                    muted: safeSenderInfo.muted,
+                    joninDate: safeSenderInfo.joninDate || null,
+                    lastReadAt: safeSenderInfo.lastReadAt || null,
+                },
+                pinnedDate: newMessage?.pinnedInfo ? newMessage.pinnedInfo.pinnedDate : null
+            };
+            const finalMsg: ItemMessage = {
+                _id: newMessage._id,
+                chatID: newMessage.chatID,
+                type: newMessage.type,
+                content: newMessage.content,
+                filename: newMessage.filename,
+                status: newMessage.status,
+                isDeleted: newMessage.isDeleted,
+                senderInfo: safeSenderInfo,
+                pinnedInfo: pinnedInfo,
+                replyTo: newMessage.replyTo,
+                createdAt: newMessage.createdAt,
+                updatedAt: newMessage.updatedAt,
+            };
+
+            setMessages((prev) => {
+                const exists = prev.some(msg => msg._id === finalMsg._id);
+                if (exists) {
+                    return prev.map(msg => msg._id === finalMsg._id ? finalMsg : msg);
+                }
+                return [ ...prev, finalMsg];
+            });
+            setPinnedMessages((prev) => {
+                const exists = prev.some(msg => msg._id === finalMsg._id);
+                if (exists) {
+                    return prev; // Không thêm nếu đã tồn tại
+                }
+                return [...prev, finalMsg]; // Thêm tin nhắn mới vào cuối danh sách
+            });
+            setPinnedIDs((prev) => {
+                if (prev.includes(finalMsg._id)) {
+                    return prev; 
+                }
+                return [...prev, finalMsg._id];
+            });
+            try {
+                socket.emit('pin_message', { chat_id: chatId, pinnedMessage: finalMsg });
+            } catch (error) {
+                console.error("Error emitting pin_message:", error);
+            }
+        } catch (error) {
+            console.error("Error pinning message:", error);
+            throw error;
+        }
+
+    };
+    const handleUnpinMessage = async (messageID: string) => {
+        try {
+            const unpinnedMessage = await unpinMessage(messageID);
+            if (unpinnedMessage == null) {
+                throw new Error("No data received");
+            }
+            setPinnedMessages((prev) => prev.filter(msg => msg._id !== messageID));
+            setPinnedIDs((prev) => prev.filter(id => id !== messageID));
+            setMessages((prev) => {
+                return prev.map(msg => {
+                    if (msg._id === messageID) {
+                        return { ...msg, pinnedInfo: null };
+                    }
+                    return msg;
+                });
+            });
+            try {
+                socket.emit('unpin_message', { chat_id: chatId, unpinnedMessageID: messageID });
+            } catch (error) {
+                console.error("Error emitting unpin_message:", error);
+            }
+        } catch (error) {
+            console.error("Error unpinning message:", error);
+            throw error;
+        }
+    };
+
+    const handleDeleteMessage = async (deletingMessage: ItemMessage | null) => {
+        try {
+            if (!deletingMessage) {
+                throw new Error("No message selected for deletion");
+            }
+            const messageID = deletingMessage._id;
+            const deletedMessage = await deleteMessage(messageID);
+            if (deletedMessage == null) {
+                throw new Error("No data received");
+            }
+            if (deletedMessage.pinnedInfo) {
+                const unpinnedMessage = await unpinMessage(messageID);
+                if (unpinnedMessage == null) {
+                    throw new Error("No data received for unpinning");
+                }
+                setPinnedIDs((prev) => {
+                return prev.filter(id => id !== messageID);
+            });
+             setPinnedMessages((prev) => {
+                return prev.filter(msg => msg._id !== messageID);
+            });
+            try {
+                socket.emit('unpin_message', { chat_id: chatId, unpinnedMessageID: messageID });
+            } catch (error) {
+                console.error("Error emitting unpin_message:", error);
+            }
+        }
+        setMessages((prev) => {
+            return prev.map(msg => {
+                if (msg._id === messageID) {
+                        return { ...msg, isDeleted: true };
+                    }
+                    return msg;
+                });
+            });
+            try {
+                socket.emit('delete_message', { chat_id: chatId, message_id: messageID });
+            } catch (error) {
+                console.error("Error emitting delete_message:", error);
+            }
+        } catch (error) {
+            console.error("Error deleting message:", error);
+            throw error;
+        }
+    }
+
 
 
     return { 
@@ -385,13 +939,25 @@ export const useMessages = (chatId: string) => {
         fileName,
         imageName,
         pinnedMessages,
+        pinnedTo,
 
         // Functions
+        //load more
         loadMoreMessages ,
-        sendMessageText,
+        // send message handlers
         handleSendMessageText,
-        handleSendReply,
         handleSendMessageImage,
+        handleSendMessageFile,
+        // pin message handlers
+        handlePinMessage,
+        // unpin message handlers
+        handleUnpinMessage,
+        // reply message handlers
+        handleSendReplyImage,
+        handleSendReplyFile,
+        handleSendReplyText,
+        // delete message handler
+        handleDeleteMessage,
 
         // Setters
         setNewMessage,
@@ -400,6 +966,9 @@ export const useMessages = (chatId: string) => {
         setFile,
         setImage,
         setFileName,
-        setImageName
+        setImageName,
+        setPinnedTo,
+       
+       
     };
 }

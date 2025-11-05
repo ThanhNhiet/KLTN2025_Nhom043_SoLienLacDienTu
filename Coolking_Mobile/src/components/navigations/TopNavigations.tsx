@@ -1,13 +1,37 @@
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
+import React,{useEffect,useState} from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-
+import { useProfile } from "@/src/services/useapi/profile/UseProfile";
+import SelectStudentModal from "../modals/SelectStudentModal"; // Giả sử đường dẫn này là đúng
 type props = {
   navigation: any;
   name: string;
+  setStudentId: (id: string) => void;
 };
 
-export default function TopNavigations({ navigation, name }: props) {
+export default function TopNavigations({ navigation, name, setStudentId }: props) {
+  const { role, students } = useProfile();
+      const isParent = role === "PARENT";
+      const [openStudentModal, setOpenStudentModal] = useState(false);
+  
+      const handleOpenStudentModal = () => {
+          setOpenStudentModal(true);
+      };
+      const handleSelectStudent = (student: any) => {
+          const id = typeof student === "string" 
+              ? student 
+              : student?.student_id || student?.id;
+  
+          if (!id) {
+              console.warn("[TopNav] No valid ID found in selected student");
+              return;
+          }
+  
+          console.log("[TopNav] Setting studentId:", id);
+          setStudentId(id);
+          setOpenStudentModal(false);
+      };
+  
   return (
     <View style={styles.container}>
       {/* Nút Back */}
@@ -21,6 +45,25 @@ export default function TopNavigations({ navigation, name }: props) {
 
       {/* Tiêu đề */}
       <Text style={styles.title}>{name}</Text>
+
+      {isParent && (
+        <TouchableOpacity
+            style={styles.iconButton}
+            onPress={handleOpenStudentModal}
+        >
+            {/* 3. Đổi màu icon cho hợp với nền */}
+            <Ionicons name="people-circle-outline" size={28} color="#e5f0f0ff" />
+        </TouchableOpacity>
+    )}
+    {/* Modal nằm ngoài View là đúng */}
+            <SelectStudentModal
+                visible={openStudentModal}
+                onClose={() => setOpenStudentModal(false)}
+                students={students} // Truyền danh sách học sinh
+                onSelectStudent={handleSelectStudent} // Truyền hàm xử lý
+            />
+
+      
     </View>
   );
 }
@@ -53,4 +96,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  iconButton: {
+        position: "absolute", // Định vị tuyệt đối
+        right: 12,            // Căn lề phải
+        padding: 4,           // Tăng vùng nhấn
+        justifyContent: "center",
+        alignItems: "center",
+    },
 });

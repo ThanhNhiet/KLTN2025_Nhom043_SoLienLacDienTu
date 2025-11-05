@@ -14,6 +14,7 @@ enum TabName {
   AttendanceScreen = "AttendanceScreen",
   CalendarScreen = "CalendarScreen",
   AttendanceScreen_Parent = "AttendanceScreen_Parent",
+  CalendarScreen_Parent = "CalendarScreen_Parent",
   ProfileScreen = "ProfileScreen",
 }
 
@@ -34,19 +35,44 @@ export default function BottomNavigations({ navigation }: Props) {
   }, [route.name]);
 
   const handleNavigate = async (screen: string) => {
-    if (screen === "AttendanceScreen") {
-      const role = await AsyncStorage.getItem("role");
-      if (!role) {
-        console.warn("Role not found in AsyncStorage");
+    try {
+      const rawRole = await AsyncStorage.getItem("role");
+      const role = rawRole ? rawRole.toUpperCase() : undefined;
+
+      // Define routes that depend on role
+      const roleBasedRoutes: Record<string, Partial<Record<'STUDENT' | 'PARENT', string>>> = {
+        AttendanceScreen: { STUDENT: "AttendanceScreen", PARENT: "AttendanceScreen_Parent" },
+        CalendarScreen: { STUDENT: "CalendarScreen", PARENT: "CalendarScreen_Parent" },
+        ScoreScreen: { STUDENT: "ScoreScreen", PARENT: "ScoreScreen_Parent" },
+      };
+
+      // If screen has role-specific variants, pick appropriately
+      if (roleBasedRoutes[screen]) {
+        const routes = roleBasedRoutes[screen];
+        if (!role) {
+          // No role: fallback to STUDENT route if available, otherwise first available route
+          const fallback = routes.STUDENT ?? Object.values(routes)[0];
+          if (fallback) {
+            navigation.navigate(fallback as any);
+          } else {
+            console.warn(`No route available for screen "${screen}"`);
+          }
+          return;
+        }
+
+        const target = (routes as any)[role] ?? routes.STUDENT;
+        if (target) {
+          navigation.navigate(target as any);
+        } else {
+          console.warn(`No route mapping for role "${role}" and screen "${screen}"`);
+        }
         return;
       }
-      if (role === "STUDENT") {
-        navigation.navigate("AttendanceScreen");
-      } else if (role === "PARENT") {
-        navigation.navigate("AttendanceScreen_Parent");
-      }
-    } else {
-      navigation.navigate(screen);
+
+      // Default: navigate to the provided screen
+      navigation.navigate(screen as any);
+    } catch (error) {
+      console.warn("handleNavigate failed:", error);
     }
   };
 
@@ -55,8 +81,11 @@ export default function BottomNavigations({ navigation }: Props) {
     <View style={styles.container}>
       {tabs.map((tab) => {
         let isActive = activeTab === tab.name;
-        if (tab.name === TabName.AttendanceScreen ) {
-          isActive = activeTab === TabName.AttendanceScreen_Parent;
+        if (tab.name === TabName.AttendanceScreen) {
+          isActive = activeTab === TabName.AttendanceScreen || activeTab === TabName.AttendanceScreen_Parent;
+        }
+        if (tab.name === TabName.CalendarScreen) {
+          isActive = activeTab === TabName.CalendarScreen || activeTab === TabName.CalendarScreen_Parent;
         }
         return (
           <TouchableOpacity

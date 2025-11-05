@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect,useMemo} from 'react';
+import React, { useState, useRef, useEffect,useMemo, useCallback} from 'react';
 import {
     View,
     Text,
     StyleSheet,
-    FlatList,
+    ScrollView,
     TextInput,
     TouchableOpacity,
     Image,
@@ -14,7 +14,8 @@ import {
     Alert,
     Modal,
     TouchableWithoutFeedback,
-    Linking
+    Linking,
+    FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FontAwesome } from "@expo/vector-icons";
@@ -82,65 +83,105 @@ type ItemMessage = { _id: string;
 };
 
 
-const PinnedMessageItem = ({message, onCloseModal, onGoToMessage}: { message: ItemMessage; onCloseModal: () => void; onGoToMessage: () => void; }) => {
+const PinnedMessageItem = ({
+  message, 
+  onCloseModal, 
+  onGoToMessage,
+  handleUnpinMessage
+}: { 
+  message: ItemMessage; 
+  onCloseModal: () => void; 
+  onGoToMessage: () => void;
+  handleUnpinMessage: (messageId: string) => void; // 2. Thêm prop mới
+}) => {
+  
   const handleGoToMessage = () => {
-
     onCloseModal();
     onGoToMessage();
   };
 
-  // Sanitize & chuẩn hoá chuỗi hiển thị
-  const createdAt = String(message?.createdAt ?? "");
-  const messageTime = createdAt.split(" ")[1]?.substring(0, 5) ?? "";
-  const pinnerName = String(message?.pinnedInfo?.pinnedByinfo?.userName ?? "Unknown");
-  
-  let pinnedTime = "";
-  const pinnedDate = String(message?.pinnedInfo?.pinnedDate ?? "");
-  if (pinnedDate) {
-    const timePart = pinnedDate.split(" ")[1];
-    if (timePart) pinnedTime = timePart.substring(0, 5);
-  }
-
-  // Nội dung dòng giữa
-  const fileName = String(message?.filename ?? "Tệp đính kèm");
-  const contentText =
-    message?.type === "image"
-      ? "📷 Hình ảnh"
-      : message?.type === "file"
-      ? `📄 ${fileName}`
-      : String(message?.content ?? "");
-
-  // Avatar nguồn
-  const avatarUri =
-    message?.senderInfo?.avatar && typeof message.senderInfo.avatar === "string"
-      ? { uri: message.senderInfo.avatar }
-      : { uri: "https://example.com/default-avatar.png" };
-
-  const senderName = String(message?.senderInfo?.name ?? "Unknown");
-
-  // Format the pinned text message
-  const getPinnedByText = () => {
-    const base = `Ghim bởi ${pinnerName}`;
-    return pinnedTime ? `${base} lúc ${pinnedTime}` : base;
+  const handleUnpin = async() => {
+    if (message?._id) {
+      await handleUnpinMessage(message._id);
+    }
   };
 
+  const displayData = useMemo(() => {
+    // 1. Xử lý thời gian tin nhắn
+    const createdAt = String(message?.createdAt ?? "");
+    const messageTime = createdAt.split(" ")[1]?.substring(0, 5) ?? "";
+
+    // 2. Xử lý thông tin ghim
+    const pinnerName = String(message?.pinnedInfo?.pinnedByinfo?.userName ?? "Unknown");
+    let pinnedTime = "";
+    const pinnedDate = String(message?.pinnedInfo?.pinnedDate ?? "");
+    if (pinnedDate) {
+      const timePart = pinnedDate.split(" ")[1];
+      if (timePart) pinnedTime = timePart.substring(0, 5);
+    }
+    const basePinText = `Ghim bởi ${pinnerName}`;
+    const pinnedByText = pinnedTime ? `${basePinText} lúc ${pinnedTime}` : basePinText;
+
+    // 3. Xử lý nội dung
+    const fileName = String(message?.filename ?? "Tệp đính kèm");
+    const contentText =
+      message?.type === "image"
+        ? "📷 Hình ảnh"
+        : message?.type === "file"
+        ? `📄 ${fileName}`
+        : String(message?.content ?? "");
+
+    // 4. Xử lý thông tin người gửi
+    const avatarUri =
+      message?.senderInfo?.avatar && typeof message.senderInfo.avatar === "string"
+        ? { uri: message.senderInfo.avatar }
+        : { uri: "https://example.com/default-avatar.png" };
+    const senderName = String(message?.senderInfo?.name ?? "Unknown");
+
+    return {
+      messageTime,
+      contentText,
+      avatarUri,
+      senderName,
+      pinnedByText,
+      showPinnedInfo: !!message?.pinnedInfo,
+    };
+
+  }, [message]);
+
   return (
+    // TouchableOpacity chính vẫn dùng để "Go To Message"
     <TouchableOpacity style={styles.pinnedItemContainer} onPress={handleGoToMessage}>
-      <View style={styles.pinnedItemHeader}>
-        <Image source={avatarUri} style={styles.pinnedAvatar} />
-        <Text style={styles.pinnedSenderName}>{senderName}</Text>
-        <Text style={styles.pinnedTimestamp}>{messageTime}</Text>
-      </View>
+      <>
+        {/* Header */}
+        <View style={styles.pinnedItemHeader}>
+          <Image source={displayData.avatarUri} style={styles.pinnedAvatar} />
+          <Text style={styles.pinnedSenderName}>{displayData.senderName}</Text>
+          
+          {/* 4. TẠO NHÓM MỚI BÊN PHẢI */}
+          <View style={styles.rightHeaderGroup}>
+            <Text style={styles.pinnedTimestamp}>{displayData.messageTime}</Text>
+            
+            {/* 5. NÚT UNPIN MỚI */}
+            <TouchableOpacity onPress={handleUnpin} style={styles.unpinButton}>
+              <Text style={styles.unpinButtonText}>X</Text>
+              {/* Bạn có thể thay <Text> bằng <Icon> ở đây */}
+            </TouchableOpacity>
+          </View>
+        </View>
 
-      <Text style={styles.pinnedContent} numberOfLines={2}>
-        {contentText}
-      </Text>
-
-      {!!message?.pinnedInfo && (
-        <Text style={styles.pinnedByText}>
-          {getPinnedByText()}
+        {/* Content */}
+        <Text style={styles.pinnedContent} numberOfLines={2}>
+          {displayData.contentText}
         </Text>
-      )}
+
+        {/* Pinned Info */}
+        {displayData.showPinnedInfo ? (
+          <Text style={styles.pinnedByText}>
+            {displayData.pinnedByText}
+          </Text>
+        ) : null}
+      </>
     </TouchableOpacity>
   );
 };
@@ -246,6 +287,7 @@ const getFileIconByExt= (ext: string): string => {
 const getFileIconFromUrl = (url: string): string => {
   return getFileIconByExt(getExtFromUrl(url));
 }
+  
 
 
     return (
@@ -256,7 +298,7 @@ const getFileIconFromUrl = (url: string): string => {
                 <View style={styles.contentAndMetaContainer}>
                     <View style={styles.nameAndPinContainer}>
                          {/* --- PIN INDICATOR --- */}
-                        {message.pinnedInfo && (
+                        {message.pinnedInfo && !message.isDeleted  && (
                             <Ionicons name="pin" size={12} color="#6B7280" style={styles.pinIcon} />
                         )}
                         <Text style={[styles.senderName, isSent ? styles.sentName : styles.receivedName]} numberOfLines={1}>
@@ -265,7 +307,7 @@ const getFileIconFromUrl = (url: string): string => {
                     </View>
 
                     {/* --- REPLY PREVIEW (If this message is a reply) --- */}
-                    {message.replyTo && (
+                    {message.replyTo && !message.isDeleted && (
                         <View style={[styles.replyPreviewBubble, isSent ? styles.sentReplyPreview : styles.receivedReplyPreview]}>
                             <Text style={styles.replyPreviewSender} numberOfLines={1}>
                                 {message.replyTo.senderInfo?.userName ?? 'Unknown'}
@@ -280,7 +322,13 @@ const getFileIconFromUrl = (url: string): string => {
                     <View style={[ styles.messageContainer, isSent ? styles.sentContainer : styles.receivedContainer ]}>
                         <View style={[styles.bubble, isSent ? styles.sentBubble : styles.receivedBubble]}>
                            {/* Content rendering */}
-                            {message.type === 'text' ? (
+                        {message.isDeleted ? (
+                                // --- A. NẾU ĐÃ XÓA ---
+                            <Text style={styles.deletedMessageText}>
+                                    Tin nhắn đã bị thu hồi
+                            </Text>
+
+                        ) :message.type === 'text' ? (
                             <Text style={isSent ? styles.sentText : styles.receivedText}>{message.content}</Text>
                         ) : message.type === 'image' ? (
                             handleArr(message.content).map((uri, index) => (
@@ -290,7 +338,7 @@ const getFileIconFromUrl = (url: string): string => {
                         ) : message.type === 'file' ? (
                             handleFileNameArr(message.filename).map((fileName, index) => (
                               <TouchableOpacity key={index} onPress={() => openGoogleDocs(handleArr(message.content)[index])}>  
-                               <FontAwesome name={getFileIconFromUrl(handleArr(message.content)[index]) as any} size={32} color="#555" style={styles.fileIcon} />
+                                <FontAwesome name={getFileIconFromUrl(handleArr(message.content)[index]) as any} size={32} color="#555" style={styles.fileIcon} />
                                     <Text style={styles.fileMessage} key={index}>{fileName}</Text>
                                 </TouchableOpacity>))
                         ) : message.type === 'link' ? (
@@ -319,15 +367,15 @@ const ReplyBar = ({ message, onCancel }: { message: ItemMessage; onCancel: () =>
     return (
         <View style={styles.replyBarContainer}>
             <View style={styles.replyBarContent}>
-                 <Ionicons name="arrow-undo" size={16} color="#6B7280" style={styles.replyIcon} />
-                 <View style={styles.replyTextContainer}>
+                <Ionicons name="arrow-undo" size={16} color="#6B7280" style={styles.replyIcon} />
+                <View style={styles.replyTextContainer}>
                     <Text style={styles.replyBarSender} numberOfLines={1}>
                         Reply to {message.senderInfo?.name ?? 'Unknown'}
                     </Text>
                     <Text style={styles.replyBarMessage} numberOfLines={1}>
                         {message.type === 'image' ? '📷 Image' : message.content}
                     </Text>
-                 </View>
+                </View>
             </View>
             <TouchableOpacity onPress={onCancel} style={styles.cancelReplyButton}>
                 <Ionicons name="close-circle" size={20} color="#9CA3AF" />
@@ -347,16 +395,19 @@ interface ActionItem {
 
 // --- Màn hình chính ---
 export default function MessageScreen() {
-   
+    
     // State cho Modal hành động tin nhắn
     const [modalVisible, setModalVisible] = useState(false);
     const [selectedMessage, setSelectedMessage] = useState<ItemMessage | null>(null);
     const [pinnedModalVisible, setPinnedModalVisible] = useState(false);
+    const flatListRef = useRef<FlatList<ItemMessage>>(null);
+    const [isAtBottom, setIsAtBottom] = useState(true);
 
-    const flatListRef = useRef<FlatList>(null);
+    const scrollViewRef = useRef<ScrollView>(null);
     const navigation = useNavigation<any>();
     const route = useRoute();
     const { chat } = route.params as { chat: { _id: string, name: string, avatar: string } };
+   
     // Sử dụng hook
     const { 
       // States
@@ -376,13 +427,26 @@ export default function MessageScreen() {
         fileName,
         imageName,
         pinnedMessages,
+        
 
         // Functions
+        //load more
         loadMoreMessages ,
-        sendMessageText,
+        // send message handlers
         handleSendMessageText,
-        handleSendReply,
         handleSendMessageImage,
+        handleSendMessageFile,
+        // pin message handlers
+        handlePinMessage,
+        // unpin message handlers
+        handleUnpinMessage,
+        // reply message handlers
+        handleSendReplyImage,
+        handleSendReplyFile,
+        handleSendReplyText,
+        // delete message handler
+        handleDeleteMessage,
+       
 
         // Setters
         setNewMessage,
@@ -391,28 +455,36 @@ export default function MessageScreen() {
         setFile,
         setImage,
         setFileName,
-        setImageName
+        setImageName,
+        
+
 
     } = useMessages(chat._id);
 
    
 
     const scrollToMessage = (messageId: string) => {
-        if (!flatListRef.current || !messages || messages.length === 0) {
-            console.warn("FlatList ref or messages not available for scrolling.");
+        if (!scrollViewRef.current || !messages || messages.length === 0) {
+            console.warn("ScrollView ref or messages not available for scrolling.");
             return;
         }
-        const messageIndex = messages.findIndex(msg => msg._id === messageId);
 
-        if (messageIndex !== -1) {
-            console.log(`Scrolling to message ID ${messageId} at index ${messageIndex}`);
-            flatListRef.current.scrollToIndex({
-                animated: true,
-                index: messageIndex,
-            });
-        } else {
-            console.warn(`Message with ID ${messageId} not found in the currently loaded messages.`);
+        // Find message index
+        const messageIndex = messages.findIndex(msg => msg._id === messageId);
+        if (messageIndex === -1) {
+            console.warn(`Message with ID ${messageId} not found in the messages.`);
+            return;
         }
+
+        // Calculate approximate scroll position
+        const messageHeight = 100; // Estimated average height of a message
+        const scrollPosition = messageIndex * messageHeight;
+
+        // Scroll to position
+        scrollViewRef.current.scrollTo({
+            y: scrollPosition,
+            animated: true
+        });
     };
 
 
@@ -423,13 +495,10 @@ export default function MessageScreen() {
         multiple: true, // Allow multiple files
         copyToCacheDirectory: true, // Recommended
       });
-      console.log("Multi-file pick result:", result);
       if (result.canceled) {
-        console.log('User cancelled file picker');
         return;
       }
       if (result.assets && result.assets.length > 0) {
-        console.log("Selected Files:", result.assets);
         setFile(result.assets);
         setFileName(result.assets.map(asset => asset.name)); 
       }
@@ -445,11 +514,10 @@ const pickMultipleImages = async () => {
     });
 
     if (!result.canceled) {
-       if (result.assets && result.assets.length > 0) {
-          console.log("Selected URIs:", result.assets);
+        if (result.assets && result.assets.length > 0) {
           setImage(result.assets); // Lưu mảng các assets
           setImageName(result.assets.map(asset => asset.uri)); // Hiển thị ảnh đầu tiên làm preview (ví dụ)
-       }
+        }
     }
   };
 
@@ -462,7 +530,7 @@ const pickMultipleImages = async () => {
         }
     } else if (file != null) {
         try {
-            // await sendMessageFile(chat._id, file);
+            await handleSendMessageFile(chat._id, file);
             setFile(null);
             setFileName(null);
         } catch (error) {
@@ -474,11 +542,45 @@ const pickMultipleImages = async () => {
     }
   };
 
+const handleReplyMessage = async() => {
+    // Ensure there is a selected message to reply to before calling reply handlers
+    if (!replyingTo) {
+        console.warn("No message selected for reply");
+        return;
+    }
+
+    if (image != null) {
+        try {
+            await handleSendReplyImage(chat._id, image, replyingTo);
+        } catch (error) {
+            console.error("Error sending image message:", error);
+        }
+    } else if (file != null) {
+        try {
+            await handleSendReplyFile(chat._id, file, replyingTo);
+            setFile(null);
+            setFileName(null);
+        } catch (error) {
+            console.error("Error sending file message:", error);
+        }
+    } else if (newMessage.trim().length > 0) {
+        await handleSendReplyText(chat._id, newMessage.trim(), replyingTo);
+    }
+  };
+
+  const handleSend = async() => {
+    if (replyingTo && replyingTo.isDeleted === false) {
+        await handleReplyMessage();
+    } else {
+        await handleSendMessage();
+    }
+    
+  }
 
     
 
 
-   // --- Start Reply Handler ---
+    // --- Start Reply Handler ---
     const handleStartReply = (messageToReply: ItemMessage) => {
         setReplyingTo(messageToReply);
         // Optionally focus the TextInput here
@@ -501,27 +603,23 @@ const pickMultipleImages = async () => {
     // --- THÊM: Hàm mở/đóng Modal tin nhắn ghim ---
     const handleOpenPinnedModal = () => setPinnedModalVisible(true);
     const handleClosePinnedModal = () => setPinnedModalVisible(false);
-    const handleStartReplyFromModal = () => {
-        if (selectedMessage) handleStartReply(selectedMessage);
+    const handlePinnTo = async () => {
+        if (selectedMessage) {
+            await handlePinMessage(selectedMessage,userId || '');
+        }
     };
-    const handlePinMessage = () => {
-        if (selectedMessage) console.log("Pin/Unpin message:", selectedMessage._id, "(Not implemented)");
-        // TODO: Gọi API pin/unpin
-    };
-    const handleDeleteMessage = () => {
-        if (selectedMessage) console.log("Delete message:", selectedMessage._id, "(Not implemented)");
-         // TODO: Gọi API xóa
-    }
+
+    
 
     // --- Định nghĩa hành động cho Modal ---
     const modalActions: ActionItem[] = selectedMessage ? [
-        { text: "Reply", icon: "arrow-undo-outline" as const, onPress: handleStartReplyFromModal },
-        { text: selectedMessage.pinnedInfo ? "Unpin" : "Pin", icon: "pin-outline" as const, onPress: handlePinMessage },
-        { text: "Delete", icon: "trash-outline" as const, onPress: handleDeleteMessage, color: '#E53E3E' }, 
+        { text: "Reply", icon: "arrow-undo-outline" as const, onPress: () => { handleStartReply(selectedMessage); } },
+        { text: selectedMessage.pinnedInfo ? "Unpin" : "Pin", icon: "pin-outline" as const, onPress: handlePinnTo },
+        { text: "Delete", icon: "trash-outline" as const, onPress: () => handleDeleteMessage(selectedMessage), color: '#E53E3E' },
     ] : [];
 
     
-   
+    
 
     // Component hiển thị loading khi tải thêm tin nhắn cũ
     const renderListHeader = () => {
@@ -532,186 +630,242 @@ const pickMultipleImages = async () => {
             </View>
         );
     };
-    if (userId === null) {
+
+    // +++ SỬA LỖI: DI CHUYỂN CÁC HOOK NÀY LÊN TRÊN KHỐI IF(userId === null) +++
+    const renderMessageItem = useCallback(({ item }: { item: ItemMessage }) => (
+        <MessageBubble
+            message={item}
+            userId={userId}
+            onShowActions={handleShowActions}
+            navigation={navigation}
+        />
+    ), [userId, navigation, handleShowActions]);
+
+    const handleLoadMore = useCallback(() => {
+        if (!loadingMore && hasMore) {
+            loadMoreMessages();
+        }
+    }, [loadingMore, hasMore, loadMoreMessages]);
+
+    const renderLoadingIndicator = useMemo(() => (
+        <View style={styles.loadingMoreContainer}>
+            <ActivityIndicator size="small" color="#007AFF" />
+        </View>
+    ), []);
+
+
+    // +++ SỬA LỖI: XÓA KHỐI `if (userId === null)` Ở ĐÂY VÀ CHUYỂN LOGIC VÀO RETURN BÊN DƯỚI +++
+    /* if (userId === null) {
         return (
             <SafeAreaProvider>
                 <SafeAreaView style={styles.safeArea}>
-                     <View style={styles.centeredContainer}>
-                         <ActivityIndicator size="large" color="#007AFF" />
-                     </View>
+                       <View style={styles.centeredContainer}>
+                           <ActivityIndicator size="large" color="#007AFF" />
+                       </View>
                 </SafeAreaView>
             </SafeAreaProvider>
         );
     }
-    // --- RENDER MESSAGE BUBBLE ---
-     const renderMessageItem = ({ item }: { item: ItemMessage }) => (
-        <MessageBubble
-            message={item}
-            userId={userId} // Pass userId as prop
-            onShowActions={handleShowActions} // Đổi tên prop
-            navigation={navigation}
-        />
-    );
+    */
+   // 3. Component loading
+    const renderHeader = () => {
+        if (!loadingMore) return null;
+        return (
+            <View style={styles.loadingMoreContainer}>
+                <ActivityIndicator size="small" color="#007AFF" />
+            </View>
+        );
+    };
+    
 
     return (
         <SafeAreaProvider>
             <SafeAreaView style={styles.safeArea}>
-                <TopNavigations_Message 
-                        navigation={navigation} 
-                        chatPartner={{chatID: chat._id, name: chat.name, avatar: chat.avatar, isOnline: true /* Lấy trạng thái online thực tế */ }} 
-                        onShowPinned={handleOpenPinnedModal} // Truyền hàm mở modal
-                        hasPinnedMessages={pinnedMessages.length > 0}
-                        />
 
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    style={styles.container}
-                    keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0} // Điều chỉnh nếu cần
-                >
-                    {/* Chỉ báo loading ban đầu */}
-                    {loading && messages.length === 0 && (
-                        <View style={styles.centeredContainer}>
-                           <ActivityIndicator size="large" color="#007AFF" />
-                        </View>
-                    )}
+                {/* +++ SỬA LỖI: THÊM LOGIC KIỂM TRA `userId` Ở ĐÂY +++ */}
+                {userId === null ? (
+                    // Hiển thị loading nếu chưa có userId
+                    <View style={styles.centeredContainer}>
+                        <ActivityIndicator size="large" color="#007AFF" />
+                    </View>
+                ) : (
+                    // Hiển thị toàn bộ màn hình chat nếu đã có userId
+                    <>
+                        <TopNavigations_Message 
+                                navigation={navigation} 
+                                chatPartner={{chatID: chat._id, name: chat.name, avatar: chat.avatar, isOnline: true /* Lấy trạng thái online thực tế */ }} 
+                                onShowPinned={handleOpenPinnedModal} // Truyền hàm mở modal
+                                hasPinnedMessages={pinnedMessages.length > 0}
+                                />
 
-                    {/* Hiển thị lỗi ban đầu */}
-                    {error && messages.length === 0 && (
-                         <View style={styles.centeredContainer}>
-                           <Text style={styles.errorText}>{error}</Text>
-                           {/* Có thể thêm nút Thử lại */}
-                        </View>
-                    )}
-
-                    {/* Chỉ hiển thị danh sách khi không loading ban đầu HOẶC đã có sẵn tin nhắn */}
-                    {(!loading || messages.length > 0) && (
-                       <FlatList
-                            ref={flatListRef}
-                            data={messages}
-                            renderItem={renderMessageItem}
-                            keyExtractor={(item,index) => `${item._id}-${index}`}
-                            style={styles.messageList}
-                            contentContainerStyle={styles.listContentContainer}
-                            onEndReached={loadMoreMessages}
-                            onEndReachedThreshold={0.5}
-                            ListHeaderComponent={renderListHeader} 
-                            maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-                        />
-                    )}
-                  {/* --- Input Container with Reply Bar --- */}
-                    <View style={styles.inputAreaWrapper}>
-                        {replyingTo && (
-                            <ReplyBar message={replyingTo} onCancel={handleCancelReply} />
-                        )}  
-                        {/* Hiển thị preview file/ảnh đã chọn */}
-                        {(image || file) && (
-                            <View style={styles.attachmentPreviewContainer}>
-                                {/* TODO: Render danh sách ảnh/file nhỏ ở đây */}
-                                <Text style={styles.attachmentText}>
-                                     {image ? `${image.length} ảnh` : ''}
-                                     {file ? `${file.length} tệp` : ''} đã chọn
-                                </Text>
-                                <TouchableOpacity onPress={() => { setImage(null); setFile(null); setImageName(null); setFileName(null); }} style={styles.cancelAttachmentButton}>
-                                      <Ionicons name="close-circle" size={20} color="#9CA3AF" />
-                                </TouchableOpacity>
-                            </View>
-                        )}
-                    {/* Khu vực nhập liệu */}
-                    <View style={styles.inputContainer}>
-                            <TextInput
-                                    style={styles.textInput}
-                                    placeholder="Nhập tin nhắn..."
-                                    placeholderTextColor="#98A2B3"
-                                    value={newMessage}
-                                    onChangeText={setNewMessage}
-                                    multiline
-                            />
-                            {newMessage.trim().length > 0 || image != null ? (
-                                <View style={styles.attachmentContainer}>
-                                    <TouchableOpacity style={styles.sendButton} onPress={() => handleSendMessage()}>
-                                        <Ionicons name="paper-plane" size={22} color="#FFFFFF" />
-                                    </TouchableOpacity>
-                                    {(image != null || file != null) && (
-                                    <TouchableOpacity style={styles.closeButton} onPress={() => { setImage(null); setFile(null); setImageName(null); setFileName(null); }}>
-                                        <Ionicons name="close-circle" size={22} color="#FFFFFF" />
-                                    </TouchableOpacity>
-                                    )}
-                                </View>
-                            )  : (
-                                <View style={styles.actionButtonsContainer}>
-                                    <TouchableOpacity style={styles.actionButton}>
-                                        <Ionicons name="happy-outline" size={24} color="#667085" />
-                                    </TouchableOpacity>
-                                    <TouchableOpacity style={styles.actionButton} onPress={pickMultipleImages}>
-                                        <Ionicons name="image-outline" size={24} color="#667085" />
-                                    </TouchableOpacity>
-                                        <TouchableOpacity style={styles.actionButton} onPress={pickMultipleFiles}>
-                                            <Ionicons name="attach-outline" size={24} color="#667085" />
-                                        </TouchableOpacity>
-                                    {/* Thêm các nút khác nếu cần */}
+                        <KeyboardAvoidingView
+                            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                            style={styles.container}
+                            keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0} // Điều chỉnh nếu cần
+                        >
+                            {/* Chỉ báo loading ban đầu */}
+                            {loading && messages.length === 0 && (
+                                <View style={styles.centeredContainer}>
+                                    <ActivityIndicator size="large" color="#007AFF" />
                                 </View>
                             )}
-                    </View>
-                  </View>
-                </KeyboardAvoidingView>
-                {/* --- Render Modal Hành Động --- */}
-                <Modal
-                    animationType="fade"
-                    transparent={true}
-                    visible={modalVisible}
-                    onRequestClose={handleCloseModal}
-                >
-                    <TouchableWithoutFeedback onPress={handleCloseModal}>
-                        <View style={styles.modalBackdrop} />
-                    </TouchableWithoutFeedback>
-                    <View style={styles.modalContent}>
-                        {modalActions.map((action, index) => (
-                            <TouchableOpacity
-                                key={index}
-                                style={styles.modalActionButton}
-                                onPress={() => { action.onPress(); handleCloseModal(); }}
-                                activeOpacity={0.7}
-                            >
-                                <Ionicons name={action.icon} size={22} color={action.color || '#333'} style={styles.modalActionIcon} />
-                                <Text style={[styles.modalActionText, { color: action.color || '#333' }]}>
-                                    {action.text}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                </Modal>
-                {/* --- THÊM: Modal Danh Sách Tin Nhắn Ghim --- */}
-                <Modal
-                    animationType="slide" // Hoặc "fade"
-                    transparent={false} // Không trong suốt để che nội dung bên dưới
-                    visible={pinnedModalVisible}
-                    onRequestClose={handleClosePinnedModal}
-                >
-                    <SafeAreaView style={styles.pinnedModalContainer}>
-                        {/* Header của Modal Pinned */}
-                        <View style={styles.pinnedModalHeader}>
-                            <TouchableOpacity onPress={handleClosePinnedModal} style={styles.pinnedCloseButton}>
-                                <Ionicons name="close" size={28} color="#007AFF" />
-                            </TouchableOpacity>
-                            <Text style={styles.pinnedModalTitle}>Tin Nhắn Đã Ghim ({pinnedMessages.length})</Text>
-                            <View style={{ width: 40 }} /> {/* Placeholder để căn giữa title */}
-                        </View>
 
-                        {/* Danh sách tin nhắn ghim */}
-                        {pinnedMessages.length > 0 ? (
-                            <FlatList
-                                data={pinnedMessages}
-                                renderItem={({ item }) => <PinnedMessageItem message={item} onCloseModal={handleClosePinnedModal} onGoToMessage={() => scrollToMessage(item._id)} />}
-                                keyExtractor={item => item._id}
-                                contentContainerStyle={styles.pinnedListContent}
-                            />
-                        ) : (
-                            <View style={styles.centeredContainer}>
-                                <Text style={styles.infoText}>Chưa có tin nhắn nào được ghim.</Text>
+                            {/* Hiển thị lỗi ban đầu */}
+                            {error && messages.length === 0 && (
+                                    <View style={styles.centeredContainer}>
+                                    <Text style={styles.errorText}>{error}</Text>
+                                    {/* Có thể thêm nút Thử lại */}
+                                </View>
+                            )}
+
+                            {/* Chỉ hiển thị danh sách khi không loading ban đầu HOẶC đã có sẵn tin nhắn */}
+                            {(!loading || messages.length > 0) && (
+                                <FlatList
+                                    ref={flatListRef}
+                                    data={messages} // Mảng [cũ...mới]
+                                    keyExtractor={(item, index) => `${item._id}-${index}`}
+                                    renderItem={({ item }) => (
+                                        <MessageBubble
+                                            message={item}
+                                            userId={userId}
+                                            onShowActions={handleShowActions}
+                                            navigation={navigation}
+                                        />
+                                    )}
+                                    style={styles.messageList}
+                                    contentContainerStyle={styles.listContentContainer}
+                                    // 4. Component Loading ở trên ĐỈNH
+                                    ListHeaderComponent={renderHeader}
+                                    scrollEventThrottle={100} // Tăng tần suất check scroll
+                                    // 6. Tự động cuộn xuống đáy khi mới mở/gửi tin
+                                    onContentSizeChange={() => {
+                                        if (isAtBottom) {
+                                            flatListRef.current?.scrollToEnd({ animated: true });
+                                        }
+                                    }}
+                                    maintainVisibleContentPosition={{
+                                        minIndexForVisible: 0,
+                                        autoscrollToTopThreshold: 100 // Tùy chỉnh nếu cần
+                                    }}
+                                />
+                            )}
+                            {/* --- Input Container with Reply Bar --- */}
+                            <View style={styles.inputAreaWrapper}>
+                                {replyingTo && (
+                                    <ReplyBar message={replyingTo} onCancel={handleCancelReply} />
+                                )}  
+                                {/* Hiển thị preview file/ảnh đã chọn */}
+                                {(image || file) && (
+                                    <View style={styles.attachmentPreviewContainer}>
+                                        {/* TODO: Render danh sách ảnh/file nhỏ ở đây */}
+                                        <Text style={styles.attachmentText}>
+                                            {image ? `${image.length} ảnh` : ''}
+                                            {file ? `${file.length} tệp` : ''} đã chọn
+                                        </Text>
+                                        <TouchableOpacity onPress={() => { setImage(null); setFile(null); setImageName(null); setFileName(null); }} style={styles.cancelAttachmentButton}>
+                                            <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+                                {/* Khu vực nhập liệu */}
+                                <View style={styles.inputContainer}>
+                                        <TextInput
+                                                style={styles.textInput}
+                                                placeholder="Nhập tin nhắn..."
+                                                placeholderTextColor="#98A2B3"
+                                                value={newMessage}
+                                                onChangeText={setNewMessage}
+                                                multiline
+                                        />
+                                        {newMessage.trim().length > 0 || image != null ? (
+                                            <View style={styles.attachmentContainer}>
+                                                <TouchableOpacity style={styles.sendButton} onPress={() => handleSend()}>
+                                                    <Ionicons name="paper-plane" size={22} color="#FFFFFF" />
+                                                </TouchableOpacity>
+                                                {(image != null || file != null) && (
+                                                <TouchableOpacity style={styles.closeButton} onPress={() => { setImage(null); setFile(null); setImageName(null); setFileName(null); }}>
+                                                    <Ionicons name="close-circle" size={22} color="#FFFFFF" />
+                                                </TouchableOpacity>
+                                                )}
+                                            </View>
+                                        )  : (
+                                            <View style={styles.actionButtonsContainer}>
+                                                <TouchableOpacity style={styles.actionButton}>
+                                                    <Ionicons name="happy-outline" size={24} color="#667085" />
+                                                </TouchableOpacity>
+                                                <TouchableOpacity style={styles.actionButton} onPress={pickMultipleImages}>
+                                                    <Ionicons name="image-outline" size={24} color="#667085" />
+                                                </TouchableOpacity>
+                                                    <TouchableOpacity style={styles.actionButton} onPress={pickMultipleFiles}>
+                                                        <Ionicons name="attach-outline" size={24} color="#667085" />
+                                                    </TouchableOpacity>
+                                                {/* Thêm các nút khác nếu cần */}
+                                            </View>
+                                        )}
+                                </View>
                             </View>
-                        )}
-                    </SafeAreaView>
-                </Modal>
+                        </KeyboardAvoidingView>
+                        {/* --- Render Modal Hành Động --- */}
+                        <Modal
+                            animationType="fade"
+                            transparent={true}
+                            visible={modalVisible}
+                            onRequestClose={handleCloseModal}
+                        >
+                            <TouchableWithoutFeedback onPress={handleCloseModal}>
+                                <View style={styles.modalBackdrop} />
+                            </TouchableWithoutFeedback>
+                            <View style={styles.modalContent}>
+                                {modalActions.map((action, index) => (
+                                    <TouchableOpacity
+                                        key={index}
+                                        style={styles.modalActionButton}
+                                        onPress={() => { action.onPress(); handleCloseModal();  }}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name={action.icon} size={22} color={action.color || '#333'} style={styles.modalActionIcon} />
+                                        <Text style={[styles.modalActionText, { color: action.color || '#333' }]}>
+                                            {action.text}
+                                        </Text>
+                                    </TouchableOpacity>
+                                    ))}
+                            </View>
+                        </Modal>
+                        {/* --- THÊM: Modal Danh Sách Tin Nhắn Ghim --- */}
+                        <Modal
+                            animationType="slide" // Hoặc "fade"
+                            transparent={false} // Không trong suốt để che nội dung bên dưới
+                            visible={pinnedModalVisible}
+                            onRequestClose={handleClosePinnedModal}
+                        >
+                            <SafeAreaView style={styles.pinnedModalContainer}>
+                                {/* Header của Modal Pinned */}
+                                <View style={styles.pinnedModalHeader}>
+                                    <TouchableOpacity onPress={handleClosePinnedModal} style={styles.pinnedCloseButton}>
+                                        <Ionicons name="close" size={28} color="#007AFF" />
+                                    </TouchableOpacity>
+                                    <Text style={styles.pinnedModalTitle}>Tin Nhắn Đã Ghim ({pinnedMessages.length})</Text>
+                                    <View style={{ width: 40 }} /> {/* Placeholder để căn giữa title */}
+                                </View>
+
+                                {/* Danh sách tin nhắn ghim */}
+                                {pinnedMessages.length > 0 ? (
+                                    <FlatList
+                                        data={pinnedMessages}
+                                        renderItem={({ item }) => <PinnedMessageItem message={item} onCloseModal={handleClosePinnedModal} onGoToMessage={() => scrollToMessage(item._id)} handleUnpinMessage={handleUnpinMessage} />}
+                                        keyExtractor={(item,index) =>`${item._id}-${index}`}
+                                        contentContainerStyle={styles.pinnedListContent}
+                                    />
+                                ) : (
+                                    <View style={styles.centeredContainer}>
+                                        <Text style={styles.infoText}>Chưa có tin nhắn nào được ghim.</Text>
+                                    </View>
+                                )}
+                            </SafeAreaView>
+                        </Modal>
+                    </>
+                )}
+
             </SafeAreaView>
         </SafeAreaProvider>
     );
@@ -720,14 +874,33 @@ const pickMultipleImages = async () => {
 const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
     container: { flex: 1, backgroundColor: '#F9FAFB' }, // Màu nền khu vực chat
-    messageList: { flex: 1 },
-    listContentContainer: { // Style cho nội dung bên trong FlatList
+    messageList: {
+        flex: 1,
+    },
+    deletedMessageContainer: {
+    alignSelf: 'center',
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+    marginVertical: 8,
+  },
+  deletedMessageText: {
+    fontStyle: 'italic',
+    color: '#F9FAFB',
+    fontSize: 13,
+  },
+    listContentContainer: {
         paddingVertical: 10,
         paddingHorizontal: 10,
     },
     centeredContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     errorText: { color: 'red', fontSize: 16, padding: 20, textAlign: 'center' },
-    loadingMoreContainer: { paddingVertical: 15, alignItems: 'center' },
+    loadingMoreContainer: {
+        padding: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
 
     messageRow: { flexDirection: 'row', marginVertical: 8, alignItems: 'flex-end' },
     sentRow: { justifyContent: 'flex-end', paddingLeft: Dimensions.get('window').width * 0.15 },
@@ -829,7 +1002,7 @@ const styles = StyleSheet.create({
     timestamp: { fontSize: 11, color: '#8A8A8E', marginTop: 5 },
     sentTimestamp: { marginRight: 5 },
     receivedTimestamp: { marginLeft: 5 },
-     fileIcon: {
+      fileIcon: {
         marginRight: 15,
     },
     linkMessage: { color: '#0645AD', fontSize: 15, textDecorationLine: 'underline' },
@@ -890,54 +1063,57 @@ const styles = StyleSheet.create({
     pinnedListContent: {
         padding: 16,
     },
-    pinnedItemContainer: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 10,
-        padding: 15,
-        marginBottom: 12,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.08,
-        shadowRadius: 4,
-        elevation: 3,
-    },
-    pinnedItemHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    pinnedAvatar: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        marginRight: 10,
-    },
-    pinnedSenderName: {
-        flex: 1, // Để tên co giãn
-        fontSize: 15,
-        fontWeight: '600',
-        color: '#1C1C1E',
-        marginRight: 8,
-    },
-    pinnedTimestamp: {
-        fontSize: 13,
-        color: '#8A8A8E',
-    },
-    pinnedContent: {
-        fontSize: 15,
-        color: '#3C3C43',
-        marginBottom: 8,
-    },
-    pinnedByText: {
-        fontSize: 12,
-        color: '#AEAEB2',
-        marginTop: 4,
-        textAlign: 'right',
-    },
+    pinnedItemContainer: { 
+    padding: 10, 
+    borderBottomWidth: 1, 
+    borderBottomColor: '#eee' 
+  },
+  pinnedItemHeader: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    marginBottom: 5 
+  },
+  pinnedAvatar: { 
+    width: 24, 
+    height: 24, 
+    borderRadius: 12, 
+    marginRight: 8 
+  },
+  pinnedSenderName: { 
+    fontWeight: 'bold', 
+    flex: 1, // <- QUAN TRỌNG: Đẩy mọi thứ khác sang phải
+    marginRight: 8, // Thêm khoảng cách
+  },
+    rightHeaderGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  pinnedTimestamp: { 
+    fontSize: 12, 
+    color: '#888',
+    marginRight: 10, // <- THAY ĐỔI: Thêm khoảng cách với nút 'X'
+  },
+  unpinButton: {
+    padding: 4, // Tăng vùng nhấn
+  },
+  unpinButtonText: {
+    fontSize: 16,
+    color: '#888',
+    fontWeight: 'bold',
+  },
+  pinnedContent: { 
+    fontSize: 14, 
+    color: '#333', 
+    marginBottom: 5 
+  },
+  pinnedByText: { 
+    fontSize: 12, 
+    color: '#888', 
+    fontStyle: 'italic' 
+  },
     infoText: { // Dùng lại style này cho modal rỗng
         fontSize: 16,
         color: '#666',
         marginTop: 10,
     },
-
 });

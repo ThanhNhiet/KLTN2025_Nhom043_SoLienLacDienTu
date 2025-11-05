@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
     View,
     Text,
@@ -9,7 +9,8 @@ import {
     Image,
     Dimensions,
     Alert, // MỚI: Thêm Alert để báo lỗi download
-    Linking // MỚI: Thêm Linking để mở link
+    Linking, // MỚI: Thêm Linking để mở link
+    Platform
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import TopNavigations_Detail from "@/src/components/navigations/TopNavigations";
@@ -17,7 +18,9 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { FontAwesome } from "@expo/vector-icons";
 import { useMessageDetail } from "@/src/services/useapi/chat/UseMessageDetail";
 import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
+import * as Mime from "react-native-mime-types";
+import * as IntentLauncher from "expo-intent-launcher";
+
 
 // Lấy chiều rộng màn hình để chia cột cho lưới ảnh
 const { width } = Dimensions.get('window');
@@ -30,10 +33,12 @@ enum MediaTab {
 }
 type ImageItemType = {
     id: string;
+    messageID: string;
     uri: string;
 }
 type FileItemType = {
     id: string;
+    messageID: string;
     url: string;
     name: string;
 }
@@ -49,21 +54,14 @@ type ChatInfoType = {
     memberCount: number;
 }
 
-// MỚI: Hàm tiện ích để format kích thước file
-const formatBytes = (bytes: number, decimals = 2): string => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-}
 
 
 export default function MessageDetailScreen() {
-    const navigation = useNavigation();
+    // Provide a generic to useNavigation so TypeScript knows navigate can accept route names and params
+    const navigation = useNavigation<any>();
     const [activeTab, setActiveTab] = useState<MediaTab>(MediaTab.Photos);
     const [downloadingId, setDownloadingId] = useState<string | null>(null); // MỚI: State để theo dõi file đang tải
+
     const router = useRoute();
     const { chatID } = router.params as { chatID: string };
 
@@ -74,7 +72,8 @@ export default function MessageDetailScreen() {
         links,
         chatInfo,
         loading,
-        error
+        error,
+        openFile
     } = useMessageDetail(chatID);
 
     if (loading) {
@@ -97,9 +96,15 @@ export default function MessageDetailScreen() {
          )
     }
 
-    // MỚI: Hàm xử lý download và share file
+    
+    // CẬP NHẬT: Hàm xử lý tải file
     const handleDownload = async (item: FileItemType) => {
-       
+        if (!item?.url) {
+            Alert.alert("Lỗi", "Không tìm thấy đường dẫn tải file.");
+            return;
+        }
+
+    
     };
 
     // MỚI: Hàm xử lý mở link
@@ -111,17 +116,20 @@ export default function MessageDetailScreen() {
             Alert.alert("Lỗi", `Không thể mở đường dẫn: ${url}`);
         }
     };
+    const openGoogleDocs = (fileUrl: string) => {
+            const googleDocsUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(fileUrl)}&embedded=true`;
+            Linking.openURL(googleDocsUrl);
+        };
 
 
     // Render 1 ô ảnh trong lưới
-    const renderImageItem = ({ item }: { item: ImageItemType }) => (
-        <TouchableOpacity style={styles.imageItemContainer}>
+    const renderImageItem = ({ item}: { item: ImageItemType }) => (
+        <TouchableOpacity style={styles.imageItemContainer} onPress={() => navigation.navigate("FullImageScreen", { uri: item.uri })}>
             <Image source={{ uri: item.uri }} style={styles.imageItem} />
         </TouchableOpacity>
     );
 
-    // (Các hàm helper getExtFromUrl, getFileIconByExt, getFileIconFromUrl của bạn giữ nguyên - đã rất tốt)
-    // ... (Giữ nguyên 3 hàm getExtFromUrl, getFileIconByExt, getFileIconFromUrl) ...
+    
     const getExtFromUrl = (url: string): string => {
         try {
             const clean = decodeURIComponent(url.split('?')[0]);
@@ -168,19 +176,23 @@ export default function MessageDetailScreen() {
 
     // CẬP NHẬT: Render 1 hàng file (thêm size và xử lý download)
     const renderFileItem = ({ item }: { item: FileItemType }) => (
-        <TouchableOpacity style={styles.fileItemContainer} onPress={() => handleDownload(item)}>
+        <TouchableOpacity style={styles.fileItemContainer} onPress={() => openGoogleDocs(item.url)}>
             <FontAwesome name={getFileIconFromUrl(item.url) as any} size={32} color="#555" style={styles.fileIcon} />
             <View style={styles.fileInfo}>
                 <Text style={styles.fileName} numberOfLines={1}>{item.name}</Text>
             </View>
-            {/* CẬP NHẬT: Hiển thị loading khi đang tải */}
-            <TouchableOpacity style={styles.downloadButton} onPress={() => handleDownload(item)} disabled={!!downloadingId}>
-                {downloadingId === item.id ? (
-                    <ActivityIndicator size="small" color="#007AFF" />
-                ) : (
-                    <FontAwesome name="download" size={20} color="#007AFF" />
-                )}
-            </TouchableOpacity>
+            {/* Hiển thị loading khi đang tải; chỉ disable các nút khác, không tất cả */}
+            <TouchableOpacity
+          style={styles.downloadButton}
+          onPress={() => handleDownload(item)}
+          disabled={downloadingId !== null && downloadingId !== item.id}
+        >
+            {downloadingId === item.id ? (
+                <ActivityIndicator size="small" color="#007AFF" />
+            ) : (
+                <FontAwesome name="download" size={20} color="#007AFF" />
+            )}
+        </TouchableOpacity>
         </TouchableOpacity>
     );
 

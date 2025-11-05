@@ -7,6 +7,7 @@ import {
   Image,
   TouchableOpacity,
   Alert,
+  ActivityIndicator
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -24,6 +25,8 @@ export default function ProfileDetailScreen() {
   const {
     profile,
     labelMap,
+    loading,
+    error,
     getUpdateAvatar,
     avatarUrl,
     setAvatarUrl,
@@ -122,6 +125,11 @@ export default function ProfileDetailScreen() {
         />
 
         <View style={styles.contentContainer} />
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#4A90E2" />
+          </View>
+        ) : (
         <ScrollView contentContainerStyle={styles.content}>
           {/* Avatar + nút chỉnh */}
           <View style={styles.avatarWrap}>
@@ -181,22 +189,40 @@ export default function ProfileDetailScreen() {
             <Text style={styles.cardTitle}>
               {isStudent ? "Thông tin phụ huynh" : "Thông tin học sinh"}
             </Text>
-            {(isStudent
-              ? Object.entries(profileParent || {})
-              : Object.entries(profileStudent || {})
-            )
-            .map(([key, value]) => (
-              <View key={key} style={styles.infoRow}>
-                <Text style={styles.label}>
-                  {isStudent
-                    ? labelMapParent[key] || key
-                    : labelMapStudent[key] || key}
-                </Text>
-                <Text style={styles.value} numberOfLines={1}>
-                  {String(value ?? "")}
-                </Text>
-              </View>
-            ))}
+
+            {/* 1. Chọn đúng mảng */}
+            {((isStudent ? profileParent : profileStudent) || [])
+              
+              /* 2. Lặp qua mảng (mỗi 'item' là một object, ví dụ: { name: 'An' }) */
+              .map((item, index) => (
+                
+                /* Dùng React.Fragment để nhóm các hàng của 1 người */
+                /* Lưu ý: Nếu 'item' có 'id' duy nhất, hãy dùng key={item.id} */
+                <React.Fragment key={index}> 
+                
+                  {/* 3. Lặp qua các thuộc tính (key, value) của 'item' đó */}
+                  {Object.entries(item || {}).map(([key, value]) => (
+                    <View key={key} style={styles.infoRow}>
+                      <Text style={styles.label}>
+                        {isStudent
+                          ? labelMapParent[key] || key
+                          : labelMapStudent[key] || key}
+                      </Text>
+                      <Text style={styles.value} numberOfLines={1}>
+                        {String(value ?? "")}
+                      </Text>
+                    </View>
+                  ))}
+
+                  {/* (TÙY CHỌN) Thêm vạch ngăn cách giữa các phần tử.
+                    Dòng này kiểm tra để không thêm vạch kẻ sau phần tử cuối cùng.
+                  */}
+                  {index < (isStudent ? profileParent : profileStudent).length - 1 && (
+                    <View style={styles.separator} />
+                  )}
+
+                </React.Fragment>
+              ))}
           </View>
           {/* Nút chỉnh sửa hồ sơ */}
           <TouchableOpacity
@@ -210,7 +236,7 @@ export default function ProfileDetailScreen() {
               initialValues={initialValues}
               onSubmit={handleSubmitProfile}
           />
-        </ScrollView>
+        </ScrollView>)}
       </View>
     </SafeAreaView>
   );
@@ -230,6 +256,12 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 18,
     paddingBottom: 28,
+  },
+  loadingContainer: {
+    flex: 1, // Chiếm hết phần không gian còn lại
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F3F6FB", // Đồng bộ màu nền
   },
 
   /* ===== Avatar ===== */
@@ -334,6 +366,11 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     paddingVertical: 2,
   },
+  separator: {
+  height: 1,
+  backgroundColor: '#e0e0e0', // Màu xám nhạt
+  marginVertical: 10,       // Khoảng cách trên và dưới
+ },
 
   /* ===== Info rows ===== */
   infoRow: {

@@ -33,6 +33,7 @@ export const useLogin_out = () => {
                 console.log("Login successful, tokens received");
                 await AsyncStorage.setItem('token', token);
                 await AsyncStorage.setItem('refreshToken', refreshToken);
+                
                 navigation.navigate("HomeScreen");
             }
         } catch (error: any) {
@@ -187,6 +188,6 @@ export const useLogin_out = () => {
         verifyOTP,
         changePassword,
         getlogout,
-        isLoading
+        isLoading,
     }
 };

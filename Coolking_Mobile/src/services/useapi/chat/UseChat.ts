@@ -1,7 +1,9 @@
 import { useEffect, useState,useCallback } from "react";
 import { getChats , getSearchChatsByKeyword , getSearchUsersByKeyword, createNewChatPrivate} from "../../api/chat/ChatApi";
 import { refresh } from "@react-native-community/netinfo";
-
+import { updatelastReadMessage } from "../../api/chat/MessageApi";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { set } from "date-fns";
 // Giữ nguyên các type ChatItemType, lastMessageType
 type ChatItemType = {
     _id: string;
@@ -28,6 +30,24 @@ export const useChat = () => {
     const [error, setError] = useState<Error | null>(null);
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState<any[]>([]);
+    const [userID, setUserID] = useState<string>('');
+
+    useEffect(() => {
+        const fetchUserID = async () => {
+            try {
+                const storedUserID = await AsyncStorage.getItem("userId");
+                if (storedUserID) {
+                    setUserID(storedUserID);
+                } else {
+                    console.warn("No user ID found in storage");
+                }
+
+            } catch (error) {
+                console.error("Error fetching user ID:", error);
+            }
+        }
+        fetchUserID();
+    }, []);
 
     const getfetchChats = useCallback(async (page: number,pageSize: number) => {
         try {
@@ -123,6 +143,23 @@ export const useChat = () => {
 
     },[]);
 
+    const markMessagesAsRead = useCallback(async (chatID: string) => {
+        try {
+            if (!chatID) {
+                console.warn("markMessagesAsRead called with invalid chatID");
+                return;
+            }
+            const data = await updatelastReadMessage(chatID);
+            if (!data && !data.success) {
+                console.warn("No data returned from updatelastReadMessage");
+                return;
+            }
+        } catch (error) {
+            setError(error as Error);
+        }
+    },[]);
+
+    //console.log("useChat - chats:", chats);
 
     return {
         chats,
@@ -134,6 +171,8 @@ export const useChat = () => {
         totalPages,
         searchChats,
         searchUsers,
-        createPrivateChat
+        createPrivateChat,
+        userID,
+        markMessagesAsRead,
     };
 };

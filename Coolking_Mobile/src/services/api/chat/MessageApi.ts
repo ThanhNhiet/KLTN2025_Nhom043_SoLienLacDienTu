@@ -143,3 +143,130 @@ export const getPinnedMessage = async (chatId: string) => {
         throw error;
     }
 }
+
+export const pinMessage = async (messageID: string,userId: string) => {
+    try {
+        const response = await axiosInstance.post(`api/messages/pinned`, {
+           messageID,
+           pinnedBy: userId
+        });
+        if (response.data == null) {
+            throw new Error("No data received");
+        }
+        return response.data;
+    } catch (error) {
+        console.error("Error pinning message:", error);
+        throw error;
+    }
+};
+
+export const unpinMessage = async (messageID: string) => {
+    try {
+        const response = await axiosInstance.post(`/api/messages/unpin/${messageID}`);
+        if (response.data == null) {
+            throw new Error("No data received");
+        }
+        return response.data;
+    } catch (error) {
+        console.error("Error unpinning message:", error);
+        throw error;
+    }
+}
+
+export const apiReplayToMessageText = async (chatID: string, content: string, replyTo: Object) => {
+    try {
+        const response = await axiosInstance.post(`/api/messages/text/reply`, {
+            chatID: chatID,
+            text: content,
+            replyTo: replyTo
+        });
+        if (response.data == null) {
+            throw new Error("No data received");
+        }
+        return response.data;
+    } catch (error) {
+        console.error("Error replying to message:", error);
+        throw error;
+    }
+}
+export const apiReplayToMessageImage = async (chatID: string, fileDatas: File[], replyTo: Object) => {
+    try {
+        const formData = new FormData();
+        formData.append('chatID', chatID);
+        formData.append('replyTo', JSON.stringify(replyTo));
+        fileDatas.forEach((fileData) => {
+            formData.append('files', {
+                uri: fileData.uri,
+                name: fileData.fileName || `photo.${fileData.uri.split('.').pop()}`,
+                type: fileData.mimeType || 'image/jpeg',
+            } as any);
+        });
+        const response = await axiosInstance.post(`/api/messages/image/reply`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+        if (response.data == null) {
+            throw new Error("No data received");
+        }
+        return response.data;
+    } catch (error) {
+        console.error("Error replying to message:", error);
+        throw error;
+    }
+}
+
+export const apiReplayToMessageFile = async (chatID: string, fileDatas: File[], replyTo: Object) => {
+    try {
+        const formData = new FormData();    
+        formData.append('chatID', chatID);
+        formData.append('replyTo', JSON.stringify(replyTo));
+        fileDatas.forEach((fileData) => {   
+            formData.append('files', {
+                uri: fileData.uri,
+                name: fileData.fileName || `file.${fileData.uri.split('.').pop()}`,
+                type: fileData.mimeType || 'application/octet-stream',
+            } as any);
+        });
+        const response = await axiosInstance.post(`/api/messages/file/reply`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+        if (response.data == null) {
+            throw new Error("No data received");
+        }
+        return response.data;
+    } catch (error) {
+        console.error("Error replying to message:", error);
+        throw error;
+    }
+}
+
+export const deleteMessage = async (messageID: string) => {
+    try {
+        const response = await axiosInstance.delete(`/api/messages/${messageID}`);
+        if (response.data == null) {
+            throw new Error("No data received");
+        }
+        return response.data;
+        
+    } catch (error) {
+        console.error("Error deleting message:", error);
+        throw error;
+    }
+}
+
+
+export const updatelastReadMessage = async (chatID: string) => {
+    try {
+        const response = await axiosInstance.put(`/api/messages/lastread/${chatID}`);
+        if (response.data == null) {
+            throw new Error("No data received");
+        }
+        return response.data;
+    } catch (error) {
+        console.error("Error updating last read message:", error);
+        throw error;
+    }
+}

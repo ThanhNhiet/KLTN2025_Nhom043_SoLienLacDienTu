@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
     View,
     Text,
@@ -13,6 +13,19 @@ import { useNavigation } from "@react-navigation/native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import TopNavigations_Chat from '@/src/components/navigations/TopNavigations_Chat';
 import { useChat } from '@/src/services/useapi/chat/UseChat';
+import { API_URL } from "@env";
+import { io } from 'socket.io-client';
+// Declare socket before any component/useEffect uses it to avoid TDZ errors
+let socket: any = null;
+try {
+    if (API_URL) {
+        socket = io(API_URL, { transports: ['websocket'] });
+    }
+} catch (e) {
+    // If socket initialization fails, keep socket as null and log the error
+    console.warn('Socket initialization failed:', e);
+    socket = null;
+}
 
 // --- Interfaces không đổi ---
 type ChatItemType = {
@@ -35,10 +48,64 @@ type lastMessageType = {
 type ChatItemProps = {
     item: ChatItemType;
     onPress: () => void;
+    userID: string;
 };
 
+type ItemMessage = { _id: string; 
+    chatID: string; 
+    type: 'text' | 'image' | string; 
+    content: string; 
+    filename: string | null; 
+    status: string; 
+    isDeleted: boolean; 
+    senderInfo: ItemSenderInfo ; 
+    pinnedInfo: ItemPinnedInfo | null; 
+    replyTo: ItemReplyInfo | null; 
+    createdAt: string; 
+    updatedAt: string; 
+};
+type ItemSenderInfo = { 
+    userID: string; 
+    name: string; 
+    avatar: string | null; 
+    role: string; 
+    muted: boolean; 
+    joninDate?: string | null; 
+    lastReadAt?: string | null; 
+}
+type ItempinnedByinfo ={
+    userID: string; 
+    userName: string; 
+    avatar: string | null; 
+    role: string; 
+    muted: boolean; 
+    joninDate?: string | null; 
+    lastReadAt?: string | null; 
+}
+type ItemReplyByinfo ={
+    userID: string; 
+    userName: string; 
+    avatar: string | null; 
+    role: string; 
+    muted: boolean; 
+    joninDate?: string | null; 
+    lastReadAt?: string | null; 
+}
+type ItemPinnedInfo = { 
+    messageID: string; 
+    pinnedByinfo : ItempinnedByinfo; 
+    pinnedDate: string; 
+}
+type ItemReplyInfo = { 
+    messageID: string; 
+    senderInfo: ItemReplyByinfo; 
+    content: string; 
+    type: string; 
+}
+
 // --- Component ChatItem (không đổi logic, chỉ áp dụng style mới) ---
-const ChatItem = ({ item, onPress }: ChatItemProps) => {
+const ChatItem = ({ item, onPress, userID }: ChatItemProps) => {
+    const isUnread = item.lastMessage && item.lastMessage.senderID !== userID && !item.unread;
 
     const formatTimeUTC = (dateString: string) => {
         // Tách chuỗi đầu vào thành các phần ngày và giờ
@@ -76,21 +143,22 @@ const ChatItem = ({ item, onPress }: ChatItemProps) => {
             <Image source={{ uri: item.avatar }} style={styles.avatar} />
             <View style={styles.contentContainer}>
                 <View style={styles.textContainer}>
-                    <Text style={[styles.userName, item.lastMessage && !item.unread && styles.userNameUnread]} numberOfLines={1}>
+                    <Text style={[styles.userName, isUnread && styles.userNameUnread]} numberOfLines={1}>
                         {item.name}
                     </Text>
                     <Text
-                        style={[styles.lastMessage, item.lastMessage && !item.unread && styles.lastMessageUnread]}
+                        style={[styles.lastMessage, isUnread && styles.lastMessageUnread]}
                         numberOfLines={1}
                     >
                         {item.lastMessage?.content ?? "Chưa có tin nhắn"}
                     </Text>
                 </View>
                 <View style={styles.metaContainer}>
-                    <Text style={styles.time}>{item.lastMessage ? formatTimeUTC(item.lastMessage.createdAt) : ""}</Text>
-                    {item.lastMessage && !item.unread && (
+                    <Text style={styles.time}>
+                        {item.lastMessage ? formatTimeUTC(item.lastMessage.createdAt) : ""}
+                    </Text>
+                    {isUnread && (
                         <View style={styles.unreadBadge}>
-                            {/* Bạn có thể thay isUnread bằng item.unreadCount nếu có */}
                             <Text style={styles.unreadText}>1</Text> 
                         </View>
                     )}
@@ -102,11 +170,70 @@ const ChatItem = ({ item, onPress }: ChatItemProps) => {
 
 export default function ChatScreen() {
     const navigation = useNavigation<any>();
-    // THAY ĐỔI: Thêm hàm `refetch` từ custom hook (giả sử hook có hỗ trợ)
-    const { chats, loading, error, refetch } = useChat();
+    const { chats, loading, error, refetch, userID, markMessagesAsRead } = useChat();
     const [refreshing, setRefreshing] = useState(false);
+    const [localChats, setLocalChats] = useState<ChatItemType[]>([]);
 
-    // THAY ĐỔI: Thêm hàm onRefresh
+    // Initialize localChats when chats changes
+    useEffect(() => {
+        setLocalChats(chats);
+    }, [chats]);
+
+    // Socket event handlers
+    useEffect(() => {
+        if (!socket || !userID) return;
+
+        const handleNewMessage = ({ chat_id, newMessage }: { chat_id: string, newMessage: ItemMessage }) => {
+            setLocalChats(prevChats => {
+                return prevChats.map(chat => {
+                    if (chat._id === chat_id) {
+                        return {
+                            ...chat,
+                            lastMessage: {
+                                senderID: newMessage.senderInfo.userID,
+                                content: newMessage.content,
+                                type: newMessage.type,
+                                createdAt: newMessage.createdAt
+                            },
+                            unread: false
+                        };
+                    }
+                    return chat;
+                });
+            });
+        };
+
+        const handleDeleteMessage = ({ chat_id, message_id }: { chat_id: string; message_id: string }) => {
+            setLocalChats(prevChats => {
+                return prevChats.map(chat => {
+                    if (chat._id === chat_id && chat.lastMessage) {
+                        return {
+                            ...chat,
+                            lastMessage: {
+                                ...chat.lastMessage,
+                                content: '[Tin nhắn đã bị thu hồi]'
+                            },
+                            unread: false
+
+                        };
+                    }
+                    return chat;
+                });
+            });
+        };
+
+        // Register socket event listeners
+        socket.emit('register', userID);
+        socket.on('receive_message', handleNewMessage);
+        socket.on('del_message', handleDeleteMessage);
+
+        // Cleanup function
+        return () => {
+            socket.off('receive_message', handleNewMessage);
+            socket.off('del_message', handleDeleteMessage);
+        };
+    }, [socket, userID]);
+
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
         try {
@@ -117,17 +244,23 @@ export default function ChatScreen() {
         setRefreshing(false);
     }, [refetch]);
 
-
-    const handlePressChat = (chat: ChatItemType) => {
+    const handlePressChat = async (chat: ChatItemType) => {
+        if (!chat.unread) {
+            await markMessagesAsRead(chat._id);
+        }
         navigation.navigate("MessageScreen", { chat });
     };
 
     const renderChatItem = ({ item }: { item: ChatItemType }) => (
-        <ChatItem item={item} onPress={() => handlePressChat(item)} />
+        <ChatItem 
+            item={item} 
+            onPress={() => handlePressChat(item)} 
+            userID={userID}
+        />
     );
 
     const renderList = () => {
-        if (loading && chats.length === 0) {
+        if (loading && localChats.length === 0) {
             return (
                 <View style={styles.centerContainer}>
                     <ActivityIndicator size="large" color="#007AFF" />
@@ -135,7 +268,7 @@ export default function ChatScreen() {
             );
         }
 
-        if (error && chats.length === 0) {
+        if (error && localChats.length === 0) {
             return (
                 <View style={styles.centerContainer}>
                     {/* (Gợi ý) Bạn có thể thêm Icon ở đây */}
@@ -147,7 +280,7 @@ export default function ChatScreen() {
             );
         }
 
-        if (!loading && chats.length === 0) {
+        if (!loading && localChats.length === 0) {
             return (
                 <View style={styles.centerContainer}>
                      {/* (Gợi ý) Bạn có thể thêm Icon ở đây */}
@@ -159,16 +292,16 @@ export default function ChatScreen() {
 
         return (
             <FlatList
-                data={chats}
+                data={localChats}
                 renderItem={renderChatItem}
                 keyExtractor={(item) => item._id}
                 style={styles.list}
-                contentContainerStyle={{ paddingBottom: 20 }} // Thêm padding dưới
+                contentContainerStyle={{ paddingBottom: 20 }}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        colors={["#007AFF"]} // (Tùy chọn) Màu của spinner
+                        colors={["#007AFF"]}
                     />
                 }
             />

@@ -12,6 +12,7 @@ export const checkAndRefreshSession = async (): Promise<boolean> => {
   try {
     const base = await AsyncStorage.getItem("url");
     const refreshToken = await getRefreshToken();
+    console.log("🔄 Kiểm tra phiên, refresh token nếu cần...", refreshToken);
 
     if (!base || !refreshToken) return false;
 
