@@ -544,6 +544,21 @@ const getAllChatIdsForUser = async (userID) => {
         throw new Error(`Failed to get chat IDs for user: ${error.message}`);
     }
 };
+/**
+ * Lấy tất cả chatID của user, dùng để join socket rooms khi đăng nhập
+ * @param {string} chatId - ID của chat
+ * @returns {Promise<Array>} - Mảng chatID
+ */
+
+const getMemberUserIdsByChat = async (chatId) => {
+    try {
+            const doc = await Chat.findById(chatId, { members: 1 }).lean();
+            return doc?.members?.map(String) ?? [];
+        } catch (error) {
+            console.error('Error getting member user IDs by chat:', error);
+            throw new Error(`Failed to get member user IDs by chat: ${error.message}`);
+        }
+}
 
 /**
  * Tìm kiếm chats theo từ khóa
@@ -2197,5 +2212,6 @@ module.exports = {
     searchUserByKeyword4Student,
     searchUserByKeyword4Lecturer,
 
-    getAllChatIdsForUser //not served api
+    getAllChatIdsForUser, //not served api
+    getMemberUserIdsByChat //not served api
 };

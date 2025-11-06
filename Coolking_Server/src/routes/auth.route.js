@@ -1,5 +1,6 @@
 const express = require('express');
 const authController = require('../controllers/auth.controller');
+const UserMobileDeviceController = require('../controllers/UserMobileDevice.controller');
 const router = express.Router();
 
 // POST /public/login
@@ -28,5 +29,12 @@ router.post('/verify-otp-phone', authController.verifyOTP_Phone);
 
 //POST /public/change-password-by-phone
 router.post('/change-password-by-phone', authController.changePasswordByPhoneNumber);
+
+
+// POST /user-mobile-devices/upsert-token
+router.post('/upsert-token', UserMobileDeviceController.registerDeviceToken);
+
+// POST /user-mobile-devices/remove-token  (dùng POST để đảm bảo body được gửi reliably)
+router.post('/remove-token', UserMobileDeviceController.deleteDeviceToken);
 
 module.exports = router;

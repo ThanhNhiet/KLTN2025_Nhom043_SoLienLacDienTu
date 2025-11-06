@@ -69,6 +69,31 @@ async function startServer() {
     process.exit(1);
   }
 }
+// const bcrypt = require('bcrypt');
+
+// async function hashPassword() {
+//   const password = '123456';
+//   const saltRounds = 10; // Đây là "độ phức tạp" của việc băm
+
+//   try {
+//     // 1. Tạo "salt" (một chuỗi ngẫu nhiên để tăng bảo mật)
+//     const salt = await bcrypt.genSalt(saltRounds);
+
+//     // 2. Băm mật khẩu với salt
+//     const hashedPassword = await bcrypt.hash(password, salt);
+
+//     console.log('Mật khẩu gốc:', password);
+//     console.log('Mật khẩu đã băm (hash):', hashedPassword);
+    
+//     // Kết quả sẽ có dạng tương tự: $2b$10$xxxxxxxxxxxxxxxxxxxxxx
+//     // Mỗi lần chạy, hash sẽ khác nhau do "salt" là ngẫu nhiên.
+
+//   } catch (error) {
+//     console.error('Lỗi khi băm mật khẩu:', error);
+//   }
+// }
+
+// hashPassword();
 
 startServer();
 
