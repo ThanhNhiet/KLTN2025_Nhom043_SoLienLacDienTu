@@ -7,6 +7,7 @@ async function registerDeviceToken(req, res) {
       return res.status(400).json({ ok: false, error: 'Missing userId/token/platform' });
     }
     await UserMobileDevice.upsertToken(String(userId), String(token), String(platform));
+    //console.log('Registered device token for user:', userId);
     res.json({ ok: true });
   } catch (err) {
     if (err?.code === 11000) return res.status(200).json({ ok: true, dedup: true });

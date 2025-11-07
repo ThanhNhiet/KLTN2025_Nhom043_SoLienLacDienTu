@@ -25,8 +25,7 @@ async function sendChatPush(toUserId, { chatId, senderName, text }) {
     }
   };
 
-  // sử dụng sendMulticast
-  const resp = await admin.messaging().sendMulticast(message);
+   const resp = await admin.messaging().sendEachForMulticast(message);
 
   // Dọn token invalid
   await Promise.all(

@@ -66,7 +66,6 @@ if (!admin.apps.length) {
           privateKey,
         }),
       });
-      console.log('Firebase initialized from FB_PROJECT_ID/FB_CLIENT_EMAIL/FB_PRIVATE_KEY.');
     } else {
       // Fallback to Application Default Credentials (e.g. GOOGLE_APPLICATION_CREDENTIALS or GCE metadata)
       admin.initializeApp();

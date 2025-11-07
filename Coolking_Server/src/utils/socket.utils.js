@@ -96,23 +96,23 @@
 // };
 
 const { Server } = require('socket.io');
-const { getAllChatIdsForUser, getMemberUserIdsByChat } = require('../repositories/chat.repo'); // ⬅️ thêm hàm này
+const { getAllChatIdsForUser, getMemberUserIdsByChat } = require('../repositories/chat.repo');
 const { sendChatPush } = require('../services/pushService');
 
 let io;
 // Map<userId, Set<socketId>>
 const userSockets = new Map();
 
-// chống spam: Map<userId, Map<chatId, lastMs>>
+// Chống spam: Map<userId, Map<chatId, lastMs>>
 const lastPushAt = new Map();
 
-/** user có online không */
+/** (Giữ lại nếu cần dùng chỗ khác) user có online không */
 function isUserOnline(userId) {
   const set = userSockets.get(String(userId));
   return !!(set && set.size > 0);
 }
 
-/** user có đang ở room không (dù mở nhiều tab/thiết bị) */
+/** (Giữ lại nếu cần) user có đang ở room không */
 function isUserInRoom(userId, roomId) {
   const set = userSockets.get(String(userId));
   if (!set) return false;
@@ -123,13 +123,13 @@ function isUserInRoom(userId, roomId) {
   return false;
 }
 
-/** chống bắn dồn dập: chỉ cho phép 1 push / user / room / 5s */
+/** Chỉ cho 1 push / user / room trong windowMs (mặc định 5s) */
 function shouldThrottlePush(userId, chatId, windowMs = 5000) {
   const now = Date.now();
   if (!lastPushAt.has(userId)) lastPushAt.set(userId, new Map());
   const map = lastPushAt.get(userId);
   const last = map.get(chatId) || 0;
-  if (now - last < windowMs) return true; // throttle
+  if (now - last < windowMs) return true;
   map.set(chatId, now);
   return false;
 }
@@ -146,34 +146,45 @@ const initSocket = (httpServer) => {
   io.on('connection', (socket) => {
     console.log(`Client connected: ${socket.id}`);
 
-    // --- Tham gia 1 room cụ thể (nếu app của bạn chủ động join thủ công)
+    // Client join thủ công 1 room
     socket.on('join_chat', (chat_id) => {
       socket.join(String(chat_id));
       console.log(`Socket ${socket.id} joined chat room: ${chat_id}`);
     });
 
-    // --- Gửi tin nhắn: broadcast + push cho người không ở phòng
+    // Gửi tin nhắn: broadcast + LUÔN push cho các member (trừ người gửi)
     socket.on('send_message', async ({ chat_id, newMessage }) => {
       const roomId = String(chat_id);
       io.to(roomId).emit('receive_message', { chat_id: roomId, newMessage });
 
       try {
-        // Lấy toàn bộ member của room (trừ người gửi)
-        const memberIds = await getMemberUserIdsByChat(roomId); // ⬅️ triển khai trong repo
-        const senderId = String(newMessage?.senderId ?? newMessage?.sender_id);
+        // Lấy members & xác định sender
+        const memberIds = await getMemberUserIdsByChat(roomId);
+        const senderId =
+          String(
+            newMessage?.senderInfo?.userID ||
+            newMessage?.sender_info?.userID ||
+            newMessage?.senderId ||
+            newMessage?.sender_id ||
+            ''
+          );
 
         for (const uid of memberIds) {
           const userId = String(uid);
           if (userId === senderId) continue;
 
-          // Nếu user không đang ở room (mọi thiết bị/tab), gửi push
-          const inRoom = isUserInRoom(userId, roomId);
-          if (!inRoom && !shouldThrottlePush(userId, roomId)) {
-            await sendChatPush(userId, {
+          // LUÔN đẩy push (kể cả offline / app đóng)
+          if (!shouldThrottlePush(userId, roomId)) {
+            // Không chặn vòng lặp nếu FCM chậm
+            sendChatPush(userId, {
               chatId: roomId,
               senderName: newMessage?.senderName ?? newMessage?.sender_name ?? 'Tin nhắn mới',
-              text: newMessage?.text ?? (newMessage?.attachments?.length ? '[Tệp đính kèm]' : '[Tin nhắn]')
-            });
+              text:
+                newMessage?.text ??
+                (Array.isArray(newMessage?.attachments) && newMessage.attachments.length
+                  ? '[Tệp đính kèm]'
+                  : '[Tin nhắn]'),
+            }).catch((e) => console.error('sendChatPush error:', e));
           }
         }
       } catch (err) {
@@ -193,7 +204,7 @@ const initSocket = (httpServer) => {
       io.to(String(chat_id)).emit('render_message', { chat_id, message_id });
     });
 
-    // --- Register: map user<->socket và auto join các room của user
+    // Đăng ký user ↔ socket và tự join các room user thuộc về
     socket.on('register', async (user_id) => {
       socket.user_id = String(user_id);
 
@@ -209,7 +220,7 @@ const initSocket = (httpServer) => {
       });
     });
 
-    // --- Unregister khi disconnect
+    // Dọn state khi disconnect
     socket.on('disconnect', () => {
       if (socket.user_id && userSockets.has(socket.user_id)) {
         const set = userSockets.get(socket.user_id);
@@ -234,8 +245,7 @@ module.exports = {
   initSocket,
   getIO,
   userSockets,
-  // Export thêm helpers nếu bạn muốn dùng ở nơi khác (dashboard admin, v.v.)
   isUserOnline,
-  isUserInRoom,
+  isUserInRoom, // vẫn export nếu nơi khác dùng
 };
 

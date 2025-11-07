@@ -553,7 +553,11 @@ const getAllChatIdsForUser = async (userID) => {
 const getMemberUserIdsByChat = async (chatId) => {
     try {
             const doc = await Chat.findById(chatId, { members: 1 }).lean();
-            return doc?.members?.map(String) ?? [];
+            if (!doc) {
+                throw new Error('Chat not found');
+            }
+            console.log('Member user IDs for chat', chatId, ':', doc.members.map(member => member.userID));
+            return doc.members.map(member => member.userID);
         } catch (error) {
             console.error('Error getting member user IDs by chat:', error);
             throw new Error(`Failed to get member user IDs by chat: ${error.message}`);
