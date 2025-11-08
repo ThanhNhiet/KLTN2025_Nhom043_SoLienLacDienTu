@@ -159,7 +159,10 @@ const initSocket = (httpServer) => {
 
       try {
         // Lấy members & xác định sender
-        const memberIds = await getMemberUserIdsByChat(roomId);
+        const {
+                userIds,
+                chatName
+            } = await getMemberUserIdsByChat(roomId);
         const senderId =
           String(
             newMessage?.senderInfo?.userID ||
@@ -169,21 +172,23 @@ const initSocket = (httpServer) => {
             ''
           );
 
-        for (const uid of memberIds) {
+        for (const uid of userIds) {
           const userId = String(uid);
           if (userId === senderId) continue;
 
           // LUÔN đẩy push (kể cả offline / app đóng)
           if (!shouldThrottlePush(userId, roomId)) {
             // Không chặn vòng lặp nếu FCM chậm
+            let body =
+              newMessage?.type === 'text' ? newMessage.content
+              : newMessage?.type === 'image' ? '📷 Hình ảnh'
+              : newMessage?.type === 'file' ? '📄 Tệp đính kèm'
+              : String(newMessage.content ?? '');
             sendChatPush(userId, {
               chatId: roomId,
-              senderName: newMessage?.senderName ?? newMessage?.sender_name ?? 'Tin nhắn mới',
-              text:
-                newMessage?.text ??
-                (Array.isArray(newMessage?.attachments) && newMessage.attachments.length
-                  ? '[Tệp đính kèm]'
-                  : '[Tin nhắn]'),
+              senderName: newMessage?.senderInfo?.name || 'Tin nhắn mới',
+              text: body,
+              chatName: chatName
             }).catch((e) => console.error('sendChatPush error:', e));
           }
         }
