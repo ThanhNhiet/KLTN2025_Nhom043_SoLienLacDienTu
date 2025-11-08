@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback,useMemo } from "react";
+import { getChatById } from "../../api/chat/ChatApi";
 import { 
     getAllMessages, 
     sendMessageText as apiSendMessageText, 
@@ -19,6 +20,8 @@ import { set } from "date-fns";
 import {API_URL} from "@env";
 
 import { io } from 'socket.io-client';
+import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
 const socket = io(API_URL, { transports: ['websocket'] });
 
 
@@ -115,6 +118,12 @@ type ItemMessage = { _id: string;
     createdAt: string; 
     updatedAt: string; 
 };
+type ChatInfoType = {
+    id: string;
+    name: string;
+    avatar: string;
+    memberCount: number;
+}
 
 type File = { uri: string; name?: string; mimeType?: string; }
 
@@ -141,6 +150,34 @@ export const useMessages = (chatId: string) => {
     const [image, setImage] = useState<File[] | null>(null);
     const [fileName, setFileName] = useState<string[] | null>(null);
     const [imageName, setImageName] = useState<string[] | null>(null);
+    const [chatInfo, setChatInfo] = useState<ChatInfoType>({ id: "", name: "", avatar: "", memberCount: 0 });
+
+    const fetchChatInfo = useCallback(async (chatID: string) => {
+        try {
+            const dataChat = await getChatById(chatID);
+            if (!dataChat || !dataChat.chat) throw new Error("Failed to fetch chat info");
+            // Xử lý data chat info
+            if (dataChat && dataChat.chat) {
+                const chatInfoData = {
+                    id: dataChat.chat._id,
+                        name: dataChat.chat.name,
+                        avatar: dataChat.chat.avatar,
+                        memberCount: dataChat.chat.members.length,
+                    };
+            setChatInfo(chatInfoData);
+                } else{
+                    throw new Error("Chat data is missing");
+                }
+        } catch (error) {
+            console.error("Error fetching chat info:", error);
+            setError(error instanceof Error ? error.message : "Failed to fetch chat info");
+        }
+    }, []);
+    useEffect(() => {
+        if (chatId) {
+            fetchChatInfo(chatId);
+        }
+    }, [chatId, fetchChatInfo]);
 
     const fetchMessages = useCallback(async (chatID: string, requestedPage: number, pSize: number) => {
         if (loadingMore || (requestedPage > 1 && !hasMore)) return;
@@ -164,7 +201,8 @@ export const useMessages = (chatId: string) => {
                 if (requestedPage === 1) {
                     updatedMessages = sortedNewMessages;
                 } else {
-                    const existingIds = new Set(prevMessages.map(m => m._id));
+                    // guard: prevMessages may contain undefined elements, use optional chaining
+                    const existingIds = new Set(prevMessages.map(m => m?._id));
                     const uniqueNewMessages = sortedNewMessages.filter(m => !existingIds.has(m._id));
                     updatedMessages = [...uniqueNewMessages, ...prevMessages]; // Prepend older
                 }
@@ -241,64 +279,47 @@ export const useMessages = (chatId: string) => {
                 if (!newMessage) return;
                 // Only handle messages for this chat
                 if (chat_id && chat_id !== chatId) return;
-                console.log('Received new message via socket:', newMessage);
                 setMessages(prev => {
-                    if (prev.some(m => m._id === newMessage._id)) return prev;
+                    // guard against undefined elements in prev
+                    if (prev.some(m => m?._id === newMessage._id)) return prev;
                     return [...prev, newMessage]; // oldest -> newest ordering
                 });
+                // schedule local notification (if appropriate)
+               // showLocalNotification(newMessage);
             };
             const onReceivePin = ({ chat_id, newMessage }: { chat_id: string; newMessage: ItemMessage }) => {
                 if (!newMessage) return;
-                // Only handle messages for this chat
                 if (chat_id && chat_id !== chatId) return;
-                console.log('Received new message via socket:', newMessage);
                 setMessages((prev) => {
-                    const exists = prev.some(msg => msg._id === newMessage._id);
+                    const exists = prev.some(msg => msg?._id === newMessage._id);
                     if (exists) {
-                        return prev.map(msg => msg._id === newMessage._id ? newMessage : msg);
+                        return prev.map(msg => (msg && msg._id === newMessage._id) ? newMessage : msg);
                     }
                     return [ ...prev, newMessage];
                 });
                 setPinnedMessages((prev) => {
-                    const exists = prev.some(msg => msg._id === newMessage._id);
-                    if (exists) {
-                        return prev; // Không thêm nếu đã tồn tại
-                    }
-                    return [...prev, newMessage]; // Thêm tin nhắn mới vào cuối danh sách
+                    const exists = prev.some(msg => msg?._id === newMessage._id);
+                    if (exists) return prev;
+                    return [...prev, newMessage];
                 });
-            setPinnedIDs((prev) => {
-                if (prev.includes(newMessage._id)) {
-                    return prev;
-                }
-                return [...prev, newMessage._id];
-            });
+                setPinnedIDs((prev) => prev.includes(newMessage._id) ? prev : [...prev, newMessage._id]);
+
+                // also notify for pinned message if from others
+               // showLocalNotification(newMessage);
             };
             const onReceiveUnpin = ({ chat_id, unpinnedMessage_id }: { chat_id: string; unpinnedMessage_id: string }) => {
                 if (!unpinnedMessage_id) return;
                 // Only handle messages for this chat
                 if (chat_id && chat_id !== chatId) return;
-                console.log('Received unpinned message via socket:', unpinnedMessage_id);
-                setPinnedMessages((prev) => {
-                    return prev.filter(msg => msg._id !== unpinnedMessage_id);
-                });
-                setPinnedIDs((prev) => {
-                    return prev.filter(id => id !== unpinnedMessage_id);
-                });
+                
+                setPinnedMessages((prev) => prev.filter(msg => msg && msg._id !== unpinnedMessage_id));
+                setPinnedIDs((prev) => prev.filter(id => id !== unpinnedMessage_id));
             };
             const onReceiveDelete = ({ chat_id, message_id }: { chat_id: string; message_id: string }) => {
                 if (!message_id) return;
                 // Only handle messages for this chat
                 if (chat_id && chat_id !== chatId) return;
-                console.log('Received deleted message via socket:', message_id);
-                setMessages((prev) => {
-                    return prev.map(msg => {
-                        if (msg._id === message_id) {
-                            // Mark as deleted
-                            return { ...msg, deleted: true };
-                        }
-                        return msg;
-                    });
-                });
+                setMessages((prev) => prev.map(msg => (msg && msg._id === message_id) ? { ...msg, isDeleted: true } : msg));
             };
 
             socket.on('receive_message', onReceive);
@@ -366,12 +387,12 @@ export const useMessages = (chatId: string) => {
      // --- Lọc danh sách tin nhắn đã ghim ---
         const pinned = useMemo(() => {
             return messages
-                .filter(msg => pinnedIDs.includes(msg._id))
-                .sort((a, b) => {
-                     const dateA = a.pinnedInfo ? new Date(a.pinnedInfo.pinnedDate.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$2/$1/$3')) : new Date(0); // Chuyển DD/MM/YYYY -> MM/DD/YYYY
-                     const dateB = b.pinnedInfo ? new Date(b.pinnedInfo.pinnedDate.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$2/$1/$3')) : new Date(0);
-                     // Sắp xếp mới nhất lên đầu
-                     return dateB.getTime() - dateA.getTime();
+                .filter(msg => msg && pinnedIDs.includes(msg._id))
+                 .sort((a, b) => {
+                     const dateA = a?.pinnedInfo ? new Date(a.pinnedInfo.pinnedDate.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$2/$1/$3')) : new Date(0); // Chuyển DD/MM/YYYY -> MM/DD/YYYY
+                     const dateB = b?.pinnedInfo ? new Date(b.pinnedInfo.pinnedDate.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$2/$1/$3')) : new Date(0);
+                      // Sắp xếp mới nhất lên đầu
+                      return dateB.getTime() - dateA.getTime();
                 });
         }, [messages]); 
 
@@ -425,12 +446,13 @@ export const useMessages = (chatId: string) => {
 
             // Replace temp message with final server message (or append if not found)
             setMessages(prev => {
-                const exists = prev.some(m => m._id === finalMsg._id);
-                if (exists) {
-                    // remove temp if present
-                    return prev.map(m => m._id === tempId ? finalMsg : m);
+                // guard and normalize prev
+                const normalized = prev.filter(Boolean);
+                if (normalized.some(m => m._id === finalMsg._id)) return prev;
+                if (normalized.some(m => m._id === tempId)) {
+                    return prev.map(m => (m && m._id === tempId) ? finalMsg : m);
                 }
-                return prev.map(m => m._id === tempId ? finalMsg : m);
+                return [...prev, finalMsg];
             });
 
             // emit to server/other clients
@@ -443,7 +465,7 @@ export const useMessages = (chatId: string) => {
         } catch (err) {
             console.error("Send message failed:", err);
             // mark temp message as failed
-            setMessages(prev => prev.map(m => m._id === tempId ? { ...m, status: "failed" } : m));
+            setMessages(prev => prev.map(m => (m && m._id === tempId) ? { ...m, status: "failed" } : m));
         }
     };
 
@@ -481,12 +503,12 @@ export const useMessages = (chatId: string) => {
             };
              // Replace temp message with final server message (or append if not found)
             setMessages(prev => {
-                const exists = prev.some(m => m._id === finalMsg._id);
-                if (exists) {
-                    // remove temp if present
-                    return prev.map(m => m._id === tempId ? finalMsg : m);
+                const normalized = prev.filter(Boolean);
+                if (normalized.some(m => m._id === finalMsg._id)) return prev;
+                if (normalized.some(m => m._id === tempId)) {
+                    return prev.map(m => (m && m._id === tempId) ? finalMsg : m);
                 }
-                return prev.map(m => m._id === tempId ? finalMsg : m);
+                return [...prev, finalMsg];
             });
             // emit to server/other clients
             try {
@@ -498,7 +520,7 @@ export const useMessages = (chatId: string) => {
             }
         } catch (err) {
             console.error("Error sending image message:", err);
-            setMessages(prev => prev.map(m => m._id === tempId ? { ...m, status: "failed" } : m));
+            setMessages(prev => prev.map(m => (m && m._id === tempId) ? { ...m, status: "failed" } : m));
         }
     };
 
@@ -535,12 +557,12 @@ export const useMessages = (chatId: string) => {
             };
              // Replace temp message with final server message (or append if not found)
             setMessages(prev => {
-                const exists = prev.some(m => m._id === finalMsg._id);
-                if (exists) {
-                    // remove temp if present
-                    return prev.map(m => m._id === tempId ? finalMsg : m);
+                const normalized = prev.filter(Boolean);
+                if (normalized.some(m => m._id === finalMsg._id)) return prev;
+                if (normalized.some(m => m._id === tempId)) {
+                    return prev.map(m => (m && m._id === tempId) ? finalMsg : m);
                 }
-                return prev.map(m => m._id === tempId ? finalMsg : m);
+                return [...prev, finalMsg];
             });
 
             // emit to server/other clients
@@ -553,7 +575,7 @@ export const useMessages = (chatId: string) => {
             }
         } catch (err) {
             console.error("Error sending image message:", err);
-            setMessages(prev => prev.map(m => m._id === tempId ? { ...m, status: "failed" } : m));
+            setMessages(prev => prev.map(m => (m && m._id === tempId) ? { ...m, status: "failed" } : m));
         }
     };
 
@@ -609,11 +631,12 @@ export const useMessages = (chatId: string) => {
             };
             // Insert or replace message in state (similar to other send handlers)
             setMessages(prev => {
-                const exists = prev.some(m => m._id === finalMsg._id);
-                if (exists) {
-                    return prev.map(m => m._id === tempId ? finalMsg : m);
+                const normalized = prev.filter(Boolean);
+                if (normalized.some(m => m._id === finalMsg._id)) return prev;
+                if (normalized.some(m => m._id === tempId)) {
+                    return prev.map(m => (m && m._id === tempId) ? finalMsg : m);
                 }
-                return prev.map(m => m._id === tempId ? finalMsg : m);
+                return [...prev, finalMsg];
             });
             setNewMessage('');
             try {
@@ -625,7 +648,7 @@ export const useMessages = (chatId: string) => {
         } catch (err) {
             console.error("Send message failed:", err);
             // mark temp message as failed if needed
-            setMessages(prev => prev.map(m => m._id === tempId ? { ...m, status: "failed" } : m));
+            setMessages(prev => prev.map(m => (m && m._id === tempId) ? { ...m, status: "failed" } : m));
         }
     };
 
@@ -681,11 +704,12 @@ export const useMessages = (chatId: string) => {
             };
             // Insert or replace message in state (similar to other send handlers)
             setMessages(prev => {
-                const exists = prev.some(m => m._id === finalMsg._id);
-                if (exists) {
-                    return prev.map(m => m._id === tempId ? finalMsg : m);
+                const normalized = prev.filter(Boolean);
+                if (normalized.some(m => m._id === finalMsg._id)) return prev;
+                if (normalized.some(m => m._id === tempId)) {
+                    return prev.map(m => (m && m._id === tempId) ? finalMsg : m);
                 }
-                return prev.map(m => m._id === tempId ? finalMsg : m);
+                return [...prev, finalMsg];
             });
             try {
                 socket.emit('send_message', { chat_id: chatID, newMessage: finalMsg });
@@ -696,7 +720,7 @@ export const useMessages = (chatId: string) => {
         } catch (err) {
             console.error("Send message failed:", err);
             // mark temp message as failed if needed
-            setMessages(prev => prev.map(m => m._id === tempId ? { ...m, status: "failed" } : m));
+            setMessages(prev => prev.map(m => (m && m._id === tempId) ? { ...m, status: "failed" } : m));
         }
     };
 
@@ -752,11 +776,12 @@ export const useMessages = (chatId: string) => {
             };
             // Insert or replace message in state (similar to other send handlers)
             setMessages(prev => {
-                const exists = prev.some(m => m._id === finalMsg._id);
-                if (exists) {
-                    return prev.map(m => m._id === tempId ? finalMsg : m);
+                const normalized = prev.filter(Boolean);
+                if (normalized.some(m => m._id === finalMsg._id)) return prev;
+                if (normalized.some(m => m._id === tempId)) {
+                    return prev.map(m => (m && m._id === tempId) ? finalMsg : m);
                 }
-                return prev.map(m => m._id === tempId ? finalMsg : m);
+                return [...prev, finalMsg];
             });
             try {
                 socket.emit('send_message', { chat_id: chatID, newMessage: finalMsg });
@@ -767,7 +792,7 @@ export const useMessages = (chatId: string) => {
         } catch (err) {
             console.error("Send message failed:", err);
             // mark temp message as failed if needed
-            setMessages(prev => prev.map(m => m._id === tempId ? { ...m, status: "failed" } : m));
+            setMessages(prev => prev.map(m => (m && m._id === tempId) ? { ...m, status: "failed" } : m));
         }
     };
 
@@ -815,14 +840,14 @@ export const useMessages = (chatId: string) => {
             };
 
             setMessages((prev) => {
-                const exists = prev.some(msg => msg._id === finalMsg._id);
+                const exists = prev.some(msg => msg?._id === finalMsg._id);
                 if (exists) {
-                    return prev.map(msg => msg._id === finalMsg._id ? finalMsg : msg);
+                    return prev.map(msg => (msg && msg._id === finalMsg._id) ? finalMsg : msg);
                 }
                 return [ ...prev, finalMsg];
             });
             setPinnedMessages((prev) => {
-                const exists = prev.some(msg => msg._id === finalMsg._id);
+                const exists = prev.some(msg => msg?._id === finalMsg._id);
                 if (exists) {
                     return prev; // Không thêm nếu đã tồn tại
                 }
@@ -851,15 +876,10 @@ export const useMessages = (chatId: string) => {
             if (unpinnedMessage == null) {
                 throw new Error("No data received");
             }
-            setPinnedMessages((prev) => prev.filter(msg => msg._id !== messageID));
+            setPinnedMessages((prev) => prev.filter(msg => msg && msg._id !== messageID));
             setPinnedIDs((prev) => prev.filter(id => id !== messageID));
             setMessages((prev) => {
-                return prev.map(msg => {
-                    if (msg._id === messageID) {
-                        return { ...msg, pinnedInfo: null };
-                    }
-                    return msg;
-                });
+                return prev.map(msg => (msg && msg._id === messageID) ? { ...msg, pinnedInfo: null } : msg);
             });
             try {
                 socket.emit('unpin_message', { chat_id: chatId, unpinnedMessageID: messageID });
@@ -900,13 +920,8 @@ export const useMessages = (chatId: string) => {
             }
         }
         setMessages((prev) => {
-            return prev.map(msg => {
-                if (msg._id === messageID) {
-                        return { ...msg, isDeleted: true };
-                    }
-                    return msg;
+            return prev.map(msg => (msg && msg._id === messageID) ? { ...msg, isDeleted: true } : msg);
                 });
-            });
             try {
                 socket.emit('delete_message', { chat_id: chatId, message_id: messageID });
             } catch (error) {
@@ -940,6 +955,7 @@ export const useMessages = (chatId: string) => {
         imageName,
         pinnedMessages,
         pinnedTo,
+        chatInfo,
 
         // Functions
         //load more

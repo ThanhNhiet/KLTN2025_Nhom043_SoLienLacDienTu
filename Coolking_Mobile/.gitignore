@@ -1,15 +1,15 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# dependencies
+# ========== Dependencies ==========
 node_modules/
 
-# Expo
+# ========== Expo ==========
 .expo/
 dist/
 web-build/
 expo-env.d.ts
 
-# Native
+# ========== Native ==========
 .kotlin/
 *.orig.*
 *.jks
@@ -18,30 +18,52 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
-# Metro
+# ========== Metro ==========
 .metro-health-check*
 
-# debug
+# ========== Debug logs ==========
 npm-debug.*
 yarn-debug.*
 yarn-error.*
 
-# macOS
+# ========== OS / Editors ==========
 .DS_Store
+.vscode/
+
+# ========== Certificates / Keys ==========
 *.pem
 
-# local env files
+# ========== Env files ==========
+# local env files (your existing rule)
 .env*.local
+# ignore all env by default
+.env
+.env.*
+# but keep a template
+!.env.example
 
-# typescript
+# ========== TypeScript ==========
 *.tsbuildinfo
 
+# ========== Project extras ==========
 app-example
 
-# generated native folders
+# ========== Generated native folders ==========
 /ios
 /android
 
-# common
-.vscode/
-/.env
+# ========== Firebase / Secrets (ADDED) ==========
+# Mobile configs
+google-services.json
+**/google-services.json
+GoogleService-Info.plist
+**/GoogleService-Info.plist
+
+# Server-side service accounts / admin creds
+service-account.json
+*.serviceAccount.json
+firebase-adminsdk-*.json
+
+# Optional: if you sometimes store creds under /secrets or similar
+secrets/
+**/secrets/*

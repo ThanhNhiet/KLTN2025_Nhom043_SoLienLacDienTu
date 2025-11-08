@@ -248,7 +248,7 @@ export default function ChatScreen() {
         if (!chat.unread) {
             await markMessagesAsRead(chat._id);
         }
-        navigation.navigate("MessageScreen", { chat });
+        navigation.navigate("MessageScreen", { chatId: chat._id });
     };
 
     const renderChatItem = ({ item }: { item: ChatItemType }) => (

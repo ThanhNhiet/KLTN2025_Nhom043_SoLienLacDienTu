@@ -406,7 +406,7 @@ export default function MessageScreen() {
     const scrollViewRef = useRef<ScrollView>(null);
     const navigation = useNavigation<any>();
     const route = useRoute();
-    const { chat } = route.params as { chat: { _id: string, name: string, avatar: string } };
+    const { chatId } = route.params as { chatId: string };
    
     // Sử dụng hook
     const { 
@@ -427,6 +427,7 @@ export default function MessageScreen() {
         fileName,
         imageName,
         pinnedMessages,
+        chatInfo,
         
 
         // Functions
@@ -459,7 +460,7 @@ export default function MessageScreen() {
         
 
 
-    } = useMessages(chat._id);
+    } = useMessages(chatId);
 
    
 
@@ -524,13 +525,13 @@ const pickMultipleImages = async () => {
   const handleSendMessage = async() => {
     if (image != null) {
         try {
-            await handleSendMessageImage(chat._id, image);
+            await handleSendMessageImage(chatId, image);
         } catch (error) {
             console.error("Error sending image message:", error);
         }
     } else if (file != null) {
         try {
-            await handleSendMessageFile(chat._id, file);
+            await handleSendMessageFile(chatId, file);
             setFile(null);
             setFileName(null);
         } catch (error) {
@@ -538,7 +539,7 @@ const pickMultipleImages = async () => {
         }
     } else if (newMessage.trim().length > 0) {
 
-        await handleSendMessageText(chat._id, newMessage.trim());
+        await handleSendMessageText(chatId, newMessage.trim());
     }
   };
 
@@ -551,20 +552,20 @@ const handleReplyMessage = async() => {
 
     if (image != null) {
         try {
-            await handleSendReplyImage(chat._id, image, replyingTo);
+            await handleSendReplyImage(chatId, image, replyingTo);
         } catch (error) {
             console.error("Error sending image message:", error);
         }
     } else if (file != null) {
         try {
-            await handleSendReplyFile(chat._id, file, replyingTo);
+            await handleSendReplyFile(chatId, file, replyingTo);
             setFile(null);
             setFileName(null);
         } catch (error) {
             console.error("Error sending file message:", error);
         }
     } else if (newMessage.trim().length > 0) {
-        await handleSendReplyText(chat._id, newMessage.trim(), replyingTo);
+        await handleSendReplyText(chatId, newMessage.trim(), replyingTo);
     }
   };
 
@@ -693,7 +694,7 @@ const handleReplyMessage = async() => {
                     <>
                         <TopNavigations_Message 
                                 navigation={navigation} 
-                                chatPartner={{chatID: chat._id, name: chat.name, avatar: chat.avatar, isOnline: true /* Lấy trạng thái online thực tế */ }} 
+                                chatPartner={{chatID: chatId, name: chatInfo.name, avatar: chatInfo.avatar, isOnline: true /* Lấy trạng thái online thực tế */ }} 
                                 onShowPinned={handleOpenPinnedModal} // Truyền hàm mở modal
                                 hasPinnedMessages={pinnedMessages.length > 0}
                                 />
