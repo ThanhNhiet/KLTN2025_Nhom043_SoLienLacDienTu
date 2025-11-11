@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "881607614065",
+    "project_id": "econtact-27912",
+    "storage_bucket": "econtact-27912.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:881607614065:android:32030150757daa32a3c5d0",
+        "android_client_info": {
+          "package_name": "com.coolking.econtact"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBQvLTDOdPN_ygXktFSJ_646Ree86nDqUg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

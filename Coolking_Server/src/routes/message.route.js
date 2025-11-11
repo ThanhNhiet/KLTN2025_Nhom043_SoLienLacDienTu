@@ -58,4 +58,10 @@ router.get('/pinned/:chatID', messageController.getPinnedMessagesInChat);
 // PUT /api/messages/lastread/:chatID
 router.put('/lastread/:chatID', messageController.updateLastReadAt);
 
+// GET /api/messages/faqSections
+router.get('/sections/faqSections', messageController.getSections);
+
+// POST /api/messages/faqAsk
+router.post('/faqAsk', messageController.createMessageChatAI);
+
 module.exports = router;

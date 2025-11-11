@@ -1,6 +1,6 @@
 const messageRepo = require('../repositories/message.repo');
 const jwtUtils = require('../utils/jwt.utils');
-
+const faqRepo = require('../repositories/FaqSection.repo');
 
 // POST /api/messages/text
 exports.createMessageText = async (req, res) => {
@@ -579,3 +579,61 @@ exports.updateLastReadAt = async (req, res) => {
         });
     }
 };
+
+
+exports.createMessageChatAI = async (req, res) => {
+    try {
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
+        const decoded = jwtUtils.verifyAccessToken(token);
+        if (decoded.role  === 'ADMIN'){
+            res.status(403).json({ message: 'Forbidden' });
+        }
+        const { section ,question ,chatID} = req.body;
+        if (!chatID  || !question) {
+            return res.status(400).json({
+                success: false,
+                message: 'chatID, section và question là bắt buộc'
+            });
+        }
+        if (!decoded.user_id) {
+            return res.status(400).json({
+                success: false,
+                message: 'Không tìm thấy thông tin người gửi trong token'
+            });
+        }
+        const newMessage =  await messageRepo.createMessageAI( chatID, decoded.user_id, section ,question);
+        return res.status(200).json(newMessage);
+
+        
+    } catch (error) {
+        console.error('Error in createMessageAI controller:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Lỗi server khi tạo tin nhắn AI'
+        });
+    }
+}
+
+exports.getSections = async (req, res) => {
+    try {
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
+        const decoded = jwtUtils.verifyAccessToken(token);
+        if (!decoded){
+            res.status(403).json({ message: 'Forbidden' });
+        }
+        const sections = await faqRepo.getSections();
+        return res.status(200).json({
+            success: true,
+            data: sections
+        });
+        
+    } catch (error) {
+        console.error('Error in getSections controller:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Lỗi server khi lấy các mục FAQ'
+        });
+    }
+}
