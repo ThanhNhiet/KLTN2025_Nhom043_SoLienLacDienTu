@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useSocket } from '../contexts/SocketContext';
 import { useChat } from './useChat';
 import authService from '../services/authService';
@@ -9,13 +10,33 @@ interface MessageNotificationHook {
 }
 
 export const useMessageNotification = (): MessageNotificationHook => {
-    const [newMessNav, setNewMessNav] = useState(false);
+    // Khởi tạo state từ sessionStorage để persist qua các lần re-render
+    const [newMessNav, setNewMessNav] = useState(() => {
+        return sessionStorage.getItem('new-message-notification') === 'true';
+    });
     // Sử dụng sessionStorage để persist flag qua các lần chuyển trang
     const [hasCheckedInitial, setHasCheckedInitial] = useState(() => {
         return sessionStorage.getItem('message-notification-checked') === 'true';
     });
     const { socket } = useSocket();
     const { getChats4AllUser, chatItems } = useChat();
+    const location = useLocation();
+
+    // Sync state với sessionStorage khi component mount hoặc sessionStorage thay đổi
+    useEffect(() => {
+        const handleStorageChange = () => {
+            const storedValue = sessionStorage.getItem('new-message-notification') === 'true';
+            if (storedValue !== newMessNav) {
+                setNewMessNav(storedValue);
+            }
+        };
+
+        // Listen for storage changes
+        window.addEventListener('storage', handleStorageChange);
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+        };
+    }, [newMessNav]);
 
     // Kiểm tra tin nhắn chưa đọc khi khởi tạo - CHỈ 1 LẦN DUY NHẤT
     useEffect(() => {
@@ -45,7 +66,9 @@ export const useMessageNotification = (): MessageNotificationHook => {
     useEffect(() => {
         if (!authService.isValidToken()) {
             sessionStorage.removeItem('message-notification-checked');
+            sessionStorage.removeItem('new-message-notification');
             setHasCheckedInitial(false);
+            setNewMessNav(false);
         }
     }, []); // Chỉ check 1 lần khi mount
 
@@ -63,11 +86,15 @@ export const useMessageNotification = (): MessageNotificationHook => {
                 hasUnread = chatItems.unread === true;
             }
             
-            if (hasUnread && !newMessNav) {
+            // console.log('🔔 ChatItems changed, hasUnread:', hasUnread);
+            
+            if (hasUnread) {
+                // console.log('🔔 Setting notification to true from chatItems');
                 setNewMessNav(true);
+                sessionStorage.setItem('new-message-notification', 'true');
             }
         }
-    }, [chatItems, newMessNav]);
+    }, [chatItems]); // Bỏ newMessNav khỏi dependency
 
     useEffect(() => {
         if (!socket) return;
@@ -79,8 +106,12 @@ export const useMessageNotification = (): MessageNotificationHook => {
             
             // Chỉ hiển thị notification nếu tin nhắn không phải từ chính user hiện tại
             const senderId = newMessage.senderInfo?.userID || newMessage.senderID;
+            // console.log('🔔 Received message from:', senderId, 'current user:', currentUserId);
+            
             if (senderId !== currentUserId) {
+                // console.log('🔔 Setting notification to true');
                 setNewMessNav(true);
+                sessionStorage.setItem('new-message-notification', 'true');
             }
         };
 
@@ -92,8 +123,23 @@ export const useMessageNotification = (): MessageNotificationHook => {
         };
     }, [socket]);
 
+    // Theo dõi route và tự động clear notification khi vào chat route
+    useEffect(() => {
+        const currentPath = location.pathname;
+        // console.log('🔔 Current path:', currentPath, 'newMessNav:', newMessNav);
+        
+        if (currentPath === '/lecturer/chat' || currentPath === '/admin/chat') {
+            if (newMessNav) {
+                // console.log('🔔 Clearing notification because on chat route');
+                setNewMessNav(false);
+                sessionStorage.setItem('new-message-notification', 'false');
+            }
+        }
+    }, [location.pathname, newMessNav]);
+
     const markAsRead = async () => {
         setNewMessNav(false);
+        sessionStorage.setItem('new-message-notification', 'false');
     };
 
     return {

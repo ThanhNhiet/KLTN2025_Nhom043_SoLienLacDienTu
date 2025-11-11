@@ -11,7 +11,7 @@ import noImage from '../../assets/img/no-image.jpg';
 const HeaderLECpn: React.FC = () => {
     const navigate = useNavigate();
     const { logout } = useAuth();
-    const { newMessNav, markAsRead } = useMessageNotification();
+    const { newMessNav } = useMessageNotification();
     const { 
         getMyAlerts, 
         alerts, 
@@ -329,7 +329,6 @@ const HeaderLECpn: React.FC = () => {
                             </a>
                             <a
                                 href="/lecturer/chat"
-                                onClick={markAsRead}
                                 className="text-gray-700 hover:text-blue-600 font-medium transition-colors duration-200 px-3 py-2 rounded-md hover:bg-gray-50 relative"
                             >
                                 {newMessNav && (
@@ -536,10 +535,7 @@ const HeaderLECpn: React.FC = () => {
                                 Gửi thông báo
                             </button>
                             <button
-                                onClick={() => {
-                                    markAsRead();
-                                    handleNavigation('/lecturer/chat');
-                                }}
+                                onClick={() => handleNavigation('/lecturer/chat')}
                                 className="block w-full text-left px-3 py-2 text-gray-700 hover:text-blue-600 hover:bg-gray-50 rounded-md font-medium relative"
                             >
                                 {newMessNav && (

@@ -74,10 +74,10 @@ axiosInstance.interceptors.request.use(
       }
     }
     
-    console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`, {
-      headers: config.headers,
-      data: config.data,
-    });
+    // console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`, {
+    //   headers: config.headers,
+    //   data: config.data,
+    // });
     
     return config;
   },
@@ -90,10 +90,10 @@ axiosInstance.interceptors.request.use(
 // Response interceptor - xử lý token refresh và errors
 axiosInstance.interceptors.response.use(
   (response) => {
-    console.log(`[API Response] ${response.config.method?.toUpperCase()} ${response.config.url}`, {
-      status: response.status,
-      data: response.data,
-    });
+    // console.log(`[API Response] ${response.config.method?.toUpperCase()} ${response.config.url}`, {
+    //   status: response.status,
+    //   data: response.data,
+    // });
     return response;
   },
   async (error) => {

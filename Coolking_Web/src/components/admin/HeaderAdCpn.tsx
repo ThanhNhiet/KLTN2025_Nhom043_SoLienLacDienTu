@@ -6,7 +6,7 @@ import noImage from '../../assets/img/no-image.jpg';
 
 const HeaderAdCpn: React.FC = () => {
   const { logout } = useAuth();
-  const { newMessNav, markAsRead } = useMessageNotification();
+  const { newMessNav } = useMessageNotification();
   const admin_name = localStorage.getItem('admin_name');
   const admin_avatar_url = localStorage.getItem('admin_avatar_url');
 
@@ -56,7 +56,6 @@ const HeaderAdCpn: React.FC = () => {
               </a>
               <a
                 href="/admin/chat"
-                onClick={markAsRead}
                 className="text-gray-700 hover:text-blue-600 font-medium transition-colors duration-200 px-3 py-2 rounded-md hover:bg-gray-50 relative"
               >
                 {newMessNav && (
