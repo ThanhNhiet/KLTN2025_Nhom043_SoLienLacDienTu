@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { chatServices } from '../../../services/chatServices';
+import { useChat } from '../../../hooks/useChat';
 
 interface Member {
   userID: string;
@@ -43,6 +44,12 @@ const ChatDetailInfoModal: React.FC<ChatDetailInfoModalProps> = ({
   const [searchMember, setSearchMember] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const membersPerPage = 10;
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [memberToDelete, setMemberToDelete] = useState<Member | null>(null);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  
+  const { deleteMemberFromGroupChat4Admin } = useChat();
 
   useEffect(() => {
     if (isOpen && chat?._id) {
@@ -76,7 +83,51 @@ const ChatDetailInfoModal: React.FC<ChatDetailInfoModalProps> = ({
     setError(null);
     setSearchMember('');
     setCurrentPage(1);
+    setShowDeleteConfirm(false);
+    setMemberToDelete(null);
+    setShowSuccessToast(false);
     onClose();
+  };
+
+  const handleDeleteMember = (member: Member) => {
+    setMemberToDelete(member);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteMember = async () => {
+    if (!memberToDelete || !chatDetail) return;
+
+    try {
+      const result = await deleteMemberFromGroupChat4Admin(chatDetail._id, memberToDelete.userID);
+      if (result?.success) {
+        // Cập nhật lại danh sách members
+        setChatDetail(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            members: prev.members.filter(m => m.userID !== memberToDelete.userID)
+          };
+        });
+        
+        // Hiển thị thông báo thành công
+        setSuccessMessage(result.message || 'Đã xóa thành viên thành công');
+        setShowSuccessToast(true);
+        
+        // Ẩn toast sau 2 giây
+        setTimeout(() => setShowSuccessToast(false), 2000);
+      }
+    } catch (error) {
+      console.error('Error deleting member:', error);
+      setError('Không thể xóa thành viên. Vui lòng thử lại.');
+    } finally {
+      setShowDeleteConfirm(false);
+      setMemberToDelete(null);
+    }
+  };
+
+  const cancelDeleteMember = () => {
+    setShowDeleteConfirm(false);
+    setMemberToDelete(null);
   };
 
   if (!isOpen) return null;
@@ -254,6 +305,9 @@ const ChatDetailInfoModal: React.FC<ChatDetailInfoModalProps> = ({
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                               Ngày tham gia
                             </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Hành động
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
@@ -275,6 +329,17 @@ const ChatDetailInfoModal: React.FC<ChatDetailInfoModalProps> = ({
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                                 {member.joinedAt}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                <button
+                                  onClick={() => handleDeleteMember(member)}
+                                  className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200"
+                                >
+                                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                  Xóa
+                                </button>
                               </td>
                             </tr>
                           ))}
@@ -337,6 +402,55 @@ const ChatDetailInfoModal: React.FC<ChatDetailInfoModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && memberToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <div className="flex-shrink-0">
+                  <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <div className="ml-4">
+                  <h3 className="text-lg font-medium text-gray-900">Xác nhận xóa thành viên</h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Bạn có chắc chắn muốn xóa thành viên "{memberToDelete.userName}" khỏi nhóm chat không?
+                  </p>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={cancelDeleteMember}
+                  className="px-4 py-2 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors duration-200"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={confirmDeleteMember}
+                  className="px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors duration-200"
+                >
+                  Xóa
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Toast */}
+      {showSuccessToast && (
+        <div className="fixed top-4 right-4 z-[10001]">
+          <div className="bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg flex items-center">
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <span>{successMessage}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

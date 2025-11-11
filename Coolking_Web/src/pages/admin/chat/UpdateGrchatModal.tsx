@@ -124,7 +124,7 @@ const UpdateGrchatModal: React.FC<UpdateGrchatModalProps> = ({ isOpen, onClose, 
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          Cập nhật nhóm chat: {chat.name}
+          Thêm thành viên nhóm chat: {chat.name}
         </h3>
         
         <form onSubmit={handleSubmit}>
@@ -285,7 +285,7 @@ const UpdateGrchatModal: React.FC<UpdateGrchatModalProps> = ({ isOpen, onClose, 
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
               )}
-              <span>{loading ? 'Đang cập nhật...' : 'Cập nhật'}</span>
+              <span>{loading ? 'Đang cập nhật...' : 'Thêm'}</span>
             </button>
           </div>
         </form>

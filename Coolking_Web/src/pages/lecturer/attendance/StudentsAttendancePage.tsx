@@ -374,7 +374,30 @@ const StudentsAttendancePage: React.FC = () => {
               </h1>
               
               <div className="flex gap-3">
-                {!isCreatingAttendance ? (
+                {selectedAttendanceForUpdate ? (
+                  // Khi đang cập nhật điểm danh
+                  <>
+                    <button
+                      onClick={() => {
+                        const attendance = attendanceData.attendances.find(a => a.attendance_id === selectedAttendanceForUpdate);
+                        if (attendance) handleSaveUpdateAttendance(attendance);
+                      }}
+                      className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors duration-200"
+                    >
+                      Lưu thay đổi
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedAttendanceForUpdate(null);
+                        setNewUpdateStudentsAttendance([]);
+                      }}
+                      className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors duration-200"
+                    >
+                      Hủy
+                    </button>
+                  </>
+                ) : !isCreatingAttendance ? (
+                  // Khi không tạo mới và không cập nhật
                   <button
                     onClick={() => setShowCreateModal(true)}
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors duration-200"
@@ -382,6 +405,7 @@ const StudentsAttendancePage: React.FC = () => {
                     Tạo buổi điểm danh
                   </button>
                 ) : (
+                  // Khi đang tạo buổi điểm danh mới
                   <>
                     <button
                       onClick={handleSaveAttendance}
@@ -614,32 +638,6 @@ const StudentsAttendancePage: React.FC = () => {
               </tbody>
             </table>
           </div>
-          
-          {/* Update attendance actions */}
-          {selectedAttendanceForUpdate && (
-            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => {
-                    const attendance = attendanceData.attendances.find(a => a.attendance_id === selectedAttendanceForUpdate);
-                    if (attendance) handleSaveUpdateAttendance(attendance);
-                  }}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors duration-200"
-                >
-                  Lưu thay đổi
-                </button>
-                <button
-                  onClick={() => {
-                    setSelectedAttendanceForUpdate(null);
-                    setNewUpdateStudentsAttendance([]);
-                  }}
-                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors duration-200"
-                >
-                  Hủy
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </main>
 
