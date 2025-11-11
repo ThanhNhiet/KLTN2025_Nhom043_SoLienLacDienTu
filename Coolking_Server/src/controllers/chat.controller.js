@@ -534,3 +534,30 @@ exports.searchUserByKeyword = async (req, res) => {
         });
     }
 };
+
+// DELETE /api/chats/group/:chatID/members/:memberUserID
+exports.deleteMemberFromGroupChat = async (req, res) => {
+    try {
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
+        const decoded = jwtUtils.verifyAccessToken(token);
+        if (!decoded || decoded.role !== 'ADMIN') {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
+        const { chatID, userID } = req.params;
+        if (!chatID || !userID) {
+            return res.status(400).json({
+                success: false,
+                message: 'chatID và userID là bắt buộc'
+            });
+        }
+        const result = await chatRepo.deleteMemberFromGroupChat4Admin(chatID, userID);
+        res.status(200).json(result);
+    } catch (error) {
+        console.error('Error in deleteMemberFromGroupChat controller:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Lỗi server khi xóa thành viên khỏi nhóm chat'
+        });
+    }
+};
