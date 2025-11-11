@@ -52,7 +52,7 @@ const Router: React.FC = () => {
           } 
         />
         <Route 
-          path="/admin/chat/course-sections" 
+          path="/admin/chats-management/course-sections-sl" 
           element={
             <ProtectedRoute requiredRole="ADMIN">
               <CourseSectionSLPage />
@@ -60,7 +60,7 @@ const Router: React.FC = () => {
           } 
         />
         <Route 
-          path="/admin/chats" 
+          path="/admin/chats-management" 
           element={
             <ProtectedRoute requiredRole="ADMIN">
               <ChatDbPage />
