@@ -2193,6 +2193,62 @@ const searchUserByKeyword4Lecturer = async (keyword) => {
     }
 };
 
+/**
+ * Xóa 1 member khỏi nhóm chat
+ * @param {string} chat_id - ID của chat
+ * @param {string} user_id - ID của user bị xóa
+ * @returns {Promise<Object>} - Kết quả xóa member
+ */
+const deleteMemberFromGroupChat4Admin = async (chat_id, user_id) => {
+    try {
+        // Kiểm tra chat có tồn tại và là group chat không
+        const chat = await Chat.findOne({
+            _id: chat_id,
+            type: ChatType.GROUP
+        });
+
+        if (!chat) {
+            return {
+                success: false,
+                message: 'Không tìm thấy nhóm chat hoặc chat không phải là nhóm'
+            };
+        }
+
+        // Kiểm tra member có tồn tại trong nhóm không
+        const memberIndex = chat.members.findIndex(member => member.userID === user_id);
+        
+        if (memberIndex === -1) {
+            return {
+                success: false,
+                message: 'Thành viên không tồn tại trong nhóm chat'
+            };
+        }
+
+        const memberToDelete = chat.members[memberIndex];
+        chat.members.splice(memberIndex, 1);
+        await chat.save();
+
+        // Lấy thông tin user bị xóa để trả về message
+        let userName = memberToDelete.userName;
+        let userType = 'thành viên';
+        
+        if (memberToDelete.role === MemberRole.ADMIN) {
+            userType = 'quản trị viên';
+        } else if (memberToDelete.role === MemberRole.LECTURER) {
+            userType = 'giảng viên';
+        }
+
+        return {
+            success: true,
+            message: `Đã xóa ${userType} ${userName} khỏi nhóm chat ${chat.name}`,
+            remainingMemberCount: chat.members.length
+        };
+
+    } catch (error) {
+        console.error('Error deleting member from group chat:', error);
+        throw new Error(`Failed to delete member from group chat: ${error.message}`);
+    }
+};
 
 module.exports = {
     createGroupChat4Admin,
@@ -2219,6 +2275,8 @@ module.exports = {
     searchUserByKeyword4Parent,
     searchUserByKeyword4Student,
     searchUserByKeyword4Lecturer,
+
+    deleteMemberFromGroupChat4Admin,
 
     getAllChatIdsForUser, //not served api
     getMemberUserIdsByChat //not served api

@@ -27,8 +27,8 @@ const CreateAttendanceModal: React.FC<CreateAttendanceModalProps> = ({
       return;
     }
     
-    if (startLesson > 12 || endLesson > 12) {
-      setError('Tiết học không được vượt quá 12');
+    if (startLesson > 15 || endLesson > 15) {
+      setError('Tiết học không được vượt quá 15');
       return;
     }
     
@@ -43,7 +43,7 @@ const CreateAttendanceModal: React.FC<CreateAttendanceModalProps> = ({
     onClose();
   };
 
-  const isValid = startLesson >= 1 && endLesson >= 1 && startLesson <= endLesson && startLesson <= 12 && endLesson <= 12;
+  const isValid = startLesson >= 1 && endLesson >= 1 && startLesson <= endLesson && startLesson <= 15 && endLesson <= 15;
 
   if (!isOpen) return null;
 

@@ -419,6 +419,20 @@ export const useChat = () => {
         }
     }, []);
 
+    // Xóa 1 thành viên khỏi nhóm chat (dành cho admin)
+    const deleteMemberFromGroupChat4Admin = useCallback(async (chatID: string, userID: string) => {
+        try {
+            setLoading(true);
+            setError('');
+            const data = await chatServices.deleteMemberFromGroupChat4Admin(chatID, userID);
+            return data;
+        } catch (error: any) {
+            setError(error.message || 'Failed to delete member from group chat for admin');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     return {
         loading,
         error,
@@ -453,6 +467,7 @@ export const useChat = () => {
         searchChats4AllUser,
         muteChat4AllUser,
         searchUser,
-        getChatInfoByID4Admin
+        getChatInfoByID4Admin,
+        deleteMemberFromGroupChat4Admin
     };
 };

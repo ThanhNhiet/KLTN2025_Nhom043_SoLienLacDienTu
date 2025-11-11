@@ -103,7 +103,7 @@ const CourseSectionSLPage: React.FC = () => {
             <div className="flex items-center justify-between mb-4">
               <h1 className="text-2xl font-bold text-gray-800">Lớp học phần chưa có chat</h1>
               <button
-                onClick={() => navigate('/admin/chats')}
+                onClick={() => navigate('/admin/chats-management')}
                 className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors duration-200 font-medium"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

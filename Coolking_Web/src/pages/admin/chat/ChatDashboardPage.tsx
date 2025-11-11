@@ -183,7 +183,7 @@ const ChatDashboardPage: React.FC = () => {
               
               <div className="flex gap-3 flex-wrap">
                 <button 
-                  onClick={() => navigate('/admin/chat/course-sections')}
+                  onClick={() => navigate('/admin/chats-management/course-sections-sl')}
                   className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200 font-medium"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -325,8 +325,8 @@ const ChatDashboardPage: React.FC = () => {
                                 }}
                                 className="w-full text-left px-4 py-2 hover:bg-blue-50 text-sm text-gray-700 border-b border-gray-100 transition-colors duration-200 flex items-center gap-2"
                               >
-                                <span className="text-blue-500">✏️</span>
-                                <span>Cập nhật</span>
+                                <span className="text-blue-500">➕</span>
+                                <span>Thêm thành viên</span>
                               </button>
                               <button
                                 onClick={(e) => {

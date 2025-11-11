@@ -82,4 +82,8 @@ router.get('/info/:chatID', chatController.getChatInfoByID4Admin);
 // GET /api/chats/:chatID
 router.get('/:chatID', chatController.getChatInfoByID);
 
+// Xóa thành viên khỏi cuộc trò chuyện nhóm (dành cho admin)
+// DELETE /api/chats/group/:chatID/member/:userID
+router.delete('/group/:chatID/member/:userID', chatController.deleteMemberFromGroupChat);
+
 module.exports = router;

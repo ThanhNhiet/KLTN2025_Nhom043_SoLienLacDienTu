@@ -174,6 +174,12 @@ class ChatServices {
         const response = await axiosInstance.get(`/chats/info/${chatID}`);
         return response.data;
     }
+
+    // DELETE /api/chats/group/:chatID/member/:userID
+    async deleteMemberFromGroupChat4Admin(chatID: string, userID: string) {
+        const response = await axiosInstance.delete(`/chats/group/${chatID}/member/${userID}`);
+        return response.data;
+    }
 }
 
 export const chatServices = new ChatServices();
