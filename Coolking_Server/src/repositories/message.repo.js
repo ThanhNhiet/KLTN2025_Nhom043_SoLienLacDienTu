@@ -5,9 +5,12 @@ const models = initModels(sequelize);
 const { v4: uuidv4 } = require('uuid');
 const { Message, MessageStatus, MessageType } = require('../databases/mongodb/schemas/Message');
 const { Chat, ChatType, MemberRole } = require('../databases/mongodb/schemas/Chat');
+const {createChatMessageAI } = require("../services/faq.service");
 const mongoose = require('mongoose');
 const datetimeFormatter = require("../utils/format/datetime-formatter");
 const cloudinaryService = require('../services/cloudinary.service');
+
+
 
 const folder = 'messages'; // Cloudinary folder for messages
 
@@ -420,7 +423,6 @@ const getMessagesByChatID = async (chatID, page, pageSize) => {
                 pages: []
             };
         }
-
         const page_num = parseInt(page) || 1;
         const pageSize_num = parseInt(pageSize) || 10;
 
@@ -705,6 +707,54 @@ const updateLastReadAt = async (chatID, userID) => {
     }
 };
 
+const createMessageAI = async (chatID, senderID, section, question) => {
+    try {
+        const answerData = await createChatMessageAI(section, question);
+        if (!answerData || !answerData.answer) {
+            throw new Error("Failed to get answer from FAQ service");
+        }
+        const newMessage = new Message({
+            _id: uuidv4(),
+            chatID,
+            senderID,
+            content: answerData.answer,
+            type: MessageType.TEXT,
+            status: MessageStatus.SENDING,
+            filename: null,
+            replyTo: null,
+            pinnedInfo: null,
+        });
+        await newMessage.save();
+        const lastMessage = await Message.findOne({ chatID }).sort({ createdAt: -1 });
+        if (!lastMessage) {
+            throw new Error("No messages found for the given chatID");
+            return;
+        }
+        return {
+            _id: lastMessage._id,
+            chatID: lastMessage.chatID,
+            senderID: lastMessage.senderID,
+            content: lastMessage.content,
+            type: lastMessage.type,
+            status: lastMessage.status,
+            filename: lastMessage.filename,
+            replyTo: lastMessage.replyTo,
+            pinnedInfo: lastMessage.pinnedInfo,
+            createdAt: datetimeFormatter.formatDateTimeVN(lastMessage.createdAt),
+            updatedAt: datetimeFormatter.formatDateTimeVN(lastMessage.updatedAt)
+        };
+    } catch (error) {
+        console.error("Error creating AI chat message:", error);
+        throw error;
+    }
+
+};
+
+
+
+
+
+
 module.exports = {
     createMessageText,
     createMessageFile,
@@ -723,5 +773,6 @@ module.exports = {
     deleteMessageByID,
     getPinnedMessagesInChat,
     unPinMessage,
-    updateLastReadAt
+    updateLastReadAt,
+    createMessageAI
 }

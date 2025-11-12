@@ -3,6 +3,7 @@ const { Message, MessageType, MessageStatus } = require('./Message');
 const Alert = require('./Alert');
 const IsReadAlert = require('./IsReadAlert');
 const UserMobileDevice = require('./UserMobileDevice');
+const { FaqSection } = require('./FaqSection');
 
 module.exports = {
   // Models
@@ -11,6 +12,7 @@ module.exports = {
   Alert,
   IsReadAlert,
   UserMobileDevice,
+  FaqSection,
   
   // Enums
   ChatType,

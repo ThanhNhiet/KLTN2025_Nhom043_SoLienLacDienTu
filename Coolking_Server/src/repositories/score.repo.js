@@ -3,6 +3,20 @@ const sequelize = require("../config/mariadb.conf");
 const initModels = require("../databases/mariadb/model/init-models");
 const models = initModels(sequelize);
 
+// Thêm helper này phía trên hoặc ngoài hàm
+function safeParseJSON(value) {
+  if (value == null) return null;
+  if (typeof value === 'object') return value; // đã là object -> giữ nguyên
+  if (typeof value !== 'string') return value; // không phải string -> giữ nguyên
+
+  try {
+    return JSON.parse(value);
+  } catch (e) {
+    console.warn('⚠️ JSON parse error:', e.message);
+    return value; // giữ nguyên nếu không parse được
+  }
+}
+
 
 const  getScoreStudentBySession = async (studentId) =>{
     try {
@@ -96,7 +110,7 @@ const  getScoreStudentBySession = async (studentId) =>{
     // Parse the JSON string in subjects field
         const formattedResults = results.map(result => ({
             ...result,
-            subjects: JSON.parse(result.subjects)
+            subjects: safeParseJSON(result.subjects)
         }));
 
         return {
@@ -202,7 +216,7 @@ const  getScoreParentStudentBySession = async (ParentId, studentID) =>{
     // Parse the JSON string in subjects field
         const formattedResults = results.map(result => ({
             ...result,
-            subjects: JSON.parse(result.subjects)
+            subjects: safeParseJSON(result.subjects)
         }));
 
 
