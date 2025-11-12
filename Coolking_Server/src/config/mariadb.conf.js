@@ -23,7 +23,6 @@ const sequelize = new Sequelize(
   }
 );
 
-
 // Cloud MariaDB connection
 // const sequelize = new Sequelize(
 //   process.env.MARIADB_NAME,

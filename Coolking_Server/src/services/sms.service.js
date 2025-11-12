@@ -1,5 +1,55 @@
 const redisService = require('./redis.service');
 
+var http = require('http');
+var https = require('https');
+
+const sendSMS = function(phones, content, type, sender) {
+    var url = 'api.speedsms.vn';
+    var params = JSON.stringify({
+        to: phones,
+        content: content,
+        sms_type: type,
+        sender: sender
+    });
+
+    var buf = new Buffer(process.env.SPEEDSMS_TOKEN + ':x');
+    var auth = "Basic " + buf.toString('base64');
+    const options = {
+        hostname: url,
+        port: 443,
+        path: '/index.php/sms/send',
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': auth
+        }
+    };
+
+    const req = https.request(options, function(res) {
+        res.setEncoding('utf8');
+        var body = '';
+        res.on('data', function(d) {
+            body += d;
+        });
+        res.on('end', function() {
+            var json = JSON.parse(body);
+            if (json.status == 'success') {
+                console.log("send sms success")
+            }
+            else {
+                console.log("send sms failed " + body);
+            }
+        });
+    });
+
+    req.on('error', function(e) {
+        console.log("send sms failed: " + e);
+    });
+
+    req.write(params);
+    req.end();
+};
+
 // Tạo OTP ngẫu nhiên 6 số
 const generateOTP = () => {
     return Math.floor(100000 + Math.random() * 900000).toString();
@@ -13,8 +63,9 @@ const sendOTP = async (phoneNumber) => {
         // Lưu OTP vào Redis với thời gian hết hạn 3 phút
         const redisKey = `otp:${phoneNumber}`;
         await redisService.setex(redisKey, 180, otp);
-        // Gửi OTP qua SMS (giả lập)
-        console.log(`Sending OTP ${otp} to phone number ${phoneNumber}`);
+        // Gửi OTP qua SMS bằng Api của speedSMS
+        // console.log(`Sending OTP ${otp} to phone number ${phoneNumber}`);
+        sendSMS([phoneNumber], `Ma OTP cho Econtact cua ban la ${otp}`, 5, '733357d3981bdb64');
         return { success: true, message: 'OTP đã được gửi' };
     } catch (error) {
         console.error('Error sending OTP:', error);
