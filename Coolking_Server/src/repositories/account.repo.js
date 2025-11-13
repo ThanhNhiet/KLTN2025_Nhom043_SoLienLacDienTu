@@ -190,7 +190,7 @@ const createAccount = async (accountData) => {
       // Tự động sinh user_id cho ADMIN, user_id có định dạng ADMINxxx
       // Đếm số lượng record có role là ADMIN
       const numberOfAdmins = await models.Account.count({ where: { role: 'ADMIN' } });
-      const newAdminNumber = numberOfAdmins + 1;
+      const newAdminNumber = numberOfAdmins;
       const paddedNumber = String(newAdminNumber).padStart(3, '0'); // luôn đủ 3 số
       const admin_id = `ADMIN${paddedNumber}`;
       if (accountData.email === '') {
