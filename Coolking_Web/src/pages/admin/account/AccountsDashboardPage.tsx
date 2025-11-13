@@ -5,8 +5,12 @@ import FooterAdCpn from '../../../components/admin/FooterAdCpn';
 import AccountsCreateModal from './AccountsCreateModal';
 import AdminCreateModal from './AdminCreateModal';
 import AccountsEditModal from './AccountsEditModal';
+import authService from '../../../services/authService';
 
 const AccountsDashboardPage: React.FC = () => {
+  const tokenData = authService.parseToken();
+  const current_user_id = tokenData?.user_id;
+
   const { accounts, loading, error, currentPage, pageSize, pages, getAccounts, searchAccounts, disableAccount, resetPassword, refreshAccounts } = useAccount();
   const [searchKeyword, setSearchKeyword] = useState('');
   const [showActionMenu, setShowActionMenu] = useState<string | null>(null);
@@ -72,7 +76,7 @@ const AccountsDashboardPage: React.FC = () => {
     setSuccessMessage(message);
     setShowSuccessNotification(true);
     refreshAccounts();
-    
+
     // Auto hide success notification after 3 seconds
     setTimeout(() => {
       setShowSuccessNotification(false);
@@ -90,15 +94,15 @@ const AccountsDashboardPage: React.FC = () => {
         await resetPassword(confirmAction.userId);
         setSuccessMessage(`Đã reset mật khẩu cho tài khoản ${confirmAction.userId} thành công!`);
       }
-      
+
       // Show success notification
       setShowSuccessNotification(true);
-      
+
       // Refresh the accounts list
       refreshAccounts();
       setShowConfirmModal(false);
       setConfirmAction(null);
-      
+
       // Auto hide success notification after 3 seconds
       setTimeout(() => {
         setShowSuccessNotification(false);
@@ -136,13 +140,13 @@ const AccountsDashboardPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <HeaderAdCpn />
-      
+
       <main className="flex-1 max-w-7xl mx-auto px-6 py-8 w-full">
         <div className="bg-white rounded-lg shadow-sm border">
           {/* Header */}
           <div className="px-6 py-4 border-b border-gray-200">
             <h1 className="text-2xl font-bold text-gray-800 mb-4 text-center">Quản lý Tài Khoản</h1>
-            
+
             {/* Search and Actions */}
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3 flex-1 max-w-md">
@@ -163,9 +167,9 @@ const AccountsDashboardPage: React.FC = () => {
                   </svg>
                 </button>
               </div>
-              
+
               <div className="flex gap-3">
-                <button 
+                <button
                   onClick={handleCreateAccount}
                   className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 font-medium"
                 >
@@ -174,7 +178,7 @@ const AccountsDashboardPage: React.FC = () => {
                   </svg>
                   <span>Tạo mới</span>
                 </button>
-                <button 
+                <button
                   onClick={handleAdminCreateAccount}
                   className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors duration-200 font-medium"
                 >
@@ -254,21 +258,34 @@ const AccountsDashboardPage: React.FC = () => {
                           data-account-id={account.user_id}
                           onClick={(e) => {
                             e.stopPropagation();
+                            // Vô hiệu hóa nếu account có role ADMIN và current user không phải ADMIN000
+                            if (account.role === 'ADMIN' && current_user_id !== 'ADMIN000') {
+                              return;
+                            }
                             handleActionClick(account.user_id);
                           }}
-                          className="p-2 hover:bg-gray-100 rounded-full transition-colors duration-200"
+                          disabled={account.role === 'ADMIN' && current_user_id !== 'ADMIN000'}
+                          className={`p-2 rounded-full transition-colors duration-200 ${
+                            account.role === 'ADMIN' && current_user_id !== 'ADMIN000'
+                              ? 'cursor-not-allowed opacity-50'
+                              : 'hover:bg-gray-100 cursor-pointer'
+                          }`}
                         >
-                          <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                          <svg className={`w-5 h-5 ${
+                            account.role === 'ADMIN' && current_user_id !== 'ADMIN000'
+                              ? 'text-gray-400'
+                              : 'text-gray-600'
+                          }`} fill="currentColor" viewBox="0 0 20 20">
                             <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
                           </svg>
                         </button>
-                        
+
                         {showActionMenu === account.user_id && (
-                          <div className="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-[60] w-48" 
-                               style={{
-                                 top: `${(document.querySelector(`[data-account-id="${account.user_id}"]`) as HTMLElement)?.getBoundingClientRect()?.bottom + 5 || 0}px`,
-                                 right: `${window.innerWidth - (document.querySelector(`[data-account-id="${account.user_id}"]`) as HTMLElement)?.getBoundingClientRect()?.right || 0}px`
-                               }}>
+                          <div className="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-[60] w-48"
+                            style={{
+                              top: `${(document.querySelector(`[data-account-id="${account.user_id}"]`) as HTMLElement)?.getBoundingClientRect()?.bottom + 5 || 0}px`,
+                              right: `${window.innerWidth - (document.querySelector(`[data-account-id="${account.user_id}"]`) as HTMLElement)?.getBoundingClientRect()?.right || 0}px`
+                            }}>
                             <div className="py-1">
                               <button
                                 onClick={(e) => {
@@ -322,21 +339,20 @@ const AccountsDashboardPage: React.FC = () => {
                 >
                   &lt;
                 </button>
-                
+
                 {pages.map((page) => (
                   <button
                     key={page}
                     onClick={() => handlePageChange(page)}
-                    className={`px-3 py-1 text-sm rounded-md transition-colors duration-200 ${
-                      page === currentPage
+                    className={`px-3 py-1 text-sm rounded-md transition-colors duration-200 ${page === currentPage
                         ? 'bg-blue-600 text-white'
                         : 'bg-white border border-gray-300 hover:bg-gray-50'
-                    }`}
+                      }`}
                   >
                     {page}
                   </button>
                 ))}
-                
+
                 <button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === pages[pages.length - 1]}
@@ -403,8 +419,8 @@ const AccountsDashboardPage: React.FC = () => {
 
       {/* Click outside to close action menu */}
       {showActionMenu && (
-        <div 
-          className="fixed inset-0 z-40" 
+        <div
+          className="fixed inset-0 z-40"
           onClick={() => setShowActionMenu(null)}
         />
       )}
