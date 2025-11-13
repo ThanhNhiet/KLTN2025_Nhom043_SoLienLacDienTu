@@ -48,7 +48,6 @@ export const useStatistics = () => {
         setLoading(true);
         setError('');
         try {
-            console.log(await statisticsServices.getFacultyOverview(facultyId, sessionId));
            return await statisticsServices.getFacultyOverview(facultyId, sessionId);
         } catch (err) {
             setError('Failed to fetch faculty statistics');
@@ -61,7 +60,6 @@ export const useStatistics = () => {
         setLoading(true);
         setError('');
         try {
-            console.log(await statisticsServices.getLecturersOverview(facultyId, sessionId));
            return await statisticsServices.getLecturersOverview(facultyId, sessionId);
         } catch (err) {
             setError('Failed to fetch lecturers statistics');
@@ -74,7 +72,6 @@ export const useStatistics = () => {
         setLoading(true);
         setError('');
         try {
-            console.log(await statisticsServices.getLecturerOverview(lecturerId, sessionId));
            return await statisticsServices.getLecturerOverview(lecturerId, sessionId);
         } catch (err) {
             setError('Failed to fetch lecturer statistics');
@@ -87,7 +84,6 @@ export const useStatistics = () => {
         setLoading(true);
         setError('');
         try {
-            console.log(await statisticsServices.getCoursesSectionsOverview(facultyId, sessionId));
            return await statisticsServices.getCoursesSectionsOverview(facultyId, sessionId);
         } catch (err) {
             setError('Failed to fetch courses sections statistics');
