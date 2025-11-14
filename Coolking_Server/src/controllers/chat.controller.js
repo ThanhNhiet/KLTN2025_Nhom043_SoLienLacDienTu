@@ -250,7 +250,7 @@ exports.searchAllChats = async (req, res) => {
     }
 };
 
-// GET /api/chats/nonchat-course-sections?page=1&pageSize=10
+// GET /api/chats/nonchat-course-sections?faculty_id=&page=1&pageSize=10
 exports.getNonChatCourseSections = async (req, res) => {
     try {
         const authHeader = req.headers['authorization'];
@@ -259,8 +259,8 @@ exports.getNonChatCourseSections = async (req, res) => {
         if (!decoded || decoded.role !== 'ADMIN') {
             return res.status(403).json({ message: 'Forbidden' });
         }
-        const { page, pageSize } = req.query;
-        const courseSections = await chatRepo.getNonChatCourseSections(page, pageSize);
+        const { faculty_id, page, pageSize } = req.query;
+        const courseSections = await chatRepo.getNonChatCourseSections(faculty_id, page, pageSize);
         res.status(200).json(courseSections);
     } catch (error) {
         console.error('Error in getNonChatCourseSections controller:', error);
@@ -271,7 +271,7 @@ exports.getNonChatCourseSections = async (req, res) => {
     }
 };
 
-// GET /api/Chats/nonchat-course-sections/search?keyword=<keyword>&page=1&pageSize=10
+// GET /api/Chats/nonchat-course-sections/search?faculty_id=<faculty_id>&keyword=<keyword>&page=1&pageSize=10
 exports.searchNonChatCourseSections = async (req, res) => {
     try {
         const authHeader = req.headers['authorization'];
@@ -280,14 +280,14 @@ exports.searchNonChatCourseSections = async (req, res) => {
         if (!decoded || decoded.role !== 'ADMIN') {
             return res.status(403).json({ message: 'Forbidden' });
         }
-        const { keyword, page, pageSize } = req.query;
+        const { faculty_id, keyword, page, pageSize } = req.query;
         if (!keyword) {
             return res.status(400).json({
                 success: false,
                 message: 'keyword là bắt buộc'
             });
         }
-        const courseSections = await chatRepo.searchNonChatCourseSections(keyword, page, pageSize);
+        const courseSections = await chatRepo.searchNonChatCourseSections(faculty_id, keyword, page, pageSize);
         res.status(200).json(courseSections);
     } catch (error) {
         console.error('Error in searchNonChatCourseSections controller:', error);
@@ -354,39 +354,31 @@ exports.getNonChatCourseSectionsBySessionFaculty = async (req, res) => {
     }
 };
 
-// POST /api/chats/bulk-create-session/:session_id?namegroup=
-// exports.createBulkGroupChatsForSession = async (req, res) => {
-//     try {
-//         const authHeader = req.headers['authorization'];
-//         const token = authHeader && authHeader.split(' ')[1];
-//         const decoded = jwtUtils.verifyAccessToken(token);
-//         if (!decoded || decoded.role !== 'ADMIN') {
-//             return res.status(403).json({ message: 'Forbidden' });
-//         }
-//         const { session_id } = req.params;
-//         const { namegroup } = req.query; // Get namegroup from query params
-        
-//         if (!session_id) {
-//             return res.status(400).json({
-//                 success: false,
-//                 message: 'session_id là bắt buộc'
-//             });
-//         }
+// POST /api/chats/bulk-create
+exports.createBulkGroupChats = async (req, res) => {
+    try {
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
+        const decoded = jwtUtils.verifyAccessToken(token);
+        if (!decoded || decoded.role !== 'ADMIN') {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
+        const { courseSections, sessionInfo } = req.body;
 
-//         const result = await chatRepo.createBulkGroupChatsForSession(
-//             decoded.user_id,
-//             session_id,
-//             namegroup
-//         );
-//         res.status(201).json(result);
-//     } catch (error) {
-//         console.error('Error in createBulkGroupChatsForSession controller:', error);
-//         res.status(500).json({
-//             success: false,
-//             message: error.message || 'Lỗi server khi tạo hàng loạt nhóm chat cho học kỳ'
-//         });
-//     }
-// };
+        const result = await chatRepo.createBulkGroupChats(
+            decoded.user_id,
+            courseSections,
+            sessionInfo
+        );
+        res.status(201).json(result);
+    } catch (error) {
+        console.error('Error in createBulkGroupChats controller:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Lỗi server khi tạo hàng loạt nhóm chat cho học kỳ'
+        });
+    }
+};
 
 // DELETE /api/chats/cleanup-gr-completed/:session_id
 exports.cleanupCompletedCourseSectionChats = async (req, res) => {
