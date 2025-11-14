@@ -1174,8 +1174,8 @@ const getNonChatCourseSections = async (page = 1, pageSize = 10) => {
 
         // Điều kiện WHERE để loại bỏ các course section đã có group chat
         const whereCondition = existingCourseSectionIds.length > 0
-            ? { id: { [Op.notIn]: existingCourseSectionIds } }
-            : {};
+            ? { id: { [Op.notIn]: existingCourseSectionIds }, isCompleted: false }
+            : { isCompleted: false };
 
         // Đếm tổng số course sections chưa có group chat
         const total = await models.CourseSection.count({
@@ -1223,9 +1223,10 @@ const getNonChatCourseSections = async (page = 1, pageSize = 10) => {
                     model: models.Schedule,
                     as: 'schedules',
                     where: {
-                        isExam: false
+                        isExam: false,
+                        user_id: { [Op.like]: 'LE%' }
                     },
-                    attributes: ['start_lesson', 'end_lesson'],
+                    attributes: ['start_lesson', 'end_lesson', 'room'],
                     required: false
                 }
             ],
@@ -1235,23 +1236,45 @@ const getNonChatCourseSections = async (page = 1, pageSize = 10) => {
             offset: offset
         });
 
-        // Format dữ liệu trả về
-        const processedCourseSections = courseSections.map(cs => {
+        // Format dữ liệu trả về - tạo một bản ghi cho mỗi schedule
+        const processedCourseSections = [];
+        courseSections.forEach(cs => {
             const lecturer = cs.lecturers_course_sections?.[0]?.lecturer;
-            const schedule = cs.schedules?.[0];
-
-            return {
+            const baseRecord = {
                 subjectName: cs.subject?.name || 'N/A',
                 className: cs.clazz?.name || 'N/A',
                 course_section_id: cs.id,
                 facultyName: cs.subject?.faculty?.name || 'N/A',
                 sessionName: cs.session ? `${cs.session.name} ${cs.session.years}` : 'N/A',
                 lecturerName: lecturer?.name || 'N/A',
-                start_lesson: schedule?.start_lesson || 'N/A',
-                end_lesson: schedule?.end_lesson || 'N/A',
                 createdAt: datetimeFormatter.formatDateTimeVN(cs.createdAt),
                 updatedAt: datetimeFormatter.formatDateTimeVN(cs.updatedAt)
             };
+
+            // Nếu có schedules, tạo một bản ghi cho mỗi schedule
+            if (cs.schedules && cs.schedules.length > 0) {
+                cs.schedules.forEach(schedule => {
+                    // Xác định loại môn học dựa trên room
+                    let subjectSuffix = '';
+                    if (schedule.room) {
+                        subjectSuffix = schedule.room.startsWith('TH_') ? '-TH' : '-LT';
+                    }
+                    
+                    processedCourseSections.push({
+                        ...baseRecord,
+                        subjectName: (baseRecord.subjectName || 'N/A') + subjectSuffix,
+                        start_lesson: schedule.start_lesson || 'N/A',
+                        end_lesson: schedule.end_lesson || 'N/A'
+                    });
+                });
+            } else {
+                // Nếu không có schedules, loại bỏ
+                processedCourseSections.push({
+                    ...baseRecord,
+                    start_lesson: 'N/A',
+                    end_lesson: 'N/A'
+                });
+            }
         });
 
         const totalPages = Math.ceil(total / pageSize_num);
@@ -1355,25 +1378,41 @@ const searchNonChatCourseSections = async (keyword, page = 1, pageSize = 10) => 
             });
             classMatches.forEach(item => matchingCourseIds.add(item.id));
 
-            // 3. Tìm theo session name (bắt đầu bằng HK)
+            // 3. Tìm theo session (format "HK1 2025-2026")
             const sessionMatches = await models.CourseSection.findAll({
                 include: [{
                     model: models.Session,
                     as: 'session',
-                    where: {
-                        name: {
-                            [Op.and]: [
-                                { [Op.like]: 'HK%' },
-                                { [Op.like]: `%${searchKeyword}%` }
-                            ]
-                        }
-                    },
+                    where: sequelize.where(
+                        sequelize.fn('CONCAT', sequelize.col('session.name'), ' ', sequelize.col('session.years')),
+                        searchKeyword
+                    ),
                     attributes: []
                 }],
                 attributes: ['id'],
                 raw: true
             });
             sessionMatches.forEach(item => matchingCourseIds.add(item.id));
+
+            // 4. Tìm theo faculty name
+            const facultyMatches = await models.CourseSection.findAll({
+                include: [{
+                    model: models.Subject,
+                    as: 'subject',
+                    include: [{
+                        model: models.Faculty,
+                        as: 'faculty',
+                        where: {
+                            name: searchKeyword
+                        },
+                        attributes: []
+                    }],
+                    attributes: []
+                }],
+                attributes: ['id'],
+                raw: true
+            });
+            facultyMatches.forEach(item => matchingCourseIds.add(item.id));
         }
 
         // Chuyển Set thành Array và loại bỏ các course section đã có group chat
@@ -1395,7 +1434,8 @@ const searchNonChatCourseSections = async (keyword, page = 1, pageSize = 10) => 
         }
 
         const whereCondition = {
-            id: { [Op.in]: filteredIds }
+            id: { [Op.in]: filteredIds },
+            isCompleted: false
         };
 
         // Đếm tổng số kết quả
@@ -1442,9 +1482,10 @@ const searchNonChatCourseSections = async (keyword, page = 1, pageSize = 10) => 
                     model: models.Schedule,
                     as: 'schedules',
                     where: {
-                        isExam: false
+                        isExam: false,
+                        user_id: { [Op.like]: 'LE%' }
                     },
-                    attributes: ['start_lesson', 'end_lesson'],
+                    attributes: ['start_lesson', 'end_lesson', 'room'],
                     required: false
                 }
             ],
@@ -1454,22 +1495,45 @@ const searchNonChatCourseSections = async (keyword, page = 1, pageSize = 10) => 
             offset: offset
         });
 
-        // Format dữ liệu trả về
-        const processedCourseSections = courseSections.map(cs => {
+        // Format dữ liệu trả về - tạo một bản ghi cho mỗi schedule
+        const processedCourseSections = [];
+        courseSections.forEach(cs => {
             const lecturer = cs.lecturers_course_sections?.[0]?.lecturer;
-            const schedule = cs.schedules?.[0];
-
-            return {
+            const baseRecord = {
                 subjectName: cs.subject?.name || 'N/A',
                 className: cs.clazz?.name || 'N/A',
                 course_section_id: cs.id,
                 facultyName: cs.subject?.faculty?.name || 'N/A',
                 sessionName: cs.session ? `${cs.session.name} ${cs.session.years}` : 'N/A',
                 lecturerName: lecturer?.name || 'N/A',
-                start_lesson: schedule?.start_lesson || 'N/A',
-                end_lesson: schedule?.end_lesson || 'N/A',
+                createdAt: datetimeFormatter.formatDateTimeVN(cs.createdAt),
                 updatedAt: datetimeFormatter.formatDateTimeVN(cs.updatedAt)
             };
+
+            // Nếu có schedules, tạo một bản ghi cho mỗi schedule
+            if (cs.schedules && cs.schedules.length > 0) {
+                cs.schedules.forEach(schedule => {
+                    // Xác định loại môn học dựa trên room
+                    let subjectSuffix = '';
+                    if (schedule.room) {
+                        subjectSuffix = schedule.room.startsWith('TH_') ? '-TH' : '-LT';
+                    }
+                    
+                    processedCourseSections.push({
+                        ...baseRecord,
+                        subjectName: (baseRecord.subjectName || 'N/A') + subjectSuffix,
+                        start_lesson: schedule.start_lesson || 'N/A',
+                        end_lesson: schedule.end_lesson || 'N/A'
+                    });
+                });
+            } else {
+                // Nếu không có schedules, loại bỏ bản ghi
+                // processedCourseSections.push({
+                //     ...baseRecord,
+                //     start_lesson: 'N/A',
+                //     end_lesson: 'N/A'
+                // });
+            }
         });
 
         const totalPages = Math.ceil(total / pageSize_num);
@@ -1708,18 +1772,17 @@ const createBulkGroupChatsForSession = async (admin_id, session_id, nameTemplate
 };
 
 /**
- * Lấy danh sách các lớp học phần chưa có group chat theo học kỳ
+ * Lấy danh sách các lớp học phần chưa có group chat theo học kỳ và theo khoa. Không phân trang.
  * @param {string} session_id - ID của học kỳ
- * @param {number} page - Trang hiện tại (mặc định 1) 
- * @param {number} pageSize - Kích thước trang (mặc định 10)
+ * @param {number} faculty_id - ID của khoa
  * @returns {Promise<Object>} - Danh sách course sections chưa có group chat trong session
  */
-const getNonChatCourseSectionsBySession = async (session_id, page = 1, pageSize = 10) => {
+const getNonChatCourseSectionsBySessionFaculty = async (session_id, faculty_id) => {
     try {
         // Kiểm tra session có tồn tại không
         const session = await models.Session.findOne({
             where: { id: session_id },
-            attributes: ['id', 'name', 'years']
+            attributes: ['name', 'years']
         });
 
         if (!session) {
@@ -1728,10 +1791,6 @@ const getNonChatCourseSectionsBySession = async (session_id, page = 1, pageSize 
                 message: 'Không tìm thấy học kỳ với ID đã cho'
             };
         }
-
-        const page_num = Math.max(1, parseInt(page) || 1);
-        const pageSize_num = Math.max(1, parseInt(pageSize) || 10);
-        const offset = (page_num - 1) * pageSize_num;
 
         // Lấy danh sách course_section_id đã có group chat
         const existingGroupChats = await Chat.find(
@@ -1744,103 +1803,84 @@ const getNonChatCourseSectionsBySession = async (session_id, page = 1, pageSize 
         // Điều kiện WHERE để lọc theo session và loại bỏ các course section đã có group chat
         const whereCondition = {
             session_id: session_id,
+            isCompleted: false,
             ...(existingCourseSectionIds.length > 0 ? { id: { [Op.notIn]: existingCourseSectionIds } } : {})
         };
 
-        // Đếm tổng số course sections chưa có group chat trong session
-        const total = await models.CourseSection.count({
-            where: whereCondition
-        });
+        const includeConditions = [
+            {
+                model: models.Subject,
+                as: 'subject',
+                attributes: ['name'],
+                where: { faculty_id: faculty_id },
+                required: true,
+            },
+            {
+                model: models.Clazz,
+                as: 'clazz',
+                attributes: ['name']
+            },
+            {
+                model: models.Schedule,
+                as: 'schedules',
+                where: {
+                    isExam: false,
+                    user_id: { [Op.like]: 'LE%' }
+                },
+                attributes: ['start_lesson', 'end_lesson', 'room'],
+                required: false
+            }
+        ];
 
-        // Lấy danh sách course sections với phân trang
+        // Lấy danh sách course sections
         const courseSections = await models.CourseSection.findAll({
             where: whereCondition,
-            include: [
-                {
-                    model: models.Subject,
-                    as: 'subject',
-                    attributes: ['name'],
-                    include: [
-                        {
-                            model: models.Faculty,
-                            as: 'faculty',
-                            attributes: ['name']
-                        }
-                    ]
-                },
-                {
-                    model: models.Clazz,
-                    as: 'clazz',
-                    attributes: ['name']
-                },
-                {
-                    model: models.Session,
-                    as: 'session',
-                    attributes: ['name', 'years']
-                },
-                {
-                    model: models.LecturerCourseSection,
-                    as: 'lecturers_course_sections',
-                    include: [
-                        {
-                            model: models.Lecturer,
-                            as: 'lecturer',
-                            attributes: ['lecturer_id', 'name']
-                        }
-                    ]
-                },
-                {
-                    model: models.Schedule,
-                    as: 'schedules',
-                    where: {
-                        isExam: false
-                    },
-                    attributes: ['start_lesson', 'end_lesson'],
-                    required: false
-                }
-            ],
-            attributes: ['id', 'createdAt', 'updatedAt'],
-            order: [['updatedAt', 'DESC']],
-            limit: pageSize_num,
-            offset: offset
+            include: includeConditions,
+            attributes: ['id']
         });
 
-        // Format dữ liệu trả về
-        const processedCourseSections = courseSections.map(cs => {
-            const lecturer = cs.lecturers_course_sections?.[0]?.lecturer;
-            const schedule = cs.schedules?.[0];
-
-            return {
+        // Format dữ liệu trả về - tạo một bản ghi cho mỗi schedule
+        const processedCourseSections = [];
+        courseSections.forEach(cs => {
+            const baseRecord = {
                 subjectName: cs.subject?.name || 'N/A',
                 className: cs.clazz?.name || 'N/A',
                 course_section_id: cs.id,
-                facultyName: cs.subject?.faculty?.name || 'N/A',
-                sessionName: cs.session ? `${cs.session.name} ${cs.session.years}` : 'N/A',
-                lecturerName: lecturer?.name || 'N/A',
-                start_lesson: schedule?.start_lesson || 'N/A',
-                end_lesson: schedule?.end_lesson || 'N/A',
-                createdAt: datetimeFormatter.formatDateTimeVN(cs.createdAt),
-                updatedAt: datetimeFormatter.formatDateTimeVN(cs.updatedAt)
             };
+
+            // Nếu có schedules, tạo một bản ghi cho mỗi schedule
+            if (cs.schedules && cs.schedules.length > 0) {
+                cs.schedules.forEach(schedule => {
+                    let subjectSuffix = '';
+                    if (schedule.room) {
+                        subjectSuffix = schedule.room.startsWith('TH_') ? '-TH' : '-LT';
+                    }
+                    
+                    processedCourseSections.push({
+                        ...baseRecord,
+                        subjectName: (baseRecord.subjectName || 'N/A') + subjectSuffix,
+                        start_lesson: schedule.start_lesson || 'N/A',
+                        end_lesson: schedule.end_lesson || 'N/A'
+                    });
+                });
+            } else {
+                // Nếu không có schedules, loại bỏ bản ghi
+                // processedCourseSections.push({
+                //     ...baseRecord,
+                //     start_lesson: 'N/A',
+                //     end_lesson: 'N/A'
+                // });
+            }
         });
 
-        const totalPages = Math.ceil(total / pageSize_num);
+        // Tổng số sau khi xử lý schedules
+        const totalCount = processedCourseSections.length;
 
         return {
             success: true,
-            total,
-            page: page_num,
-            pageSize: pageSize_num,
-            totalPages,
+            totalCount,
             courseSections: processedCourseSections,
-            sessionInfo: {
-                session_id: session.id,
-                session_name: session.name,
-                session_years: session.years
-            },
-            linkPrev: page_num > 1 ? `/course-sections/non-chat/session/${session_id}?page=${page_num - 1}&pageSize=${pageSize_num}` : null,
-            linkNext: page_num < totalPages ? `/course-sections/non-chat/session/${session_id}?page=${page_num + 1}&pageSize=${pageSize_num}` : null,
-            pages: Array.from({ length: Math.min(3, totalPages - page_num + 1) }, (_, i) => page_num + i)
+            sessionInfo: `${session.name} ${session.years}`
         };
 
     } catch (error) {
@@ -2267,7 +2307,7 @@ module.exports = {
     updateMuteStatus,
     cleanupCompletedCourseSectionChats,
     createBulkGroupChatsForSession,
-    getNonChatCourseSectionsBySession,
+    getNonChatCourseSectionsBySessionFaculty,
     getChatInfoById,
     getChatInfoById4Admin,
 

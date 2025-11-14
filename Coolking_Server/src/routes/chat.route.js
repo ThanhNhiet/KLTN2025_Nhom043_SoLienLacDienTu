@@ -62,9 +62,9 @@ router.post('/homeroom/:lecturer_id', chatController.createGroupChatWithHomeroom
 // POST /api/chats/bulk-create-session/:session_id?namegroup=
 // router.post('/bulk-create-session/:session_id', chatController.createBulkGroupChatsForSession);
 
-// // Lấy danh sách các lớp học phần chưa có group chat theo học kỳ dành cho admin
-// // GET /api/chats/nonchat-course-sections/session/:session_id?page=1&pageSize=10
-// router.get('/nonchat-course-sections/session/:session_id', chatController.getNonChatCourseSectionsBySession);
+// // Lấy danh sách các lớp học phần chưa có group chat theo học kỳ và Khoa dành cho admin
+// GET /api/chats/nonchat-course-sections/session/:session_id/faculty/:faculty_id
+router.get('/nonchat-course-sections/session/:session_id/faculty/:faculty_id', chatController.getNonChatCourseSectionsBySessionFaculty);
 
 // Dọn dẹp các nhóm chat của các course section đã hoàn thành
 // DELETE /api/chats/cleanup-gr-completed/:session_id
