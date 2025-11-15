@@ -54,7 +54,7 @@ class MessageServices {
             const response = await axiosInstance.get(`/messages/${chatID}`, {
                 params: {
                     page: 1,
-                    pageSize: 5
+                    pageSize: 20
                 }
             });
             return response.data;
