@@ -8,10 +8,11 @@ import UpdateGrchatModal from './UpdateGrchatModal';
 import ChatDetailInfoModal from './ChatDetailInfoModal';
 import CreateHomeroomGrModal from './CreateHomeroomGrModal';
 import CleanUpGrchatOfCSCompleteModal from './CleanUpGrchatOfCSCompleteModal';
+import BulkCreateGrChatsModal from './BulkCreateGrChatsModal';
 
 const ChatDashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { chats, loading, error, currentPage, pageSize, pages, getChats, searchChats, deleteChat} = useChat();
+  const { chats, loading, error, currentPage, pageSize, pages, getChats, searchChats, deleteChat } = useChat();
   const [searchKeyword, setSearchKeyword] = useState('');
   const [showActionMenu, setShowActionMenu] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -25,6 +26,7 @@ const ChatDashboardPage: React.FC = () => {
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [showCreateHomeroomModal, setShowCreateHomeroomModal] = useState(false);
   const [showCleanUpCompleteModal, setShowCleanUpCompleteModal] = useState(false);
+  const [showBulkCreateModal, setShowBulkCreateModal] = useState(false);
 
   useEffect(() => {
     getChats(1, 10);
@@ -82,10 +84,10 @@ const ChatDashboardPage: React.FC = () => {
           }
         }
       }
-      
+
       setShowConfirmModal(false);
       setConfirmAction(null);
-      
+
       // Auto hide success notification after 3 seconds
       setTimeout(() => {
         setShowSuccessNotification(false);
@@ -103,14 +105,14 @@ const ChatDashboardPage: React.FC = () => {
   const handleCleanUpSuccess = (message: string) => {
     setSuccessMessage(message);
     setShowSuccessNotification(true);
-    
+
     // Refresh the chats list
     if (searchKeyword.trim()) {
       searchChats(searchKeyword, currentPage, pageSize);
     } else {
       getChats(currentPage, pageSize);
     }
-    
+
     // Auto hide success notification after 3 seconds
     setTimeout(() => {
       setShowSuccessNotification(false);
@@ -120,14 +122,14 @@ const ChatDashboardPage: React.FC = () => {
   const handleUpdateSuccess = (message: string) => {
     setSuccessMessage(message);
     setShowSuccessNotification(true);
-    
+
     // Refresh the chats list
     if (searchKeyword.trim()) {
       searchChats(searchKeyword, currentPage, pageSize);
     } else {
       getChats(currentPage, pageSize);
     }
-    
+
     // Auto hide success notification after 3 seconds
     setTimeout(() => {
       setShowSuccessNotification(false);
@@ -153,19 +155,19 @@ const ChatDashboardPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <HeaderAdCpn />
-      
+
       <main className="flex-1 max-w-7xl mx-auto px-6 py-8 w-full">
         <div className="bg-white rounded-lg shadow-sm border">
           {/* Header */}
           <div className="px-6 py-4 border-b border-gray-200">
             <h1 className="text-2xl font-bold text-gray-800 mb-4 text-center">Quản lý Chat</h1>
-            
+
             {/* Search and Actions */}
             <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3 flex-1 max-w-md">
+              <div className="flex items-center gap-3 flex-1 max-w-md ">
                 <input
                   type="text"
-                  placeholder="Tìm kiếm chat theo tên..."
+                  placeholder="Mã LHP, tên nhóm chat"
                   value={searchKeyword}
                   onChange={(e) => setSearchKeyword(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
@@ -180,19 +182,29 @@ const ChatDashboardPage: React.FC = () => {
                   </svg>
                 </button>
               </div>
-              
+
               <div className="flex gap-3 flex-wrap">
-                <button 
+                <button
                   onClick={() => navigate('/admin/chats-management/course-sections-sl')}
                   className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200 font-medium"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
                   </svg>
                   <span>Lớp học phần chưa có chat</span>
                 </button>
 
-                <button 
+                <button
+                  onClick={() => setShowBulkCreateModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors duration-200 font-medium"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  <span>Tạo nhiều nhóm chat</span>
+                </button>
+
+                <button
                   onClick={() => setShowCreateHomeroomModal(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 font-medium"
                 >
@@ -201,8 +213,8 @@ const ChatDashboardPage: React.FC = () => {
                   </svg>
                   <span>Tạo nhóm chat chủ nhiệm</span>
                 </button>
-                
-                <button 
+
+                <button
                   onClick={() => setShowCleanUpModal(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200 font-medium"
                 >
@@ -212,7 +224,7 @@ const ChatDashboardPage: React.FC = () => {
                   <span>Dọn dẹp chat riêng không hoạt động</span>
                 </button>
 
-                <button 
+                <button
                   onClick={() => setShowCleanUpCompleteModal(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors duration-200 font-medium"
                 >
@@ -266,8 +278,8 @@ const ChatDashboardPage: React.FC = () => {
                   </tr>
                 ) : (
                   chats.map((chat, index) => (
-                    <tr 
-                      key={chat._id} 
+                    <tr
+                      key={chat._id}
                       className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 cursor-pointer transition-colors duration-200 select-none`}
                       onClick={(e) => {
                         // Only trigger detail if not clicking on action buttons and no text is selected
@@ -310,15 +322,15 @@ const ChatDashboardPage: React.FC = () => {
                             <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
                           </svg>
                         </button>
-                        
+
                         {showActionMenu === chat._id && (
-                          <div className="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-[60] w-48" 
-                               style={{
-                                 top: `${(document.querySelector(`[data-chat-id="${chat._id}"]`) as HTMLElement)?.getBoundingClientRect()?.bottom + 5 || 0}px`,
-                                 right: `${window.innerWidth - (document.querySelector(`[data-chat-id="${chat._id}"]`) as HTMLElement)?.getBoundingClientRect()?.right || 0}px`
-                               }}>
+                          <div className="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-[60] w-48"
+                            style={{
+                              top: `${(document.querySelector(`[data-chat-id="${chat._id}"]`) as HTMLElement)?.getBoundingClientRect()?.bottom + 5 || 0}px`,
+                              right: `${window.innerWidth - (document.querySelector(`[data-chat-id="${chat._id}"]`) as HTMLElement)?.getBoundingClientRect()?.right || 0}px`
+                            }}>
                             <div className="py-1">
-                              <button
+                              {chat.type === 'group' && (<button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleUpdateChat(chat._id);
@@ -328,6 +340,7 @@ const ChatDashboardPage: React.FC = () => {
                                 <span className="text-blue-500">➕</span>
                                 <span>Thêm thành viên</span>
                               </button>
+                              )}
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -360,21 +373,20 @@ const ChatDashboardPage: React.FC = () => {
                 >
                   &lt;
                 </button>
-                
+
                 {pages.map((page) => (
                   <button
                     key={page}
                     onClick={() => handlePageChange(page)}
-                    className={`px-3 py-1 text-sm rounded-md transition-colors duration-200 ${
-                      page === currentPage
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white border border-gray-300 hover:bg-gray-50'
-                    }`}
+                    className={`px-3 py-1 text-sm rounded-md transition-colors duration-200 ${page === currentPage
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white border border-gray-300 hover:bg-gray-50'
+                      }`}
                   >
                     {page}
                   </button>
                 ))}
-                
+
                 <button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === pages[pages.length - 1]}
@@ -440,8 +452,8 @@ const ChatDashboardPage: React.FC = () => {
 
       {/* Click outside to close action menu */}
       {showActionMenu && (
-        <div 
-          className="fixed inset-0 z-40" 
+        <div
+          className="fixed inset-0 z-40"
           onClick={() => setShowActionMenu(null)}
         />
       )}
@@ -479,6 +491,13 @@ const ChatDashboardPage: React.FC = () => {
       <CleanUpGrchatOfCSCompleteModal
         isOpen={showCleanUpCompleteModal}
         onClose={() => setShowCleanUpCompleteModal(false)}
+        onSuccess={handleCleanUpSuccess}
+      />
+
+      {/* Bulk Create Group Chats Modal */}
+      <BulkCreateGrChatsModal
+        isOpen={showBulkCreateModal}
+        onClose={() => setShowBulkCreateModal(false)}
         onSuccess={handleCleanUpSuccess}
       />
     </div>
