@@ -65,10 +65,11 @@ class ChatServices {
         return response.data;
     }
 
-    // GET /api/chats/nonchat-course-sections?page=1&pageSize=10
-    async getNonChatCourseSections(page: number, pageSize: number) {
+    // GET /api/chats/nonchat-course-sections?faculty_id=1&page=1&pageSize=10
+    async getNonChatCourseSections(faculty_id: string, page: number, pageSize: number) {
         const response = await axiosInstance.get(`/chats/nonchat-course-sections`, {
             params: {
+                faculty_id,
                 page,
                 pageSize
             }
@@ -76,10 +77,11 @@ class ChatServices {
         return response.data;
     }
 
-    // GET /api/Chats/nonchat-course-sections/search?keyword=<keyword>&page=1&pageSize=10
-    async searchNonChatCourseSections(keyword: string, page: number, pageSize: number) {
+    // GET /api/Chats/nonchat-course-sections/search?faculty_id=<faculty_id>&keyword=<keyword>&page=1&pageSize=10
+    async searchNonChatCourseSections(faculty_id: string, keyword: string, page: number, pageSize: number) {
         const response = await axiosInstance.get(`/chats/nonchat-course-sections/search`, {
             params: {
+                faculty_id,
                 keyword,
                 page,
                 pageSize
@@ -158,7 +160,7 @@ class ChatServices {
         const response = await axiosInstance.post(`/chats/private/${target_id}`);
         return response.data;
     }
-    
+
     // GET /api/chats/user-search?keyword=
     async searchUsersToChat(keyword: string) {
         const response = await axiosInstance.get(`/chats/user-search`, {
@@ -178,6 +180,29 @@ class ChatServices {
     // DELETE /api/chats/group/:chatID/member/:userID
     async deleteMemberFromGroupChat4Admin(chatID: string, userID: string) {
         const response = await axiosInstance.delete(`/chats/group/${chatID}/member/${userID}`);
+        return response.data;
+    }
+
+    // GET /api/chats/nonchat-course-sections/session/f52eafd2-939c-11f0-a902-088fc3521198/faculty/CNTT
+    async getNonChatCourseSectionsFacultySession(session_id: string, faculty_id: string) {
+        const response = await axiosInstance.get(`/chats/nonchat-course-sections/session/${session_id}/faculty/${faculty_id}`);
+        return response.data;
+    }
+
+    // POST api/chats/bulk-create
+    async bulkCreateGroupChats(
+        courseSections: {
+            subjectName: string;
+            className: string;
+            course_section_id: string;
+            start_lesson: number;
+            end_lesson: number;
+        }[], 
+        sessionInfo: String) {
+        const response = await axiosInstance.post(`/chats/bulk-create`, {
+            courseSections,
+            sessionInfo
+        });
         return response.data;
     }
 }
