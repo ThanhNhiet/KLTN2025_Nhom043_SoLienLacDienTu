@@ -1,13 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useChat, type CourseSection } from '../../../hooks/useChat';
+import { useStatistics } from '../../../hooks/useStatistics';
 import HeaderAdCpn from '../../../components/admin/HeaderAdCpn';
 import FooterAdCpn from '../../../components/admin/FooterAdCpn';
 
 const CourseSectionSLPage: React.FC = () => {
   const navigate = useNavigate();
   const { courseSections, loading, error, currentPage, pageSize, pages, getNonChatCourseSections, searchNonChatCourseSections, createGroupChat } = useChat();
+  const { faculties, fetchAllFaculties } = useStatistics();
+
   const [searchKeyword, setSearchKeyword] = useState('');
+  const [facultyId, setFacultyId] = useState('CNTT'); // Default to CNTT
+  const [facultySearch, setFacultySearch] = useState('');
+  const [showFacultyDropdown, setShowFacultyDropdown] = useState(false);
   const [showSuccessNotification, setShowSuccessNotification] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [creatingChat, setCreatingChat] = useState<string | null>(null);
@@ -16,24 +22,52 @@ const CourseSectionSLPage: React.FC = () => {
   const [groupNameToCreate, setGroupNameToCreate] = useState('');
 
   useEffect(() => {
-    getNonChatCourseSections(1, 10);
-  }, [getNonChatCourseSections]);
+    getNonChatCourseSections(facultyId, 1, 10);
+    fetchAllFaculties();
+  }, [facultyId]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+
+      // Check if click is outside faculty dropdown
+      if (!target.closest('.faculty-dropdown')) {
+        setShowFacultyDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showFacultyDropdown]);
 
   const handleSearch = async () => {
     if (searchKeyword.trim()) {
-      await searchNonChatCourseSections(searchKeyword, 1, pageSize);
+      await searchNonChatCourseSections(facultyId, searchKeyword, 1, pageSize);
     } else {
-      getNonChatCourseSections(1, pageSize);
+      getNonChatCourseSections(facultyId, 1, pageSize);
     }
   };
 
   const handlePageChange = (page: number) => {
     if (searchKeyword.trim()) {
-      searchNonChatCourseSections(searchKeyword, page, pageSize);
+      searchNonChatCourseSections(facultyId, searchKeyword, page, pageSize);
     } else {
-      getNonChatCourseSections(page, pageSize);
+      getNonChatCourseSections(facultyId, page, pageSize);
     }
   };
+
+  const handleFacultySelect = (selectedFacultyId: string) => {
+    setFacultyId(selectedFacultyId);
+    setFacultySearch('');
+    setShowFacultyDropdown(false);
+    setSearchKeyword(''); // Clear search when faculty changes
+  };
+
+  const filteredFaculties = faculties.filter(faculty =>
+    faculty.name.toLowerCase().includes(facultySearch.toLowerCase()) ||
+    faculty.faculty_id.toLowerCase().includes(facultySearch.toLowerCase())
+  );
 
   const handleShowConfirmCreate = (courseSection: CourseSection) => {
     // Tạo tên nhóm theo format: sessionName_subjectName_className_Tiết start_lesson-end_lesson
@@ -42,9 +76,9 @@ const CourseSectionSLPage: React.FC = () => {
     const className = courseSection.className;
     const startLesson = courseSection.start_lesson || 'N/A';
     const endLesson = courseSection.end_lesson || 'N/A';
-    
+
     const nameGroup = `${sessionName}_${subjectName}_${className}_Tiết ${startLesson}-${endLesson}`;
-    
+
     setSelectedCourseSection(courseSection);
     setGroupNameToCreate(nameGroup);
     setShowConfirmModal(true);
@@ -52,24 +86,24 @@ const CourseSectionSLPage: React.FC = () => {
 
   const handleConfirmCreate = async () => {
     if (!selectedCourseSection) return;
-    
+
     try {
       setCreatingChat(selectedCourseSection.course_section_id);
       setShowConfirmModal(false);
-      
+
       const result = await createGroupChat(selectedCourseSection.course_section_id, groupNameToCreate);
-      
+
       if (result && result.success) {
         setSuccessMessage(result.message || 'Đã tạo nhóm chat thành công!');
         setShowSuccessNotification(true);
-        
+
         // Refresh the course sections list
         if (searchKeyword.trim()) {
-          await searchNonChatCourseSections(searchKeyword, currentPage, pageSize);
+          await searchNonChatCourseSections(facultyId, searchKeyword, currentPage, pageSize);
         } else {
-          await getNonChatCourseSections(currentPage, pageSize);
+          await getNonChatCourseSections(facultyId, currentPage, pageSize);
         }
-        
+
         // Auto hide success notification after 3 seconds
         setTimeout(() => {
           setShowSuccessNotification(false);
@@ -95,7 +129,7 @@ const CourseSectionSLPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <HeaderAdCpn />
-      
+
       <main className="flex-1 max-w-7xl mx-auto px-6 py-8 w-full">
         <div className="bg-white rounded-lg shadow-sm border">
           {/* Header */}
@@ -112,25 +146,67 @@ const CourseSectionSLPage: React.FC = () => {
                 <span>Quay lại</span>
               </button>
             </div>
-            
-            {/* Search */}
-            <div className="flex items-center gap-3 max-w-md">
-              <input
-                type="text"
-                placeholder="Tìm kiếm theo môn học, lớp, học kỳ..."
-                value={searchKeyword}
-                onChange={(e) => setSearchKeyword(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              />
-              <button
-                onClick={handleSearch}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg transition-colors duration-200"
-              >
-                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </button>
+
+            {/* Search and Faculty Filter */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-3 max-w-md w-full flex-1">
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm theo mã lớp học phần, môn học, lớp"
+                  value={searchKeyword}
+                  onChange={(e) => setSearchKeyword(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                />
+                <button
+                  onClick={handleSearch}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg transition-colors duration-200"
+                >
+                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Faculty Dropdown with Search */}
+              <div className="faculty-dropdown ml-3 md:w-80">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Tìm và chọn khoa..."
+                    value={facultyId ? faculties.find(f => f.faculty_id === facultyId)?.name || '' : facultySearch}
+                    onChange={(e) => {
+                      setFacultySearch(e.target.value);
+                      if (facultyId && e.target.value !== faculties.find(f => f.faculty_id === facultyId)?.name) {
+                        setFacultyId('');
+                      }
+                    }}
+                    onFocus={() => setShowFacultyDropdown(true)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-blue-50 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  />
+
+                  {showFacultyDropdown && (
+                    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {filteredFaculties.length > 0 ? (
+                        filteredFaculties.map((faculty) => (
+                          <div
+                            key={faculty.faculty_id}
+                            onClick={() => handleFacultySelect(faculty.faculty_id)}
+                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                          >
+                            <div className="font-medium">{faculty.faculty_id}</div>
+                            <div className="text-sm text-gray-600">{faculty.name}</div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="px-4 py-2 text-gray-500 text-center">
+                          Không tìm thấy khoa nào
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -248,21 +324,20 @@ const CourseSectionSLPage: React.FC = () => {
                 >
                   &lt;
                 </button>
-                
+
                 {pages.map((page) => (
                   <button
                     key={page}
                     onClick={() => handlePageChange(page)}
-                    className={`px-3 py-1 text-sm rounded-md transition-colors duration-200 ${
-                      page === currentPage
+                    className={`px-3 py-1 text-sm rounded-md transition-colors duration-200 ${page === currentPage
                         ? 'bg-blue-600 text-white'
                         : 'bg-white border border-gray-300 hover:bg-gray-50'
-                    }`}
+                      }`}
                   >
                     {page}
                   </button>
                 ))}
-                
+
                 <button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === pages[pages.length - 1]}
