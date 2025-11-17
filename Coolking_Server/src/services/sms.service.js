@@ -65,7 +65,7 @@ const sendOTP = async (phoneNumber) => {
         await redisService.setex(redisKey, 180, otp);
         // Gửi OTP qua SMS bằng Api của speedSMS
         // console.log(`Sending OTP ${otp} to phone number ${phoneNumber}`);
-        sendSMS([phoneNumber], `Ma OTP cho Econtact cua ban la ${otp}`, 5, '733357d3981bdb64');
+        sendSMS([phoneNumber], `Ma OTP cho Tai khoan Econtact cua ban la ${otp}`, 5, process.env.SPEEDSMS_SENDER);
         return { success: true, message: 'OTP đã được gửi' };
     } catch (error) {
         console.error('Error sending OTP:', error);
