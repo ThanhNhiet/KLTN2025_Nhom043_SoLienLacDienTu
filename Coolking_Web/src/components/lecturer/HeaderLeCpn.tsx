@@ -57,6 +57,17 @@ const HeaderLECpn: React.FC = () => {
         getMyAlerts(1, 10);
     }, [getMyAlerts]);
 
+    // Auto refresh alerts every minute, pause when modal is open
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (!showDetailModal) {
+                getMyAlerts(1, 10);
+            }
+        }, 60000); // 1 phút = 60000ms
+
+        return () => clearInterval(interval);
+    }, [showDetailModal, getMyAlerts]);
+
     // Đóng alert box và mobile menu khi click bên ngoài
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
