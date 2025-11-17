@@ -32,9 +32,9 @@ const WarningStudentsPage: React.FC = () => {
 
     // Table data states
     const [students, setStudents] = useState<any[]>([]);
-    const [total, setTotal] = useState(0);
+    const [, setTotal] = useState(0);
     const [page, setPage] = useState(1);
-    const [pageSize, setPageSize] = useState(10);
+    const [pageSize, ] = useState(10);
     const [pages, setPages] = useState<number[]>([]);
     const [searchResult, setSearchResult] = useState<any | null>(null);
     const [showWarningModal, setShowWarningModal] = useState(false);
