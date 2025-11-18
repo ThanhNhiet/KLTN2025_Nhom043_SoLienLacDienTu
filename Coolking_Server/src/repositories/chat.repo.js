@@ -236,6 +236,98 @@ const createGroupChatWithHomeroomLecturer = async (admin_id, lecturer_id) => {
 };
 
 /**
+ * Tạo private chat giữa user và system
+ * @param {string} UserID - ID của user tạo chat
+ * @returns {Promise<Object>} - Chat được tạo
+ */
+
+const createPrivateChatWithSystem = async (UserID) => {
+    try {
+        // Kiểm tra xem private chat đã tồn tại chưa
+        const existingChat = await Chat.findOne({
+            type: ChatType.PRIVATE,
+            $and: [
+                { "members.userID": UserID },
+                { "members.userID": "SYSTEM" }
+            ]
+        });
+        if (existingChat) {
+            return {
+                success: true,
+                chat: existingChat,
+                message: 'Cuộc trò chuyện đã tồn tại'
+            };
+        }
+        // Lấy thông tin của request user
+        let requestUser = null;
+        if (UserID.startsWith('SV')) {
+            requestUser = await models.Student.findOne({
+                where: { student_id: UserID },
+                attributes: ['student_id', 'name', 'avatar']
+            });
+        } else if (UserID.startsWith('PA')) {
+            requestUser = await models.Parent.findOne({
+                where: { parent_id: UserID },
+                attributes: ['parent_id', 'name', 'avatar']
+            });
+        }
+
+        if (!requestUser) {
+            return {
+                success: false,
+                message: 'Không tìm thấy thông tin người dùng'
+            };
+        }
+
+        // Tạo members array
+        const now = new Date();
+        const members = [
+            {
+                userID: UserID,
+                userName: requestUser.name,
+                avatar: requestUser?.avatar || 'https://res.cloudinary.com/dplg9r6z1/image/upload/v1758809711/privateavatar_hagxki.png',
+                role: MemberRole.MEMBER,
+                joinedAt: now,
+                muted: false
+            },
+            {
+                userID: "SYSTEM",
+                userName: "Trợ lý ảo",
+                role: MemberRole.SYSTEM,
+                avatar: 'https://res.cloudinary.com/echoappchat/image/upload/v1763027571/logo_agxf1c.jpg',
+                joinedAt: now,
+                muted: false
+            }
+        ];
+        // Tạo chat object
+        const chatData = {
+            _id: uuidv4(),
+            type: ChatType.PRIVATE,
+            avatar: "https://res.cloudinary.com/dplg9r6z1/image/upload/v1758809711/privateavatar_hagxki.png",
+            createdBy: UserID,
+            updatedBy: UserID,
+            members
+        };
+        // Lưu vào MongoDB
+        const newChat = new Chat(chatData);
+        await newChat.save();
+
+        return {
+            success: true,
+            chat: newChat,
+            message: 'Cuộc trò chuyện được tạo thành công'
+        };
+
+    } catch (error) {
+        console.error('Error creating private chat with system:', error);
+        throw new Error(`Failed to create private chat with system: ${error.message}`);
+    }
+}
+
+
+
+
+/**
  * Tạo private chat giữa 2 users
  * @param {string} requestUserID - ID của user tạo chat
  * @param {string} targetUserID - ID của user được chat
@@ -454,8 +546,11 @@ const getUserChats = async (userID, roleAccount, page = 1, pageSize = 10) => {
         }
 
         // Lấy tất cả chats trước (không phân trang)
-        const allChats = await Chat.find(chatFilter)
+        let allChats = await Chat.find(chatFilter)
             .lean(); // Sử dụng lean() để tăng performance
+
+        // Loại bỏ chats có chứa member với userID === "SYSTEM"
+        allChats = allChats.filter(chat => !chat.members.some(member => member.userID === "SYSTEM"));
 
         // Xử lý dữ liệu và lấy tin nhắn cuối cùng cho tất cả chats
         const processedChats = await Promise.all(allChats.map(async (chat) => {
@@ -1972,6 +2067,7 @@ const searchUserByKeyword = async (keyword) => {
         // Tìm kiếm trong Staff
         result = await models.Staff.findOne({
             where: {
+
                 [Op.or]: [
                     { admin_id: searchKeyword },
                     { phone: searchKeyword },
@@ -2253,6 +2349,7 @@ const deleteMemberFromGroupChat4Admin = async (chat_id, user_id) => {
 module.exports = {
     createGroupChat4Admin,
     createPrivateChat4Users,
+    createPrivateChatWithSystem,
     getGroupChatInfoByCourseSection4Admin,
     getUserChats,
     searchChatsByKeyword,

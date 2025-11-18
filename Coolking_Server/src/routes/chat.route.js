@@ -14,6 +14,10 @@ router.get('/search', chatController.searchChatsByKeyword);
 // POST /api/chats/group?course_section_id=&nameGroup=
 router.post('/group', chatController.createGroupChat);
 
+// Tạo cuộc trò chuyện riêng tư giữa user và hệ thống
+// POST /api/chats/private/system
+router.post('/private/system', chatController.createPrivateChatSystem);
+
 // Tạo cuộc trò chuyện riêng tư giữa 2 người dùng
 // POST /api/chats/private/:userID
 router.post('/private/:userID', chatController.createPrivateChat);

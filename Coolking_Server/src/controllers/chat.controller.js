@@ -44,16 +44,54 @@ exports.createPrivateChat = async (req, res) => {
                 message: 'userID là bắt buộc'
             });
         }
+        
+        // Validate that userID is different from current user
+        if (userID === decoded.user_id) {
+            return res.status(400).json({
+                success: false,
+                message: 'Không thể tạo cuộc trò chuyện với chính bạn'
+            });
+        }
+        
         const chat = await chatRepo.createPrivateChat4Users(decoded.user_id, userID);
         res.status(201).json(chat);
     } catch (error) {
         console.error('Error in createPrivateChat controller:', error);
+        
+        // Provide specific error messages
+        if (error.message.includes('not found')) {
+            return res.status(404).json({
+                success: false,
+                message: 'Một hoặc cả hai người dùng không tồn tại'
+            });
+        }
+        
         res.status(500).json({
             success: false,
             message: error.message || 'Lỗi server khi tạo cuộc trò chuyện'
         });
     }
 };
+
+// POST /api/chats/private/system
+exports.createPrivateChatSystem = async (req, res) => {
+    try {
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
+        const decoded = jwtUtils.verifyAccessToken(token);
+        if (!decoded) {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
+        const chat = await chatRepo.createPrivateChatWithSystem(decoded.user_id);
+        res.status(201).json(chat);
+    } catch (error) {
+        console.error('Error in createPrivateChatWithSystem controller:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Lỗi server khi tạo cuộc trò chuyện với hệ thống'
+        });
+    }
+}
 
 // GET /api/chats/group-info/:course_section_id
 exports.getGroupChatInfoByCourseSection = async (req, res) => {

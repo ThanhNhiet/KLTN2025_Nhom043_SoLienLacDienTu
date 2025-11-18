@@ -11,7 +11,8 @@ const ChatType = {
 const MemberRole = {
   ADMIN: 'admin',
   LECTURER: 'lecturer',
-  MEMBER: 'member'
+  MEMBER: 'member',
+  SYSTEM : 'system'
 };
 
 // Subdocument schema for members

@@ -713,10 +713,16 @@ const createMessageAI = async (chatID, senderID, section, question) => {
         if (!answerData || !answerData.answer) {
             throw new Error("Failed to get answer from FAQ service");
         }
+        const chat = await Chat.findOne({ _id: chatID });
+        if (!chat) {
+            throw new Error("Chat not found");
+        }
+        const member = chat.members.find(m => m.userID !== senderID);
+
         const newMessage = new Message({
             _id: uuidv4(),
             chatID,
-            senderID,
+            senderID: member.userID,
             content: answerData.answer,
             type: MessageType.TEXT,
             status: MessageStatus.SENDING,
