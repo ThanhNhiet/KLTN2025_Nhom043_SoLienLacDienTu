@@ -7,14 +7,18 @@ import {
     TouchableOpacity,
     FlatList,
     ActivityIndicator,
-    RefreshControl
+    RefreshControl,
+    Button,
+    Alert
 } from 'react-native';
 import { useNavigation } from "@react-navigation/native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import TopNavigations_Chat from '@/src/components/navigations/TopNavigations_Chat';
+import ChatAiModal from '@/src/components/modals/ChatAiModal';
 import { useChat } from '@/src/services/useapi/chat/UseChat';
 import { API_URL } from "@env";
 import { io } from 'socket.io-client';
+import { set } from 'date-fns';
 // Declare socket before any component/useEffect uses it to avoid TDZ errors
 let socket: any = null;
 try {
@@ -170,14 +174,26 @@ const ChatItem = ({ item, onPress, userID }: ChatItemProps) => {
 
 export default function ChatScreen() {
     const navigation = useNavigation<any>();
-    const { chats, loading, error, refetch, userID, markMessagesAsRead } = useChat();
+    const { chats, loading, error, refetch, userID, markMessagesAsRead, createPrivateChatAI } = useChat();
     const [refreshing, setRefreshing] = useState(false);
     const [localChats, setLocalChats] = useState<ChatItemType[]>([]);
+     const [modalVisible, setModalVisible] = useState(false);
+     const [chatAIId, setChatAIId] = useState<string | null>(null);
 
     // Initialize localChats when chats changes
     useEffect(() => {
         setLocalChats(chats);
     }, [chats]);
+
+    const handleCreatePrivateChatAI = async () => {
+        const newChat = await createPrivateChatAI();
+        if (newChat) {
+            setChatAIId(newChat._id);
+            setModalVisible(true);
+        } else{
+            Alert.alert("Lỗi","Không thể tạo cuộc trò chuyện với AI vào lúc này. Vui lòng thử lại sau.");
+        }
+    };
 
     // Socket event handlers
     useEffect(() => {
@@ -313,6 +329,19 @@ export default function ChatScreen() {
             <SafeAreaView style={styles.safeArea}>
                 <TopNavigations_Chat navigation={navigation} name='Tin nhắn' onRefresh={onRefresh} />
                 {renderList()}
+                <TouchableOpacity 
+                style={styles.fab} // 2. Áp dụng style cho nút tròn
+                onPress={handleCreatePrivateChatAI} // Mở Modal
+            >
+               <Image source={require('../../assets/images/chatbot.avif')} style={styles.fabImage} />
+            </TouchableOpacity>
+
+            
+            <ChatAiModal 
+                visible={modalVisible} 
+                onClose={() => setModalVisible(false)} // Đóng Modal
+                chatId={chatAIId!}
+            />
             </SafeAreaView>
         </SafeAreaProvider>
     );
@@ -435,5 +464,45 @@ const styles = StyleSheet.create({
         fontSize: 15,
         color: '#6B7280',
         textAlign: 'center',
-    }
+    },
+    
+    // --- Style cho Nút Tròn (Floating Action Button - FAB) ---
+    fab: {
+        // 1. Định vị tuyệt đối
+        position: 'absolute',
+        
+        // 2. Vị trí: Dưới cùng, bên phải
+        bottom: 30, // Cách đáy 30px
+        right: 20,  // Cách lề phải 20px
+        
+        // 3. Kích thước và làm tròn
+        width: 60,
+        height: 60,
+        borderRadius: 30, // <-- Nửa của width/height để làm tròn
+        
+        // 4. Màu sắc và căn chỉnh chữ
+        backgroundColor: '#007AFF', // Màu nút (bạn có thể đổi)
+        justifyContent: 'center',
+        alignItems: 'center',
+        
+        // 5. Thêm bóng (cho đẹp)
+        shadowColor: "#000",
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 5,
+    },
+    fabImage: {
+        width:  36,
+        height:  36,
+        borderRadius: 18,
+    },
+    fabText: {
+        color: 'white',
+        fontSize: 18,
+        fontWeight: 'bold',
+    },
 });

@@ -80,6 +80,31 @@ export const getcheckemail = async (email: string) => {
     }
 
 }
+export const getcheckPhoneNumber = async (number: string) => {
+    try {
+        const response = await axiosInstance.post(`/api/public/check-phone-number/${number}`);
+        if (!response.data) {
+            throw new Error("Invalid phone number response");
+        }
+        return response.data;
+        
+    } catch (error) {
+        console.error("Check phone number error:", error);
+        throw error;
+    }
+}
+export const getVerifyOTPPhone = async (phoneNumber: string, otp: string) => {
+    try {
+        const response = await axiosInstance.post(`/api/public/verify-otp-phone`, { phoneNumber, otp });
+        return response.data;
+        
+    } catch (error) {
+        console.error("Verify OTP error:", error);
+        throw error;
+    }
+}
+
+
 export const  getVerifyOTP = async (email: string, otp: string) => {
     try {
         const response = await axiosInstance.post(`/api/public/verify-otp-email`, { email, otp });
@@ -92,6 +117,15 @@ export const  getVerifyOTP = async (email: string, otp: string) => {
 export const getchangePassword = async (email: string, resetToken: string, newPassword: string) => {
     try {
         const response = await axiosInstance.post(`/api/public/change-password-by-email`, { email, resetToken, newPassword });
+        return response.data;
+    } catch (error) {
+        console.error("Change password error:", error);
+        throw error;
+    }
+}
+export const getchangePasswordPhone = async (phoneNumber: string, resetToken: string, newPassword: string) => {
+    try {
+        const response = await axiosInstance.post(`/api/public/change-password-by-phone`, { phoneNumber, resetToken, newPassword }); 
         return response.data;
     } catch (error) {
         console.error("Change password error:", error);

@@ -270,3 +270,34 @@ export const updatelastReadMessage = async (chatID: string) => {
         throw error;
     }
 }
+
+export const getFaqSections = async () => {
+    try {
+        const response = await axiosInstance.get(`/api/messages/sections/faqSections`);
+        if (response.data == null) {
+            throw new Error("No data received");
+        }
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching sections:", error);
+        throw error;
+    }
+}
+
+export const createNewChatPrivateAI = async (chatId:string,question:string,section:string | null) => {
+    try {
+        const response = await axiosInstance.post(`/api/messages/faqAsk`,{
+            chatID:chatId,
+            question:question,
+            section:section
+        });
+        if (response.data == null) {
+            throw new Error("No data received");
+        }
+        return response.data;
+        
+    } catch (error) {
+        console.error("Error creating new private AI chat:", error);
+        throw error;
+    }
+}

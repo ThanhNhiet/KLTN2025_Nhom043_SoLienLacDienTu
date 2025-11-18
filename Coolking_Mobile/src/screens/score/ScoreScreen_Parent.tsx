@@ -247,11 +247,13 @@ export default function ScoreScreen_Parent() {
         {content}
       </View>
       </>
-    ) : (
-        <View style={{padding: 20}}>
-            <Text style={{color: '#666'}}>Vui lòng chọn học sinh để xem bảng điểm.</Text>
-        </View>
-      )}
+    ) :(
+              <View style={styles.contentContainer}>
+                <Text style={styles.centeredText}>
+                  Vui lòng chọn học sinh để xem điểm.
+                </Text>
+              </View>
+            )}
     </View>
   </SafeAreaView>
 </SafeAreaProvider>
@@ -262,6 +264,19 @@ export default function ScoreScreen_Parent() {
 /* ======================= STYLES ======================= */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f4f4f8", paddingHorizontal: 16 },
+  contentContainer: {
+    flex: 1, // 1. Chiếm hết không gian còn lại
+    justifyContent: 'center', // 2. Căn giữa theo chiều dọc
+    alignItems: 'center', // 3. Căn giữa theo chiều ngang
+    padding: 20,
+  },
+  // Style cho text
+  centeredText: {
+    textAlign: 'center',
+    fontSize: 25,
+    color: '#6c0909ff',
+    lineHeight: 24,
+  },
 
   /* Tabs */
   tabContainer: {

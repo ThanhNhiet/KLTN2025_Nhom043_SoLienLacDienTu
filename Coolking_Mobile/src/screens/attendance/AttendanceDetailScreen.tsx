@@ -28,6 +28,7 @@ const getStatusStyle = (status: string) => {
 
 export default function AttendanceDetailScreen() {
     const navigation = useNavigation<any>();
+    const [studentId, setStudentId] = React.useState<string | null>(null);
     const route = useRoute();
     const { courseSectionId, subjectId } = route.params as { courseSectionId: string; subjectId: string; };
 
@@ -50,7 +51,7 @@ export default function AttendanceDetailScreen() {
         return (
             <SafeAreaProvider>
                 <SafeAreaView style={styles.centeredContainer}>
-                    <TopNavigations_AttendanceDetail navigation={navigation} name="Chi tiết điểm danh" />
+                    <TopNavigations_AttendanceDetail navigation={navigation} name="Chi tiết điểm danh" setStudentId={setStudentId} />
                     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                         <Text style={styles.errorText}>Không thể tải dữ liệu điểm danh.</Text>
                     </View>
@@ -64,7 +65,7 @@ export default function AttendanceDetailScreen() {
     return (
         <SafeAreaProvider>
             <SafeAreaView style={styles.safeArea}>
-                <TopNavigations_AttendanceDetail navigation={navigation} name="Chi tiết điểm danh" />
+                <TopNavigations_AttendanceDetail navigation={navigation} name="Chi tiết điểm danh" setStudentId={setStudentId} />
                 
                 <FlatList
                     data={attendance_details}

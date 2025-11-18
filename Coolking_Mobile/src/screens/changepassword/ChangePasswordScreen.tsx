@@ -8,8 +8,8 @@ import { useLogin_out } from "@/src/services/useapi/Login/UseLogin_Forgot";
 export default function ChangePasswordScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute();
-  const { email, resetToken } = route.params as { email: string; resetToken: string };
-  const { changePassword } = useLogin_out();
+  const { value, resetToken } = route.params as { value: string; resetToken: string };
+  const { changePassword,changePasswordPhone, identifyInputType } = useLogin_out();
   const [nextPwd, setNextPwd] = useState("");
   const [confirm, setConfirm] = useState("");
   const [show2, setShow2] = useState(false);
@@ -22,7 +22,13 @@ export default function ChangePasswordScreen() {
       return Alert.alert("Yêu cầu", "Mật khẩu mới tối thiểu 6 ký tự.");
     if (nextPwd !== confirm)
       return Alert.alert("Lỗi", "Xác nhận mật khẩu không khớp.");
-     const data = await changePassword(email, resetToken, nextPwd);
+    const inputType = identifyInputType(value);
+    let data = null;
+    if (inputType === 'EMAIL') {
+      data = await changePassword(value, resetToken, nextPwd);
+    } else if (inputType === 'PHONE') {
+      data = await changePasswordPhone(value, resetToken, nextPwd);
+    }
       if (!data || !data.success) {
         return Alert.alert("Lỗi",data?.message || "Đổi mật khẩu thất bại.");
       } else {

@@ -7,10 +7,16 @@ import { useLogin_out } from "@/src/services/useapi/Login/UseLogin_Forgot";
 export default function OtpVerifyScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute();
-  const { email } = route.params as { email: string };
+  const { value } = route.params as { value: string };
   const [otp, setOtp] = useState("");
   const [timeLeft, setTimeLeft] = useState(180); // 3 phút
-  const { resetOTP, verifyOTP } = useLogin_out();
+  const { 
+    resetOTP, 
+    verifyOTP,
+    identifyInputType,
+    resetOTPPhone,
+    verifyOTPPhone
+   } = useLogin_out();
 
   useEffect(() => {
     if (timeLeft <= 0) return;
@@ -28,24 +34,43 @@ export default function OtpVerifyScreen() {
     if (timeLeft <= 0) return Alert.alert("Hết hạn", "Mã OTP đã hết hạn.");
     if (otp.length !== 6) return Alert.alert("Lỗi", "Vui lòng nhập đủ 6 số OTP.");
     // TODO: gọi API kiểm tra OTP
-    const response = await verifyOTP(email, otp);
-    if (!response || !response.success) {
+    const inputType = identifyInputType(value);
+   
+    if (inputType === 'EMAIL') {
+    const  response = await verifyOTP(value, otp);
+     if (!response || !response.success) {
       return Alert.alert("Lỗi", "OTP không đúng hoặc đã hết hạn.");
     } else {
       Alert.alert("Thành công", response.message);
-      navigation.navigate("ChangePasswordScreen", { email: response?.email, resetToken: response?.resetToken });
+      navigation.navigate("ChangePasswordScreen", { value: response?.email, resetToken: response?.resetToken });
     }
+    } else if (inputType === 'PHONE') {
+      const response = await verifyOTPPhone(value, otp);
+      if (!response || !response.success) {
+        return Alert.alert("Lỗi", "OTP không đúng hoặc đã hết hạn.");
+      } else {
+        Alert.alert("Thành công", response.message);
+        navigation.navigate("ChangePasswordScreen", { value: response?.number, resetToken: response?.resetToken });
+      }
+    }
+   
   };
 
   const handleResend = async () => {
     // Chặn nếu chưa hết giờ (phòng trường hợp dev quên disabled ở UI)
     if (timeLeft > 0) return;
     // TODO: gọi API gửi lại OTP
-    const data = await resetOTP(email);
-    if (!data || !data.success) {
-      return Alert.alert("Lỗi", "Email không tồn tại trong hệ thống.");
-    } else {
-          setOtp("");
+    const inputType = identifyInputType(value);
+    let data = null;
+    if (inputType === 'PHONE') {
+      data = await resetOTPPhone(value);
+    } else if (inputType === 'EMAIL') {
+      data = await resetOTP(value);
+    }
+      if (!data || !data.success) {
+        return Alert.alert("Lỗi", "Email không tồn tại trong hệ thống.");
+      } else {
+            setOtp("");
           setTimeLeft(180);
           Alert.alert("OTP mới", "Đã gửi lại mã OTP.");
         }

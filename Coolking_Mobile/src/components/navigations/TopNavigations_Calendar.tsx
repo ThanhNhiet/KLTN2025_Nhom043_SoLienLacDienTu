@@ -46,24 +46,20 @@ export default function TopNavigations_Calendar({
   };
 
   const handleSelectStudent = (student: any) => {
-    console.log("[TopNav] handleSelectStudent called with:", student);
 
     // Extract ID - support both object and string formats
     const id = typeof student === "string" 
       ? student 
       : student?.student_id || student?.id;
 
-    console.log("[TopNav] Extracted student ID:", id);
-
     if (!id) {
       console.warn("[TopNav] No valid ID found in selected student");
       return;
     }
 
-    console.log("[TopNav] Calling setStudentID with:", id);
+   
     setStudentID?.(id);
     setOpenStudentModal(false);
-    console.log("[TopNav] Calling handleGoToday with:", id);
     handleGoToday?.(id);
   };
 

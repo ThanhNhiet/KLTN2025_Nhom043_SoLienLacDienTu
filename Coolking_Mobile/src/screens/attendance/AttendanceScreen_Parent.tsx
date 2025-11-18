@@ -93,7 +93,6 @@ export default function AttendanceScreen_Parent() {
 
     // xu ly du lieu
     const sections = useMemo(() => {
-        console.log("Processing sections with data:", attendanceDetails?.data);
         if (!attendanceDetails?.data?.course_sections) {
             console.log("No course sections found");
             return [];
@@ -190,9 +189,9 @@ export default function AttendanceScreen_Parent() {
                             </View>
                         )}
                     </>) : (
-                    <View style={styles.centeredContainer}>
+                    <View style={styles.contentContainer}>
                         {/* Nếu là phụ huynh mà không có học sinh nào */}
-                        <Text style={styles.infoText}>
+                        <Text style={styles.centeredText}>
                             Vui lòng chọn học sinh để xem điểm danh.
                         </Text>
                     </View>
@@ -209,6 +208,20 @@ const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: '#f0f0f0' },
     centeredContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     infoText: { fontSize: 16, color: '#666', marginTop: 10 },
+    contentContainer: {
+    flex: 1, // 1. Chiếm hết không gian còn lại
+    justifyContent: 'center', // 2. Căn giữa theo chiều dọc
+    alignItems: 'center', // 3. Căn giữa theo chiều ngang
+    padding: 20,
+  },
+  // Style cho text
+  centeredText: {
+    textAlign: 'center',
+    fontSize: 25,
+    color: '#6c0909ff',
+    lineHeight: 24,
+  },
+
     studentSelector: {
         flexDirection: 'row',
         backgroundColor: '#fff',

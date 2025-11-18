@@ -26,8 +26,6 @@ export default function TopNavigations({ navigation, name, setStudentId }: props
               console.warn("[TopNav] No valid ID found in selected student");
               return;
           }
-  
-          console.log("[TopNav] Setting studentId:", id);
           setStudentId(id);
           setOpenStudentModal(false);
       };

@@ -67,3 +67,16 @@ export const getChatById = async (chatID: string) => {
         throw error;
     }
 }
+
+export const createNewChatPrivateAI = async () => {
+    try {
+        const response = await axiosInstance.post(`/api/chats/private/system`);
+        if (response.data == null) {
+            throw new Error("No data received");
+        }
+        return response.data;
+    } catch (error) {
+        console.error("Error creating new AI chat:", error);
+        throw error;
+    }
+}

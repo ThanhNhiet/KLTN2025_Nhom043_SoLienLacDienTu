@@ -1,5 +1,5 @@
 import { useEffect, useState,useCallback } from "react";
-import { getChats , getSearchChatsByKeyword , getSearchUsersByKeyword, createNewChatPrivate} from "../../api/chat/ChatApi";
+import { getChats , getSearchChatsByKeyword , getSearchUsersByKeyword, createNewChatPrivate, createNewChatPrivateAI} from "../../api/chat/ChatApi";
 import { refresh } from "@react-native-community/netinfo";
 import { updatelastReadMessage } from "../../api/chat/MessageApi";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -159,7 +159,22 @@ export const useChat = () => {
         }
     },[]);
 
-    //console.log("useChat - chats:", chats);
+    const createPrivateChatAI = useCallback(async () => {
+        setLoading(true);
+        try {
+            const res = await createNewChatPrivateAI(); 
+            if (!res || !res.success) {
+                console.warn("Failed to create private AI chat");
+                return null;
+            }
+            return res.chat;
+        } catch (error) {
+            setError(error as Error);
+            return null;
+        } finally {
+            setLoading(false);
+        }
+    },[]);
 
     return {
         chats,
@@ -174,5 +189,6 @@ export const useChat = () => {
         createPrivateChat,
         userID,
         markMessagesAsRead,
+        createPrivateChatAI,
     };
 };

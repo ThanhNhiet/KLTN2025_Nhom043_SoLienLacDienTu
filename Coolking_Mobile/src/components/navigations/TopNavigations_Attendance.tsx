@@ -23,8 +23,6 @@ export default function TopNavigations_Attendance({setStudentId,handleFetchAtten
             console.warn("[TopNav] No valid ID found in selected student");
             return;
         }
-
-        console.log("[TopNav] Setting studentId:", id);
         setStudentId(id);
         handleFetchAttendance(id);
         setOpenStudentModal(false);
