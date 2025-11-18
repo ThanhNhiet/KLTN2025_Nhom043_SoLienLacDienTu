@@ -73,6 +73,82 @@ const LecturerStatisticsChart: React.FC<Props> = ({ data, sessionId }) => {
     lecturers
   } = data;
 
+  // Export to CSV function
+  const exportToCSV = () => {
+    try {
+      // Prepare data for CSV
+      const csvData = [
+        ['THỐNG KÊ GIẢNG VIÊN'],
+        ['Khoa:', faculty_name],
+        ['Mã khoa:', data.faculty_id],
+        ['Học kỳ:', session_name],
+        ['Tổng số giảng viên:', total_lecturers],
+        [''],
+        ['THỐNG KÊ TỔNG QUAN KHOA'],
+        ['Chỉ tiêu', 'Giá trị'],
+        ['Tổng lớp học phần', faculty_summary.total_course_sections],
+        ['Tổng môn học', faculty_summary.total_subjects],
+        ['Tổng sinh viên', faculty_summary.total_students],
+        ['Điểm trung bình', faculty_summary.average_score],
+        ['Tỷ lệ đậu (%)', faculty_summary.pass_rate],
+        ['Tỷ lệ điểm danh (%)', faculty_summary.attendance_rate],
+        [''],
+        ['CHI TIẾT TỪNG GIẢNG VIÊN'],
+        ['Mã giảng viên', 'Họ tên', 'Tổng lớp học phần', 'Tổng môn học', 'Tổng sinh viên', 'Sinh viên có điểm', 'Sinh viên đậu', 'Tỷ lệ đậu (%)', 'Điểm trung bình', 'Tỷ lệ điểm danh (%)'],
+      ];
+
+      // Add lecturer data
+      lecturers.forEach(lecturer => {
+        csvData.push([
+          lecturer.lecturer_id,
+          lecturer.lecturer_name,
+          lecturer.total_course_sections,
+          lecturer.total_subjects,
+          lecturer.total_students,
+          lecturer.students_with_scores,
+          lecturer.students_passed,
+          lecturer.pass_rate,
+          lecturer.average_score,
+          lecturer.attendance_rate
+        ]);
+      });
+
+      // Convert array to CSV string
+      const csvContent = csvData.map(row => 
+        row.map(cell => {
+          // Handle cells containing commas, quotes, or newlines
+          const cellStr = String(cell);
+          if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+            return `"${cellStr.replace(/"/g, '""')}"`;
+          }
+          return cellStr;
+        }).join(',')
+      ).join('\n');
+
+      // Add UTF-8 BOM for proper encoding
+      const BOM = '\uFEFF';
+      const csvWithBOM = BOM + csvContent;
+
+      // Create and download file
+      const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', `Thong-ke-giang-vien-${data.faculty_id}-${data.session_name}.csv`);
+      link.style.visibility = 'hidden';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error generating CSV:', error);
+      alert('Có lỗi xảy ra khi xuất CSV. Vui lòng thử lại.');
+    }
+  };
+
   // Filter and sort lecturers
   const filteredLecturers = lecturers
     .filter(lecturer =>
@@ -158,6 +234,19 @@ const LecturerStatisticsChart: React.FC<Props> = ({ data, sessionId }) => {
         <p className="text-green-100 mt-1">
           Tổng số giảng viên: <span className="font-semibold">{total_lecturers}</span>
         </p>
+      </div>
+
+      {/* Export Button */}
+      <div className="flex justify-end">
+        <button
+          onClick={exportToCSV}
+          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200 font-medium"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Xuất CSV
+        </button>
       </div>
 
       {/* Faculty Summary Cards */}

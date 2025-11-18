@@ -51,24 +51,24 @@ router.get('/all', chatController.getAllChats);
 router.get('/all/search', chatController.searchAllChats);
 
 // Lấy các lớp học phần chưa có cuộc trò chuyện nhóm dành cho admin
-// GET /api/chats/nonchat-course-sections?page=1&pageSize=10
+// GET /api/chats/nonchat-course-sections?faculty_id=&page=1&pageSize=10
 router.get('/nonchat-course-sections', chatController.getNonChatCourseSections);
 
 // Tìm kiếm các lớp học phần chưa có cuộc trò chuyện nhóm dành cho admin
-// GET /api/Chats/nonchat-course-sections/search?keyword=<keyword>&page=1&pageSize=10
+// GET /api/Chats/nonchat-course-sections/search?faculty_id=<faculty_id>&keyword=<keyword>&page=1&pageSize=10
 router.get('/nonchat-course-sections/search', chatController.searchNonChatCourseSections);
 
 // Tạo cuộc trò chuyện nhóm với giảng viên chủ nhiệm dành cho admin
 // POST /api/chats/homeroom/:lecturer_id
 router.post('/homeroom/:lecturer_id', chatController.createGroupChatWithHomeroomLecturer);
 
-// Tạo hàng loạt nhóm chat cho các lớp học phần chưa có chat theo học kỳ
-// POST /api/chats/bulk-create-session/:session_id?namegroup=
-// router.post('/bulk-create-session/:session_id', chatController.createBulkGroupChatsForSession);
+// Tạo hàng loạt nhóm chat cho các lớp học phần chưa có chat
+// POST /api/chats/bulk-create
+router.post('/bulk-create', chatController.createBulkGroupChats);
 
-// // Lấy danh sách các lớp học phần chưa có group chat theo học kỳ dành cho admin
-// // GET /api/chats/nonchat-course-sections/session/:session_id?page=1&pageSize=10
-// router.get('/nonchat-course-sections/session/:session_id', chatController.getNonChatCourseSectionsBySession);
+// // Lấy danh sách các lớp học phần chưa có group chat theo học kỳ và Khoa dành cho admin
+// GET /api/chats/nonchat-course-sections/session/:session_id/faculty/:faculty_id
+router.get('/nonchat-course-sections/session/:session_id/faculty/:faculty_id', chatController.getNonChatCourseSectionsBySessionFaculty);
 
 // Dọn dẹp các nhóm chat của các course section đã hoàn thành
 // DELETE /api/chats/cleanup-gr-completed/:session_id

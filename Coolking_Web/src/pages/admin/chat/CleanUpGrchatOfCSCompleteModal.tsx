@@ -16,9 +16,15 @@ const CleanUpGrchatOfCSCompleteModal: React.FC<CleanUpGrchatOfCSCompleteModalPro
   const { cleanupGroupChatsOfCompletedCourseSections, loading } = useChat();
   const { fetchAllSessions, sessions, loading: sessionsLoading } = useStatistics();
   const [selectedSessionId, setSelectedSessionId] = useState('');
+  const [sessionSearch, setSessionSearch] = useState('');
+  const [showSessionDropdown, setShowSessionDropdown] = useState(false);
   const [confirmText, setConfirmText] = useState('');
   const [error, setError] = useState('');
   const [showConfirmStep, setShowConfirmStep] = useState(false);
+
+  const filteredSessions = sessions.filter(session =>
+    session.nameSession.toLowerCase().includes(sessionSearch.toLowerCase())
+  );
 
   useEffect(() => {
     if (isOpen) {
@@ -26,8 +32,24 @@ const CleanUpGrchatOfCSCompleteModal: React.FC<CleanUpGrchatOfCSCompleteModalPro
     }
   }, [isOpen, fetchAllSessions]);
 
+  // Handle click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      
+      if (!target.closest('.session-dropdown')) {
+        setShowSessionDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleSessionSelect = (sessionId: string) => {
     setSelectedSessionId(sessionId);
+    setSessionSearch('');
+    setShowSessionDropdown(false);
     setShowConfirmStep(false);
     setConfirmText('');
     setError('');
@@ -66,6 +88,8 @@ const CleanUpGrchatOfCSCompleteModal: React.FC<CleanUpGrchatOfCSCompleteModalPro
 
   const handleClose = () => {
     setSelectedSessionId('');
+    setSessionSearch('');
+    setShowSessionDropdown(false);
     setConfirmText('');
     setError('');
     setShowConfirmStep(false);
@@ -99,9 +123,9 @@ const CleanUpGrchatOfCSCompleteModal: React.FC<CleanUpGrchatOfCSCompleteModalPro
         {!showConfirmStep ? (
           <div className="space-y-4">
             {/* Session Selection */}
-            <div>
+            <div className="session-dropdown">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Chọn học kỳ
+                Học kỳ <span className="text-red-500">*</span>
               </label>
               
               {sessionsLoading ? (
@@ -113,18 +137,40 @@ const CleanUpGrchatOfCSCompleteModal: React.FC<CleanUpGrchatOfCSCompleteModalPro
                   <span className="text-gray-500">Đang tải học kỳ...</span>
                 </div>
               ) : (
-                <select
-                  value={selectedSessionId}
-                  onChange={(e) => handleSessionSelect(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                >
-                  <option value="">-- Chọn học kỳ --</option>
-                  {sessions.map((session) => (
-                    <option key={session.id} value={session.id}>
-                      {session.nameSession}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Tìm và chọn học kỳ..."
+                    value={selectedSessionId ? sessions.find(s => s.id === selectedSessionId)?.nameSession || '' : sessionSearch}
+                    onChange={(e) => {
+                      setSessionSearch(e.target.value);
+                      if (selectedSessionId && e.target.value !== sessions.find(s => s.id === selectedSessionId)?.nameSession) {
+                        setSelectedSessionId('');
+                      }
+                    }}
+                    onFocus={() => setShowSessionDropdown(true)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  />
+                  {showSessionDropdown && (
+                    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {filteredSessions.length > 0 ? (
+                        filteredSessions.map((session) => (
+                          <div
+                            key={session.id}
+                            onClick={() => handleSessionSelect(session.id)}
+                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                          >
+                            {session.nameSession}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="px-4 py-2 text-gray-500 text-center">
+                          Không tìm thấy học kỳ nào
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 

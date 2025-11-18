@@ -126,11 +126,11 @@ export const useChat = () => {
     }, []);
 
     // Lấy danh sách course section chưa có chat
-    const getNonChatCourseSections = useCallback(async (page: number, pageSize: number) => {
+    const getNonChatCourseSections = useCallback(async (faculty_id: string, page: number, pageSize: number) => {
         try {
             setLoading(true);
             setError('');
-            const data = await chatServices.getNonChatCourseSections(page, pageSize);
+            const data = await chatServices.getNonChatCourseSections(faculty_id, page, pageSize);
             setCourseSections(data.courseSections || []);
             setTotal(data.total);
             setCurrentPage(page);
@@ -168,11 +168,11 @@ export const useChat = () => {
     }, []);
 
     // Tìm kiếm course section chưa có chat theo từ khóa
-    const searchNonChatCourseSections = useCallback(async (keyword: string, page: number, pageSize: number) => {
+    const searchNonChatCourseSections = useCallback(async (faculty_id: string, keyword: string, page: number, pageSize: number) => {
         try {
             setLoading(true);
             setError('');
-            const data = await chatServices.searchNonChatCourseSections(keyword, page, pageSize);
+            const data = await chatServices.searchNonChatCourseSections(faculty_id, keyword, page, pageSize);
             setCourseSections(data.courseSections || []);
             setTotal(data.total);
             setCurrentPage(page);
@@ -433,6 +433,44 @@ export const useChat = () => {
         }
     }, []);
 
+    // Lấy danh sách các lớp học phần chưa có nhóm chat theo session_id và faculty_id
+    const getNonChatCourseSectionsBySessionAndFaculty = useCallback(async (session_id: string, faculty_id: string) => {
+        try {
+            setLoading(true);
+            setError('');
+            const data = await chatServices.getNonChatCourseSectionsFacultySession(session_id, faculty_id);
+            setCourseSections(data.courseSections || []);
+            return data;
+        }
+        catch (error: any) {
+            setError(error.message || 'Failed to fetch non-chat course sections by session and faculty');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    // Tạo hàng loạt nhóm chat cho các lớp học phần
+    const bulkCreateGroupChats = useCallback(async (
+        courseSections: {
+            subjectName: string;
+            className: string;
+            course_section_id: string;
+            start_lesson: number;
+            end_lesson: number;
+        }[],
+        sessionInfo: String) => {
+        try {
+            setLoading(true);
+            setError('');
+            const data = await chatServices.bulkCreateGroupChats(courseSections, sessionInfo);
+            return data;
+        } catch (error: any) {
+            setError(error.message || 'Failed to bulk create group chats');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     return {
         loading,
         error,
@@ -468,6 +506,8 @@ export const useChat = () => {
         muteChat4AllUser,
         searchUser,
         getChatInfoByID4Admin,
-        deleteMemberFromGroupChat4Admin
+        deleteMemberFromGroupChat4Admin,
+        getNonChatCourseSectionsBySessionAndFaculty,
+        bulkCreateGroupChats
     };
 };

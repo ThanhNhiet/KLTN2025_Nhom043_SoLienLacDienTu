@@ -1,4 +1,6 @@
 import React from 'react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface GradeDistribution {
   excellent: number;
@@ -45,6 +47,124 @@ const FacultyStatisticsChart: React.FC<Props> = ({ data }) => {
       </div>
     );
   }
+
+  // Export to PDF
+  const exportToPDF = async () => {
+  const element = document.getElementById('faculty-statistics-chart');
+  if (!element) return;
+
+  try {
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff'
+    });
+
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF('p', 'mm', 'a4');
+
+    const margin = 10; // 10mm lề cho tất cả các bên
+    const pageRealHeight = pdf.internal.pageSize.getHeight();
+    const pageRealWidth = pdf.internal.pageSize.getWidth();
+    
+    const imgWidth = pageRealWidth - margin * 2;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    const usablePageHeight = pageRealHeight - margin * 2;
+    
+    let heightLeft = imgHeight; // Chiều cao ảnh còn lại
+    let position = margin;      // Vị trí Y ban đầu (bắt đầu từ lề trên)
+
+    pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+
+    // Tính toán chiều cao ảnh còn lại sau khi lấp đầy trang 1
+    heightLeft -= usablePageHeight;
+
+    // 3. Vòng lặp phân trang (nếu ảnh vẫn còn)
+    while (heightLeft > 0) {
+      // Cập nhật 'position' cho trang tiếp theo. Cắt tấm ảnh lên trên bằng cách trừ đi toàn bộ chiều cao của trang bao gồm cả lề
+      position -= pageRealHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+      heightLeft -= usablePageHeight;
+    }
+
+    pdf.save(`Thong-ke-khoa-${data.faculty_id}-${data.session_name}.pdf`);
+    
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    alert('Có lỗi xảy ra khi xuất PDF. Vui lòng thử lại.');
+  }
+};
+
+  // Export to CSV function
+  const exportToCSV = () => {
+    try {
+      // Prepare data for CSV
+      const csvData = [
+        ['THỐNG KÊ KHOA'],
+        ['Khoa:', data.faculty_name],
+        ['Mã khoa:', data.faculty_id],
+        ['Học kỳ:', data.session_name],
+        [''],
+        ['THỐNG KÊ TỔNG QUAN'],
+        ['Chỉ tiêu', 'Giá trị'],
+        ['Tổng số môn học', data.total_subjects],
+        ['Tổng lớp học phần', data.total_course_sections],
+        ['Tổng giảng viên', data.total_lecturers],
+        ['Tổng sinh viên', data.total_students],
+        ['Sinh viên có điểm', data.students_with_scores],
+        ['Sinh viên đậu', data.students_passed],
+        [''],
+        ['HIỆU SUẤT HỌC TẬP'],
+        ['Chỉ tiêu', 'Giá trị'],
+        ['Tỷ lệ đậu (%)', data.pass_rate],
+        ['Điểm trung bình', data.average_score],
+        ['Tỷ lệ điểm danh (%)', data.attendance_rate],
+        [''],
+        ['PHÂN BỐ ĐIỂM SỐ'],
+        ['Loại điểm', 'Số lượng', 'Tỷ lệ (%)'],
+        ['Xuất sắc (8.5-10)', data.grade_distribution.excellent, ((data.grade_distribution.excellent / Object.values(data.grade_distribution).reduce((sum, count) => sum + count, 0)) * 100).toFixed(1)],
+        ['Giỏi (7.0-8.4)', data.grade_distribution.good, ((data.grade_distribution.good / Object.values(data.grade_distribution).reduce((sum, count) => sum + count, 0)) * 100).toFixed(1)],
+        ['Khá (5.5-6.9)', data.grade_distribution.fair, ((data.grade_distribution.fair / Object.values(data.grade_distribution).reduce((sum, count) => sum + count, 0)) * 100).toFixed(1)],
+        ['Trung bình (4.0-5.4)', data.grade_distribution.poor, ((data.grade_distribution.poor / Object.values(data.grade_distribution).reduce((sum, count) => sum + count, 0)) * 100).toFixed(1)],
+        ['Yếu (<4.0)', data.grade_distribution.fail, ((data.grade_distribution.fail / Object.values(data.grade_distribution).reduce((sum, count) => sum + count, 0)) * 100).toFixed(1)]
+      ];
+
+      // Convert array to CSV string
+      const csvContent = csvData.map(row => 
+        row.map(cell => {
+          // Handle cells containing commas, quotes, or newlines
+          const cellStr = String(cell);
+          if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+            return `"${cellStr.replace(/"/g, '""')}"`;
+          }
+          return cellStr;
+        }).join(',')
+      ).join('\n');
+
+      // Add UTF-8 BOM for proper encoding
+      const BOM = '\uFEFF';
+      const csvWithBOM = BOM + csvContent;
+
+      // Create and download file
+      const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', `Thong-ke-khoa-${data.faculty_id}-${data.session_name}.csv`);
+      link.style.visibility = 'hidden';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error generating CSV:', error);
+      alert('Có lỗi xảy ra khi xuất CSV. Vui lòng thử lại.');
+    }
+  };
 
   const {
     faculty_name,
@@ -133,13 +253,37 @@ const FacultyStatisticsChart: React.FC<Props> = ({ data }) => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg p-6">
-        <h2 className="text-2xl font-bold mb-2">Thống kê Khoa</h2>
-        <p className="text-blue-100">
-          <span className="font-semibold">{faculty_name}</span> - {session_name}
-        </p>
+      {/* Export Buttons */}
+      <div className="flex justify-end gap-3 mb-4">
+        <button
+          onClick={exportToCSV}
+          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200 font-medium"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Xuất CSV
+        </button>
+        <button
+          onClick={exportToPDF}
+          className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200 font-medium"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Xuất PDF
+        </button>
       </div>
+
+      {/* Statistics Content */}
+      <div id="faculty-statistics-chart" className="space-y-6">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg p-6">
+          <h2 className="text-2xl font-bold mb-2">Thống kê Khoa</h2>
+          <p className="text-blue-100">
+            <span className="font-semibold">{faculty_name}</span> - {session_name}
+          </p>
+        </div>
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
@@ -233,6 +377,7 @@ const FacultyStatisticsChart: React.FC<Props> = ({ data }) => {
             })}
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
