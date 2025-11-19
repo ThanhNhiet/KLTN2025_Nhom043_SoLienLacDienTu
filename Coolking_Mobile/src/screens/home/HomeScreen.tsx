@@ -164,53 +164,67 @@ export default function HomeScreen() {
         {/* Top Navigation */}
         <TopNavigations_Home navigation={navigation} profileNavigation={profileNavigation} />
 
-        {/* Nội dung chính */}
-        <View style={styles.content}>
-          {/* Card Lịch học hôm nay */}
-          {isParent ? null : (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.title}>Lịch học hôm nay</Text>
-              <TouchableOpacity onPress={() => navigation.navigate("CalendarScreen")}>
-                <Text style={styles.link}>Xem tất cả</Text>
-              </TouchableOpacity>
-            </View>
+        {/* Nội dung chính - Sử dụng FlatList làm main container */}
+        <FlatList
+          style={styles.content}
+          data={[{ id: "sections" }]}
+          keyExtractor={(item) => item.id}
+          renderItem={() => (
+            <>
+              {/* Card Lịch học hôm nay */}
+              {isParent ? null : (
+              <View style={styles.card}>
+                <View style={styles.cardHeader}>
+                  <Text style={styles.title}>Lịch học hôm nay</Text>
+                  <TouchableOpacity onPress={() => navigation.navigate("CalendarScreen")}>
+                    <Text style={styles.link}>Xem tất cả</Text>
+                  </TouchableOpacity>
+                </View>
 
-            {loading ? (
-              <Text style={{ color: "#64748b", fontStyle: "italic" }}>Đang tải...</Text>
-            ) : todayEvents.length === 0 ? (
-              <Text style={{ color: "#64748b", fontStyle: "italic" }}>Hôm nay bạn không có lịch học.</Text>
-            ) : (
-              <FlatList
-                data={todayEvents}
-                renderItem={renderTodayItem}
-                keyExtractor={(i) => i.id}
-                ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-                showsVerticalScrollIndicator={false}
-              />
-            )}
-          </View>)}
+                {loading ? (
+                  <Text style={{ color: "#64748b", fontStyle: "italic" }}>Đang tải...</Text>
+                ) : todayEvents.length === 0 ? (
+                  <Text style={{ color: "#64748b", fontStyle: "italic" }}>Hôm nay bạn không có lịch học.</Text>
+                ) : (
+                  <FlatList
+                    data={todayEvents}
+                    renderItem={renderTodayItem}
+                    keyExtractor={(i) => i.id}
+                    ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+                    showsVerticalScrollIndicator={false}
+                    scrollEnabled={false}
+                    nestedScrollEnabled={false}
+                  />
+                )}
+              </View>)}
 
-          {/* Card Chức năng (mẫu, tuỳ bạn bind data) */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Chức năng</Text>
-            <View style={styles.featuresGrid}>
-              {features.map((feature) => (
-                <TouchableOpacity
-                  key={feature.id}
-                  style={styles.featureButton}
-                  onPress={() => handleNavigate(feature.screen)}
-                >
-                  {/* Thay thế Text bằng component Icon của bạn */}
-                  <View style={styles.iconContainer}>
-                      <Ionicons name={feature.icon as any} size={30} color="#007bff" />
-                  </View>
-                  <Text style={styles.featureText}>{feature.title}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </View>
+              {/* Card Chức năng */}
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Chức năng</Text>
+                <View style={styles.featuresGrid}>
+                  {features.map((feature) => (
+                    <TouchableOpacity
+                      key={feature.id}
+                      style={styles.featureButton}
+                      onPress={() => handleNavigate(feature.screen)}
+                    >
+                      <View style={styles.iconContainer}>
+                        <Ionicons name={feature.icon as any} size={30} color="#007bff" />
+                      </View>
+                      <Text style={styles.featureText}>{feature.title}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </>
+          )}
+          contentContainerStyle={{
+            paddingHorizontal: 16,
+            paddingTop: 10,
+            paddingBottom: 100,
+          }}
+          showsVerticalScrollIndicator={false}
+        />
 
         {/* Bottom Navigation */}
         <View style={styles.bottomWrapper}>
@@ -246,9 +260,6 @@ const styles = StyleSheet.create({
 
   content: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 78, // chừa chỗ cho BottomNavigation
   },
 
   // ==== Card chung ====

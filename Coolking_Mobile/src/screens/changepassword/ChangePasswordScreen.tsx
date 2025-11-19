@@ -15,27 +15,68 @@ export default function ChangePasswordScreen() {
   const [show2, setShow2] = useState(false);
   const [show3, setShow3] = useState(false);
 
-  const onChangePassword = async () => {
-    if ( !nextPwd || !confirm)
-      return Alert.alert("Thiếu thông tin", "Điền đủ các trường.");
-    if (nextPwd.length < 6)
-      return Alert.alert("Yêu cầu", "Mật khẩu mới tối thiểu 6 ký tự.");
-    if (nextPwd !== confirm)
-      return Alert.alert("Lỗi", "Xác nhận mật khẩu không khớp.");
-    const inputType = identifyInputType(value);
-    let data = null;
+ const validatePassword = (password: string): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+  
+  if (password.length < 8) {
+    errors.push('Tối thiểu 8 ký tự');
+  }
+  
+  if (!/[a-zA-Z]/.test(password)) {
+    errors.push('Ít nhất 1 chữ cái');
+  }
+  
+  if (!/[0-9]/.test(password)) {
+    errors.push('Ít nhất 1 chữ số');
+  }
+  
+  if (!/[^a-zA-Z0-9]/.test(password)) {
+    errors.push('Ít nhất 1 ký tự đặc biệt');
+  }
+  
+  return { isValid: errors.length === 0, errors };
+};
+
+const onChangePassword = async () => {
+  // Kiểm tra trường trống
+  if (!nextPwd || !confirm) {
+    return Alert.alert("Thiếu thông tin", "Điền đủ các trường.");
+  }
+  
+  // Kiểm tra xác nhận mật khẩu khớp
+  if (nextPwd !== confirm) {
+    return Alert.alert("Lỗi", "Xác nhận mật khẩu không khớp.");
+  }
+  
+  // Validate mật khẩu mới
+  const validation = validatePassword(nextPwd);
+  if (!validation.isValid) {
+    return Alert.alert("Mật khẩu không hợp lệ", validation.errors.join("\n"));
+  }
+  
+  const inputType = identifyInputType(value);
+  let data = null;
+  
+  try {
     if (inputType === 'EMAIL') {
       data = await changePassword(value, resetToken, nextPwd);
     } else if (inputType === 'PHONE') {
       data = await changePasswordPhone(value, resetToken, nextPwd);
+    } else {
+      return Alert.alert("Lỗi", "Định dạng email hoặc số điện thoại không hợp lệ.");
     }
-      if (!data || !data.success) {
-        return Alert.alert("Lỗi",data?.message || "Đổi mật khẩu thất bại.");
-      } else {
-        Alert.alert("Thành công", data.message || "Đổi mật khẩu thành công!");
-        navigation.navigate("LoginScreen");
-      }
-  };
+    
+    if (!data || !data.success) {
+      return Alert.alert("Lỗi", data?.message || "Đổi mật khẩu thất bại.");
+    }
+    
+    Alert.alert("Thành công", data.message || "Đổi mật khẩu thành công!");
+    navigation.navigate("LoginScreen");
+  } catch (error) {
+    console.error("Lỗi khi đổi mật khẩu:", error);
+    Alert.alert("Lỗi", "Có lỗi xảy ra. Vui lòng thử lại.");
+  }
+};
 
   const renderPwdRow = (
     label: string,
