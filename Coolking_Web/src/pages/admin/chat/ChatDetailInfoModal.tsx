@@ -48,6 +48,7 @@ const ChatDetailInfoModal: React.FC<ChatDetailInfoModalProps> = ({
   const [memberToDelete, setMemberToDelete] = useState<Member | null>(null);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [deletingMember, setDeletingMember] = useState(false);
   
   const { deleteMemberFromGroupChat4Admin } = useChat();
 
@@ -86,6 +87,7 @@ const ChatDetailInfoModal: React.FC<ChatDetailInfoModalProps> = ({
     setShowDeleteConfirm(false);
     setMemberToDelete(null);
     setShowSuccessToast(false);
+    setDeletingMember(false);
     onClose();
   };
 
@@ -98,6 +100,7 @@ const ChatDetailInfoModal: React.FC<ChatDetailInfoModalProps> = ({
     if (!memberToDelete || !chatDetail) return;
 
     try {
+      setDeletingMember(true);
       const result = await deleteMemberFromGroupChat4Admin(chatDetail._id, memberToDelete.userID);
       if (result?.success) {
         // Cập nhật lại danh sách members
@@ -120,6 +123,7 @@ const ChatDetailInfoModal: React.FC<ChatDetailInfoModalProps> = ({
       console.error('Error deleting member:', error);
       setError('Không thể xóa thành viên. Vui lòng thử lại.');
     } finally {
+      setDeletingMember(false);
       setShowDeleteConfirm(false);
       setMemberToDelete(null);
     }
@@ -428,15 +432,23 @@ const ChatDetailInfoModal: React.FC<ChatDetailInfoModalProps> = ({
               <div className="flex justify-end gap-3">
                 <button
                   onClick={cancelDeleteMember}
-                  className="px-4 py-2 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors duration-200"
+                  disabled={deletingMember}
+                  className="px-4 py-2 text-gray-700 bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors duration-200"
                 >
                   Hủy
                 </button>
                 <button
                   onClick={confirmDeleteMember}
-                  className="px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors duration-200"
+                  disabled={deletingMember}
+                  className="px-4 py-2 text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors duration-200 flex items-center gap-2"
                 >
-                  Xóa
+                  {deletingMember && (
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  )}
+                  <span>{deletingMember ? 'Đang xóa...' : 'Xóa'}</span>
                 </button>
               </div>
             </div>

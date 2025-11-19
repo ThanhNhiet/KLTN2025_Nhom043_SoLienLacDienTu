@@ -15,6 +15,7 @@ export interface Alert {
 
 export const useAlert = () => {
     const [loading, setLoading] = useState(false);
+    const [loadingTotalSVPA, setLoadingTotalSVPA] = useState(false);
     const [error, setError] = useState<string>('');
     const [alerts, setAlerts] = useState<Alert[]>([]);
     const [total, setTotal] = useState(0);
@@ -144,14 +145,14 @@ export const useAlert = () => {
     // Lấy danh sách sinh viên và phụ huynh theo lớp học phần
     const getStudentsAndParentsByCourseSection = useCallback(async (course_section_id: string) => {
         try {
-            setLoading(true);
+            setLoadingTotalSVPA(true);
             setError('');
             const data = await alertService.getStudentsAndParentsByCourseSection(course_section_id);
             return data;
         } catch (error: any) {
             setError(error.message || 'Failed to fetch students and parents');
         } finally {
-            setLoading(false);
+            setLoadingTotalSVPA(false);
         }
     }, []);
 
@@ -177,6 +178,7 @@ export const useAlert = () => {
 
     return {
         loading,
+        loadingTotalSVPA,
         error,
         alerts,
         total,
