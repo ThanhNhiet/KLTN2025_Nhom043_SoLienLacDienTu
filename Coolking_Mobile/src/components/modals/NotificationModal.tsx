@@ -77,18 +77,35 @@ export default function NotificationModal({
 
   const data = tab === "system" ? systemList : personalList;
 
-  const handlePressItem = useCallback(
-    async (item: NotificationItem) => {
-      if (item.targetScope === "all" && item.receiverID === null && item.isRead === false) {
-       const data =  await markSystemNotificationAsRead(item._id);
-      } else {
-        const data = await markNotificationAsRead(item._id);
-      }
-        await fetchNotifications();
-      onPressItem();
-    },
-    [onPressItem]
-  );
+const handlePressItem = useCallback(
+  async (item: NotificationItem) => {
+    try {
+      // Hiển thị nội dung thông báo
+      Alert.alert(
+        item.header,
+        item.body || "Không có nội dung",
+        [
+          {
+            text: "Đóng",
+            onPress: async () => {
+              // Đánh dấu đã đọc
+              if (item.targetScope === "all" && item.receiverID === null && item.isRead === false) {
+                await markSystemNotificationAsRead(item._id);
+              } else {
+                await markNotificationAsRead(item._id);
+              }
+              await fetchNotifications();
+              onPressItem();
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      console.error("Lỗi khi xử lý thông báo:", error);
+    }
+  },
+  [markSystemNotificationAsRead, markNotificationAsRead, fetchNotifications, onPressItem]
+);
 
   
 

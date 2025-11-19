@@ -122,45 +122,48 @@ const ChatAiModal = ({ visible, onClose, chatId }: ChatAiModalProps) => {
   };
 
   const renderMessage = ({ item }: { item: ItemMessage }) => {
-    // Giả sử 'userId' là ID của người dùng hiện tại
-    const isUser = item.senderInfo.userID === userId; 
+  const isUser = item.senderInfo.userID === userId; 
 
-    // --- 1. Tin nhắn của USER (bạn) ---
-    // (Giữ nguyên, không có avatar, căn phải)
-    if (isUser) {
-      return (
-        <View style={[styles.msgBox, styles.userMsg]}>
-          <Text style={styles.userText}>{item.content}</Text>
-        </View>
-      );
-    }
-
-    // --- 2. Tin nhắn của AI / NGƯỜI KHÁC ---
-    // (Thêm avatar và tên, căn trái)
+  if (isUser) {
     return (
-      <View style={styles.aiMessageWrapper}>
-        
-        {/* Avatar */}
-        <Image
-          source={{ uri: item.senderInfo.avatar || 'https://via.placeholder.com/40' }} // Cần 1 ảnh dự phòng
-          style={styles.avatar}
-        />
-        
-        {/* Cụm Tên + Bong bóng chat */}
-        <View style={styles.messageContentWrapper}>
-          
+      <View style={[styles.userMessageWrapper]}>
+        {/* Cụm Tên + Bong bóp chat */}
+        <View style={styles.userMessageContentWrapper}>
           {/* Tên người gửi */}
-          <Text style={styles.senderName}>{item.senderInfo.name}</Text>
+          <Text style={styles.userSenderName}>{item.senderInfo.name}</Text>
           
-          {/* Bong bóng chat */}
-          <View style={[styles.msgBox, styles.aiMsg]}>
-            <Text style={styles.aiText}>{item.content}</Text>
+          {/* Bong bóp chat */}
+          <View style={[styles.msgBox, styles.userMsg]}>
+            <Text style={styles.userText}>{item.content}</Text>
           </View>
-
         </View>
+
+        {/* Avatar bên phải */}
+        <Image
+          source={{ uri: item.senderInfo.avatar || 'https://via.placeholder.com/40' }}
+          style={styles.userAvatar}
+        />
       </View>
     );
-  };
+  }
+
+  // AI message (giữ nguyên)
+  return (
+    <View style={styles.aiMessageWrapper}>
+      <Image
+        source={{ uri: item.senderInfo.avatar || 'https://via.placeholder.com/40' }}
+        style={styles.avatar}
+      />
+      
+      <View style={styles.messageContentWrapper}>
+        <Text style={styles.senderName}>{item.senderInfo.name}</Text>
+        <View style={[styles.msgBox, styles.aiMsg]}>
+          <Text style={styles.aiText}>{item.content}</Text>
+        </View>
+      </View>
+    </View>
+  );
+};
 
   return (
     <Modal
@@ -377,6 +380,34 @@ const styles = StyleSheet.create({
     aiText: { 
         color: '#000', 
         fontSize: 16 
+    },
+    userMessageWrapper: {
+      flexDirection: 'row',
+      alignSelf: 'flex-end',
+      marginBottom: 10,
+      maxWidth: '85%',
+      alignItems: 'flex-end',
+    },
+
+    userAvatar: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      marginLeft: 8,
+      marginRight: 8,
+    },
+
+    userMessageContentWrapper: {
+      flexDirection: 'column',
+      alignItems: 'flex-end',
+    },
+
+    userSenderName: {
+      fontSize: 13,
+      color: '#666',
+      marginRight: 12,
+      marginBottom: 3,
+      fontWeight: '500',
     },
 });
 

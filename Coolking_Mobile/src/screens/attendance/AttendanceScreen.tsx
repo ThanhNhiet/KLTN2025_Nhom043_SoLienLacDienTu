@@ -51,10 +51,12 @@ const CourseCard = ({ item }: { item: CourseSection }) => {
 
 export default function AttendanceScreen() {
   const navigation = useNavigation<any>();
-
-  
-  // Logic phân trang và fetch dữ liệu không đổi
   const { courseSections, loading, error, totalPages, page, setPage } = useAttendance();
+  const [studentId, setStudentId] = useState<string>("");
+
+  const handleFetchAttendance = (newStudentId: string) => {
+    setStudentId(newStudentId);
+  };
 
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages[totalPages.length - 1]) {
@@ -138,7 +140,12 @@ export default function AttendanceScreen() {
     <SafeAreaProvider>
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
-        <TopNavigations_Attendance />
+        <View style={styles.topNavWrapper}>
+          <TopNavigations_Attendance 
+            setStudentId={setStudentId}
+            handleFetchAttendance={handleFetchAttendance}
+          />
+        </View>
         <View style={{ flex: 1 }}>
           {sessions.length > 0 ? (
             <FlatList
@@ -162,7 +169,9 @@ export default function AttendanceScreen() {
           )}
         </View>
         <View style={styles.bottomWrapper}>
-          <BottomNavigation navigation={navigation} />
+          <BottomNavigation 
+            navigation={navigation}
+          />
         </View>
       </SafeAreaView>
     </SafeAreaProvider>
@@ -174,6 +183,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f8f9fa",
+    overflow: 'hidden',
+  },
+  topNavWrapper: {
+    backgroundColor: '#ffffff',
+    overflow: 'hidden',
   },
   listContentContainer: {
     paddingHorizontal: 16,
