@@ -877,7 +877,7 @@ const updateGroupChat4Admin = async (admin_id, chatID, data) => {
         if (lecturers.length > 0) {
             const lecturerRecords = await models.Lecturer.findAll({
                 where: { lecturer_id: lecturers },
-                attributes: ['lecturer_id', 'name']
+                attributes: ['lecturer_id', 'name', 'avatar']
             });
 
             // Kiểm tra lecturers không tồn tại trong database
@@ -898,7 +898,7 @@ const updateGroupChat4Admin = async (admin_id, chatID, data) => {
         if (students.length > 0) {
             const studentRecords = await models.Student.findAll({
                 where: { student_id: students },
-                attributes: ['student_id', 'name']
+                attributes: ['student_id', 'name', 'avatar']
             });
 
             // Kiểm tra students không tồn tại trong database
@@ -928,6 +928,7 @@ const updateGroupChat4Admin = async (admin_id, chatID, data) => {
                 membersToAdd.push({
                     userID: lecturer.lecturer_id,
                     userName: lecturer.name,
+                    avatar: lecturer.avatar,
                     role: MemberRole.LECTURER,
                     joinedAt: now,
                     muted: false
@@ -941,6 +942,7 @@ const updateGroupChat4Admin = async (admin_id, chatID, data) => {
                 membersToAdd.push({
                     userID: student.student_id,
                     userName: student.name,
+                    avatar: student.avatar,
                     role: MemberRole.MEMBER,
                     joinedAt: now,
                     muted: false

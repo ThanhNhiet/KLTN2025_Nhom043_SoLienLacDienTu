@@ -91,6 +91,7 @@ export interface ChatDetail {
 
 export const useChat = () => {
     const [loading, setLoading] = useState(false);
+    const [loadingAddMembers, setLoadingAddMembers] = useState(false);
     const [error, setError] = useState<string>('');
     const [chats, setChats] = useState<Chat[]>([]);
     const [courseSections, setCourseSections] = useState<CourseSection[]>([]);
@@ -218,13 +219,13 @@ export const useChat = () => {
     // Update tên nhóm chat và (hoặc) thêm thành viên
     const addMembers2GroupChat = useCallback(async (chatID: string, name: string, students: string[], lecturers: string[]) => {
         try {
-            setLoading(true);
+            setLoadingAddMembers(true);
             const data = await chatServices.AddMembers2GroupChat(chatID, name, students, lecturers);
             return data;
         } catch (error: any) {
             setError(error.message || 'Failed to add members to group chat');
         } finally {
-            setLoading(false);
+            setLoadingAddMembers(false);
         }
     }, []);
 
@@ -473,6 +474,7 @@ export const useChat = () => {
 
     return {
         loading,
+        loadingAddMembers,
         error,
         chats,
         courseSections,

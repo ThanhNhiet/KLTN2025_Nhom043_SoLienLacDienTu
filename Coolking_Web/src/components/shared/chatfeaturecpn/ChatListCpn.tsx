@@ -61,7 +61,7 @@ const ChatListCpn = forwardRef<any, ChatListCpnProps>(({ onChatSelect, selectedC
 
         setLocalChatItems(prevItems => {
             const chatIndex = prevItems.findIndex(chat => chat._id === chatId);
-            
+
             // Nếu không tìm thấy chat, không làm gì cả
             if (chatIndex === -1) {
                 return prevItems;
@@ -250,6 +250,8 @@ const ChatListCpn = forwardRef<any, ChatListCpnProps>(({ onChatSelect, selectedC
                         <div
                             key={chat._id}
                             onClick={() => {
+                                if (selectedChatId === chat._id) return;
+
                                 onChatSelect(chat._id);
                                 // Đánh dấu đã đọc nếu có tin nhắn chưa đọc
                                 if (chat.unread) {

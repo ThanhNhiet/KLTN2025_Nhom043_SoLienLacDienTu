@@ -85,6 +85,8 @@ const ChatMainPage: React.FC = () => {
                     {/* Message Conversation - Center Panel */}
                     <div className="flex-1 flex flex-col">
                         <MessageConversationCpn
+                            key={selectedChatId}
+                            
                             selectedChatId={selectedChatId}
                             onShowSearchResults={(results, members) => handleShowSearchResults(results, members, 'search')}
                             members={chatMembers}

@@ -364,13 +364,13 @@ const createAttendanceRecord = async (lecturer_id, course_section_id, attendance
             }
 
             // Kiểm tra sinh viên có tồn tại không
-            const existingStudent = await models.Student.findOne({
-                where: { student_id: student_id }
-            });
+            // const existingStudent = await models.Student.findOne({
+            //     where: { student_id: student_id }
+            // });
 
-            if (!existingStudent) {
-                throw new Error(`Student not found with id: ${student_id}`);
-            }
+            // if (!existingStudent) {
+            //     throw new Error(`Student not found with id: ${student_id}`);
+            // }
 
             // Tạo record
             attendanceStudentRecords.push({
@@ -509,13 +509,13 @@ const updateAttendanceRecord = async (attendance_id, attendanceData) => {
             }
 
             // Kiểm tra sinh viên có tồn tại không
-            const existingStudent = await models.Student.findOne({
-                where: { student_id: student_id }
-            });
+            // const existingStudent = await models.Student.findOne({
+            //     where: { student_id: student_id }
+            // });
 
-            if (!existingStudent) {
-                throw new Error(`Student not found with id: ${student_id}`);
-            }
+            // if (!existingStudent) {
+            //     throw new Error(`Student not found with id: ${student_id}`);
+            // }
         }
 
         // Xóa các record cũ của AttendanceStudent
