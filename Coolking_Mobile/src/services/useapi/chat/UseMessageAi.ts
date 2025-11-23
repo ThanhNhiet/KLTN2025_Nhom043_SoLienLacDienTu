@@ -326,6 +326,7 @@ export const useMessageAi = (chatId: string) => {
                        }
                        return [...prev, finalMsg];
                    });
+                   setInput('');
                 const newMessage = await createNewChatPrivateAI(chatId, textInputMessage,selectedFaq);
                 if (newMessage === null){
                     console.warn("Failed to create AI chat message");

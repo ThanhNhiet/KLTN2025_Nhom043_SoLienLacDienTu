@@ -156,3 +156,5 @@ export const logout = async () => {
         await AsyncStorage.removeItem('userId');
     }
 }
+
+

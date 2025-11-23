@@ -7,11 +7,12 @@ import {
     logout,
     getcheckPhoneNumber,
     getVerifyOTPPhone,
-    getchangePasswordPhone
+    getchangePasswordPhone,
 } from "@/src/services/api/Login/Login_ForgotApi";
 import { useNavigation } from "@react-navigation/native";
 import React, { useState } from "react";
 import NetInfo from '@react-native-community/netinfo'; // Install if not already
+import { unregisterPushToken } from '@/src/utils/notifications';
 
 export const useLogin_out = () => {
     const navigation = useNavigation<any>();
@@ -279,7 +280,11 @@ export const useLogin_out = () => {
     const getlogout = async () => {
         setIsLoading(true);
         try {
-            // Cố gắng gọi API (nếu offline vẫn chạy được vì logout() đã best-effort)
+            const currentUserId = await AsyncStorage.getItem('userId');
+            if (!currentUserId) {
+            throw new Error("No user ID found for logout");
+            }
+            await unregisterPushToken(currentUserId);
             const data = await logout();
 
             // Điều hướng về Login và xoá history
