@@ -16,6 +16,8 @@ import {
     TouchableWithoutFeedback,
     Linking,
     FlatList,
+    NativeSyntheticEvent,
+    NativeScrollEvent
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FontAwesome } from "@expo/vector-icons";
@@ -344,7 +346,7 @@ const getFileIconFromUrl = (url: string): string => {
                         ) : message.type === 'link' ? (
                             handleArr(message.content).map((link, index) => (
                             <TouchableOpacity onPress={() => openLinks(link)} key={index}>
-                                <Text style={styles.linkMessage} >{link}</Text>
+                                <Text style={{ color: '#0645AD', fontSize: 15, textDecorationLine: 'underline' }}>{link}</Text>
                             </TouchableOpacity>))
                         )
                         : (
@@ -632,42 +634,7 @@ const handleReplyMessage = async() => {
         );
     };
 
-    // +++ SỬA LỖI: DI CHUYỂN CÁC HOOK NÀY LÊN TRÊN KHỐI IF(userId === null) +++
-    const renderMessageItem = useCallback(({ item }: { item: ItemMessage }) => (
-        <MessageBubble
-            message={item}
-            userId={userId}
-            onShowActions={handleShowActions}
-            navigation={navigation}
-        />
-    ), [userId, navigation, handleShowActions]);
-
-    const handleLoadMore = useCallback(() => {
-        if (!loadingMore && hasMore) {
-            loadMoreMessages();
-        }
-    }, [loadingMore, hasMore, loadMoreMessages]);
-
-    const renderLoadingIndicator = useMemo(() => (
-        <View style={styles.loadingMoreContainer}>
-            <ActivityIndicator size="small" color="#007AFF" />
-        </View>
-    ), []);
-
-
-    // +++ SỬA LỖI: XÓA KHỐI `if (userId === null)` Ở ĐÂY VÀ CHUYỂN LOGIC VÀO RETURN BÊN DƯỚI +++
-    /* if (userId === null) {
-        return (
-            <SafeAreaProvider>
-                <SafeAreaView style={styles.safeArea}>
-                       <View style={styles.centeredContainer}>
-                           <ActivityIndicator size="large" color="#007AFF" />
-                       </View>
-                </SafeAreaView>
-            </SafeAreaProvider>
-        );
-    }
-    */
+    
    // 3. Component loading
     const renderHeader = () => {
         if (!loadingMore) return null;
@@ -677,201 +644,265 @@ const handleReplyMessage = async() => {
             </View>
         );
     };
+    const lastLoadTime = useRef(0);
+const loadingTriggered = useRef(false);
+const previousScrollY = useRef(0);
+const isFirstLoad = useRef(true);
+
+// FIX: Đơn giản hóa logic load more
+const handleLoadMore = useCallback(() => {
+    const now = Date.now();
     
+    // Kiểm tra tất cả điều kiện
+    if (loadingMore || !hasMore || loadingTriggered.current) {
+        return;
+    }
+    
+    // Kiểm tra timing
+    if (now - lastLoadTime.current < 1500) {
+        return;
+    }
+    
+    loadingTriggered.current = true;
+    lastLoadTime.current = now;
+    console.log("✅ Loading more messages...");
+    
+    loadMoreMessages();
+    
+    // Reset flag sau 2 giây
+    setTimeout(() => {
+        loadingTriggered.current = false;
+    }, 2000);
+}, [loadingMore, hasMore, loadMoreMessages]);
 
-    return (
-        <SafeAreaProvider>
-            <SafeAreaView style={styles.safeArea}>
+// FIX: Cải thiện scroll detection
+const handleOnScroll = useCallback(({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+    
+    // Kiểm tra đã đến đáy hay chưa
+    const isAtBottomNow = layoutMeasurement.height + contentOffset.y >= contentSize.height - 50;
+    setIsAtBottom(isAtBottomNow);
+    
+    // Chỉ load more khi scroll lên gần top
+    const currentScrollY = contentOffset.y;
+    const isScrollingUp = currentScrollY < previousScrollY.current;
+    previousScrollY.current = currentScrollY;
+    
+    // Load khi gần top
+    const isNearTop = currentScrollY < 50 && contentSize.height > layoutMeasurement.height;
+    
+    if (isScrollingUp && isNearTop && hasMore && !loadingMore && !loadingTriggered.current) {
+        console.log("📍 Near top - triggering load more");
+        handleLoadMore();
+    }
+}, [hasMore, loadingMore, handleLoadMore]);
 
-                {/* +++ SỬA LỖI: THÊM LOGIC KIỂM TRA `userId` Ở ĐÂY +++ */}
-                {userId === null ? (
-                    // Hiển thị loading nếu chưa có userId
-                    <View style={styles.centeredContainer}>
-                        <ActivityIndicator size="large" color="#007AFF" />
-                    </View>
-                ) : (
-                    // Hiển thị toàn bộ màn hình chat nếu đã có userId
-                    <>
-                        <TopNavigations_Message 
-                                navigation={navigation} 
-                                chatPartner={{chatID: chatId, name: chatInfo.name, avatar: chatInfo.avatar, isOnline: true /* Lấy trạng thái online thực tế */ }} 
-                                onShowPinned={handleOpenPinnedModal} // Truyền hàm mở modal
-                                hasPinnedMessages={pinnedMessages.length > 0}
-                                />
+// Scroll to end khi load xong
+useEffect(() => {
+    if (isFirstLoad.current && messages.length > 0 && !loading) {
+        const timer = setTimeout(() => {
+            flatListRef.current?.scrollToEnd({ animated: false });
+            isFirstLoad.current = false;
+        }, 50);
+        return () => clearTimeout(timer);
+    }
+}, [messages.length, loading]);
 
-                        <KeyboardAvoidingView
-                            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                            style={styles.container}
-                            keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0} // Điều chỉnh nếu cần
-                        >
-                            {/* Chỉ báo loading ban đầu */}
-                            {loading && messages.length === 0 && (
-                                <View style={styles.centeredContainer}>
-                                    <ActivityIndicator size="large" color="#007AFF" />
+return (
+    <SafeAreaProvider>
+        <SafeAreaView style={styles.safeArea}>
+            {userId === null ? (
+                <View style={styles.centeredContainer}>
+                    <ActivityIndicator size="large" color="#007AFF" />
+                </View>
+            ) : (
+                <>
+                    <TopNavigations_Message 
+                        navigation={navigation} 
+                        chatPartner={{chatID: chatId, name: chatInfo.name, avatar: chatInfo.avatar, isOnline: true}} 
+                        onShowPinned={handleOpenPinnedModal}
+                        hasPinnedMessages={pinnedMessages.length > 0}
+                    />
+
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                        style={styles.container}
+                        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+                    >
+                        {loading && messages.length === 0 && (
+                            <View style={styles.centeredContainer}>
+                                <ActivityIndicator size="large" color="#007AFF" />
+                            </View>
+                        )}
+
+                        {error && messages.length === 0 && (
+                            <View style={styles.centeredContainer}>
+                                <Text style={styles.errorText}>{error}</Text>
+                            </View>
+                        )}
+
+                        {(!loading || messages.length > 0) && (
+                            <FlatList
+                                ref={flatListRef}
+                                data={messages}
+                                keyExtractor={(item, index) => `${item._id}-${index}`}
+                                renderItem={({ item }) => (
+                                    <MessageBubble
+                                        message={item}
+                                        userId={userId}
+                                        onShowActions={handleShowActions}
+                                        navigation={navigation}
+                                    />
+                                )}
+                                onScroll={handleOnScroll}
+                                scrollEventThrottle={1000}
+                                scrollEnabled={true}
+                                nestedScrollEnabled={true}
+                                style={styles.messageList}
+                                contentContainerStyle={{
+                                    paddingVertical: 10,
+                                    paddingHorizontal: 10,
+                                    flexGrow: 1,
+                                    justifyContent: 'flex-end'
+                                }}
+                                ListHeaderComponent={() => {
+                                    if (!loadingMore) return null;
+                                    return (
+                                        <View style={styles.loadingMoreContainer}>
+                                            <ActivityIndicator size="small" color="#007AFF" />
+                                        </View>
+                                    );
+                                }}
+                                maintainVisibleContentPosition={{
+                                    minIndexForVisible: 0,
+                                    autoscrollToTopThreshold: 50
+                                }}
+                                onContentSizeChange={() => {
+                                    if (!isFirstLoad.current && isAtBottom) {
+                                        flatListRef.current?.scrollToEnd({ animated: true });
+                                    }
+                                }}
+                            />
+                        )}
+
+                        {/* Input Area */}
+                        <View style={styles.inputAreaWrapper}>
+                            {replyingTo && (
+                                <ReplyBar message={replyingTo} onCancel={handleCancelReply} />
+                            )}  
+                            
+                            {(image || file) && (
+                                <View style={styles.attachmentPreviewContainer}>
+                                    <Text style={styles.attachmentText}>
+                                        {image ? `${image.length} ảnh` : ''}
+                                        {file ? `${file.length} tệp` : ''} đã chọn
+                                    </Text>
+                                    <TouchableOpacity onPress={() => { setImage(null); setFile(null); setImageName(null); setFileName(null); }} style={styles.cancelAttachmentButton}>
+                                        <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+                                    </TouchableOpacity>
                                 </View>
                             )}
 
-                            {/* Hiển thị lỗi ban đầu */}
-                            {error && messages.length === 0 && (
-                                    <View style={styles.centeredContainer}>
-                                    <Text style={styles.errorText}>{error}</Text>
-                                    {/* Có thể thêm nút Thử lại */}
-                                </View>
-                            )}
-
-                            {/* Chỉ hiển thị danh sách khi không loading ban đầu HOẶC đã có sẵn tin nhắn */}
-                            {(!loading || messages.length > 0) && (
-                                <FlatList
-                                    ref={flatListRef}
-                                    data={messages} // Mảng [cũ...mới]
-                                    keyExtractor={(item, index) => `${item._id}-${index}`}
-                                    renderItem={({ item }) => (
-                                        <MessageBubble
-                                            message={item}
-                                            userId={userId}
-                                            onShowActions={handleShowActions}
-                                            navigation={navigation}
-                                        />
-                                    )}
-                                    style={styles.messageList}
-                                    contentContainerStyle={styles.listContentContainer}
-                                    // 4. Component Loading ở trên ĐỈNH
-                                    ListHeaderComponent={renderHeader}
-                                    scrollEventThrottle={100} // Tăng tần suất check scroll
-                                    // 6. Tự động cuộn xuống đáy khi mới mở/gửi tin
-                                    onContentSizeChange={() => {
-                                        if (isAtBottom) {
-                                            flatListRef.current?.scrollToEnd({ animated: true });
-                                        }
-                                    }}
-                                    maintainVisibleContentPosition={{
-                                        minIndexForVisible: 0,
-                                        autoscrollToTopThreshold: 100 // Tùy chỉnh nếu cần
-                                    }}
+                            <View style={styles.inputContainer}>
+                                <TextInput
+                                    style={styles.textInput}
+                                    placeholder="Nhập tin nhắn..."
+                                    placeholderTextColor="#98A2B3"
+                                    value={newMessage}
+                                    onChangeText={setNewMessage}
+                                    multiline
                                 />
-                            )}
-                            {/* --- Input Container with Reply Bar --- */}
-                            <View style={styles.inputAreaWrapper}>
-                                {replyingTo && (
-                                    <ReplyBar message={replyingTo} onCancel={handleCancelReply} />
-                                )}  
-                                {/* Hiển thị preview file/ảnh đã chọn */}
-                                {(image || file) && (
-                                    <View style={styles.attachmentPreviewContainer}>
-                                        {/* TODO: Render danh sách ảnh/file nhỏ ở đây */}
-                                        <Text style={styles.attachmentText}>
-                                            {image ? `${image.length} ảnh` : ''}
-                                            {file ? `${file.length} tệp` : ''} đã chọn
-                                        </Text>
-                                        <TouchableOpacity onPress={() => { setImage(null); setFile(null); setImageName(null); setFileName(null); }} style={styles.cancelAttachmentButton}>
-                                            <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+                                {newMessage.trim().length > 0 || image != null ? (
+                                    <View style={styles.attachmentContainer}>
+                                        <TouchableOpacity style={styles.sendButton} onPress={() => handleSend()}>
+                                            <Ionicons name="paper-plane" size={22} color="#FFFFFF" />
+                                        </TouchableOpacity>
+                                        {(image != null || file != null) && (
+                                        <TouchableOpacity style={styles.closeButton} onPress={() => { setImage(null); setFile(null); setImageName(null); setFileName(null); }}>
+                                            <Ionicons name="close-circle" size={22} color="#FFFFFF" />
+                                        </TouchableOpacity>
+                                        )}
+                                    </View>
+                                )  : (
+                                    <View style={styles.actionButtonsContainer}>
+                                        <TouchableOpacity style={styles.actionButton}>
+                                            <Ionicons name="happy-outline" size={24} color="#667085" />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity style={styles.actionButton} onPress={pickMultipleImages}>
+                                            <Ionicons name="image-outline" size={24} color="#667085" />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity style={styles.actionButton} onPress={pickMultipleFiles}>
+                                            <Ionicons name="attach-outline" size={24} color="#667085" />
                                         </TouchableOpacity>
                                     </View>
                                 )}
-                                {/* Khu vực nhập liệu */}
-                                <View style={styles.inputContainer}>
-                                        <TextInput
-                                                style={styles.textInput}
-                                                placeholder="Nhập tin nhắn..."
-                                                placeholderTextColor="#98A2B3"
-                                                value={newMessage}
-                                                onChangeText={setNewMessage}
-                                                multiline
-                                        />
-                                        {newMessage.trim().length > 0 || image != null ? (
-                                            <View style={styles.attachmentContainer}>
-                                                <TouchableOpacity style={styles.sendButton} onPress={() => handleSend()}>
-                                                    <Ionicons name="paper-plane" size={22} color="#FFFFFF" />
-                                                </TouchableOpacity>
-                                                {(image != null || file != null) && (
-                                                <TouchableOpacity style={styles.closeButton} onPress={() => { setImage(null); setFile(null); setImageName(null); setFileName(null); }}>
-                                                    <Ionicons name="close-circle" size={22} color="#FFFFFF" />
-                                                </TouchableOpacity>
-                                                )}
-                                            </View>
-                                        )  : (
-                                            <View style={styles.actionButtonsContainer}>
-                                                <TouchableOpacity style={styles.actionButton}>
-                                                    <Ionicons name="happy-outline" size={24} color="#667085" />
-                                                </TouchableOpacity>
-                                                <TouchableOpacity style={styles.actionButton} onPress={pickMultipleImages}>
-                                                    <Ionicons name="image-outline" size={24} color="#667085" />
-                                                </TouchableOpacity>
-                                                    <TouchableOpacity style={styles.actionButton} onPress={pickMultipleFiles}>
-                                                        <Ionicons name="attach-outline" size={24} color="#667085" />
-                                                    </TouchableOpacity>
-                                                {/* Thêm các nút khác nếu cần */}
-                                            </View>
-                                        )}
-                                </View>
                             </View>
-                        </KeyboardAvoidingView>
-                        {/* --- Render Modal Hành Động --- */}
-                        <Modal
-                            animationType="fade"
-                            transparent={true}
-                            visible={modalVisible}
-                            onRequestClose={handleCloseModal}
-                        >
-                            <TouchableWithoutFeedback onPress={handleCloseModal}>
-                                <View style={styles.modalBackdrop} />
-                            </TouchableWithoutFeedback>
-                            <View style={styles.modalContent}>
-                                {modalActions.map((action, index) => (
-                                    <TouchableOpacity
-                                        key={index}
-                                        style={styles.modalActionButton}
-                                        onPress={() => { action.onPress(); handleCloseModal();  }}
-                                        activeOpacity={0.7}
-                                    >
-                                        <Ionicons name={action.icon} size={22} color={action.color || '#333'} style={styles.modalActionIcon} />
-                                        <Text style={[styles.modalActionText, { color: action.color || '#333' }]}>
-                                            {action.text}
-                                        </Text>
-                                    </TouchableOpacity>
-                                    ))}
+                        </View>
+                    </KeyboardAvoidingView>
+
+                    {/* Modal Hành Động */}
+                    <Modal
+                        animationType="fade"
+                        transparent={true}
+                        visible={modalVisible}
+                        onRequestClose={handleCloseModal}
+                    >
+                        <TouchableWithoutFeedback onPress={handleCloseModal}>
+                            <View style={styles.modalBackdrop} />
+                        </TouchableWithoutFeedback>
+                        <View style={styles.modalContent}>
+                            {modalActions.map((action, index) => (
+                                <TouchableOpacity
+                                    key={index}
+                                    style={styles.modalActionButton}
+                                    onPress={() => { action.onPress(); handleCloseModal();  }}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name={action.icon} size={22} color={action.color || '#333'} style={styles.modalActionIcon} />
+                                    <Text style={[styles.modalActionText, { color: action.color || '#333' }]}>
+                                        {action.text}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </Modal>
+
+                    {/* Modal Tin Nhắn Ghim */}
+                    <Modal
+                        animationType="slide"
+                        transparent={false}
+                        visible={pinnedModalVisible}
+                        onRequestClose={handleClosePinnedModal}
+                    >
+                        <SafeAreaView style={styles.pinnedModalContainer}>
+                            <View style={styles.pinnedModalHeader}>
+                                <TouchableOpacity onPress={handleClosePinnedModal} style={styles.pinnedCloseButton}>
+                                    <Ionicons name="close" size={28} color="#007AFF" />
+                                </TouchableOpacity>
+                                <Text style={styles.pinnedModalTitle}>Tin Nhắn Đã Ghim ({pinnedMessages.length})</Text>
+                                <View style={{ width: 40 }} />
                             </View>
-                        </Modal>
-                        {/* --- THÊM: Modal Danh Sách Tin Nhắn Ghim --- */}
-                        <Modal
-                            animationType="slide" // Hoặc "fade"
-                            transparent={false} // Không trong suốt để che nội dung bên dưới
-                            visible={pinnedModalVisible}
-                            onRequestClose={handleClosePinnedModal}
-                        >
-                            <SafeAreaView style={styles.pinnedModalContainer}>
-                                {/* Header của Modal Pinned */}
-                                <View style={styles.pinnedModalHeader}>
-                                    <TouchableOpacity onPress={handleClosePinnedModal} style={styles.pinnedCloseButton}>
-                                        <Ionicons name="close" size={28} color="#007AFF" />
-                                    </TouchableOpacity>
-                                    <Text style={styles.pinnedModalTitle}>Tin Nhắn Đã Ghim ({pinnedMessages.length})</Text>
-                                    <View style={{ width: 40 }} /> {/* Placeholder để căn giữa title */}
+
+                            {pinnedMessages.length > 0 ? (
+                                <FlatList
+                                    data={pinnedMessages}
+                                    renderItem={({ item }) => <PinnedMessageItem message={item} onCloseModal={handleClosePinnedModal} onGoToMessage={() => scrollToMessage(item._id)} handleUnpinMessage={handleUnpinMessage} />}
+                                    keyExtractor={(item,index) =>`${item._id}-${index}`}
+                                    contentContainerStyle={styles.pinnedListContent}
+                                />
+                            ) : (
+                                <View style={styles.centeredContainer}>
+                                    <Text style={styles.infoText}>Chưa có tin nhắn nào được ghim.</Text>
                                 </View>
-
-                                {/* Danh sách tin nhắn ghim */}
-                                {pinnedMessages.length > 0 ? (
-                                    <FlatList
-                                        data={pinnedMessages}
-                                        renderItem={({ item }) => <PinnedMessageItem message={item} onCloseModal={handleClosePinnedModal} onGoToMessage={() => scrollToMessage(item._id)} handleUnpinMessage={handleUnpinMessage} />}
-                                        keyExtractor={(item,index) =>`${item._id}-${index}`}
-                                        contentContainerStyle={styles.pinnedListContent}
-                                    />
-                                ) : (
-                                    <View style={styles.centeredContainer}>
-                                        <Text style={styles.infoText}>Chưa có tin nhắn nào được ghim.</Text>
-                                    </View>
-                                )}
-                            </SafeAreaView>
-                        </Modal>
-                    </>
-                )}
-
-            </SafeAreaView>
-        </SafeAreaProvider>
-    );
+                            )}
+                        </SafeAreaView>
+                    </Modal>
+                </>
+            )}
+        </SafeAreaView>
+    </SafeAreaProvider>
+);
 }
-
 const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
     container: { flex: 1, backgroundColor: '#F9FAFB' }, // Màu nền khu vực chat

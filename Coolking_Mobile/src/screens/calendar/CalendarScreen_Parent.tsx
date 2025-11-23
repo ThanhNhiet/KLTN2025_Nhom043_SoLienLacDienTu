@@ -173,6 +173,7 @@ export default function CalendarScreen() {
               renderItem={({ item }) => <EventCard item={item} />}
               ItemSeparatorComponent={() => <View style={styles.separator} />}
               showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 16,paddingBottom: 20, }}
             />
           )}
         </View>
@@ -183,8 +184,9 @@ export default function CalendarScreen() {
             </Text>
           </View>
         )}
-
+        <View style={styles.bottomWrapper}>
         <BottomNavigation navigation={navigation} />
+        </View>
       </SafeAreaView>
     </SafeAreaProvider>
   );
@@ -332,9 +334,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 6,
     elevation: 2,
-    width: "100%",
+    //width: "100%",
     marginHorizontal: 4,
-    alignSelf: "center",
+    //alignSelf: "center",
   },
   // Khoảng cách giữa các card
   listContent: {
@@ -377,4 +379,12 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontWeight: "800", color: "#0f172a", marginBottom: 4 },
   emptyDesc: { color: "#64748b" },
+  bottomWrapper: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    width: "100%",
+    backgroundColor: "#FFFFFF",
+  },
 });

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback,useMemo } from "react";
+import { useState, useEffect, useCallback,useMemo,useRef} from "react";
 import { getChatById } from "../../api/chat/ChatApi";
 import { 
     getAllMessages, 
@@ -180,74 +180,82 @@ export const useMessages = (chatId: string) => {
     }, [chatId, fetchChatInfo]);
 
     const fetchMessages = useCallback(async (chatID: string, requestedPage: number, pSize: number) => {
-        if (loadingMore || (requestedPage > 1 && !hasMore)) return;
+    if (loadingMore || (requestedPage > 1 && !hasMore)) return;
 
-        if (requestedPage === 1) setLoadingInitial(true);
-        else setLoadingMore(true);
-        setError(null);
+    if (requestedPage === 1) setLoadingInitial(true);
+    else setLoadingMore(true);
+    setError(null);
 
-        try {
-            const response: MessagesApiResponse = await getAllMessages(chatID, requestedPage, pSize);
-            if (!response || !Array.isArray(response.messages)) throw new Error("Invalid API response");
+    try {
+        const response: MessagesApiResponse = await getAllMessages(chatID, requestedPage, pSize);
+        if (!response || !Array.isArray(response.messages)) throw new Error("Invalid API response");
 
-            // Sắp xếp lô tin nhắn mới nhất -> cũ nhất (chronological: oldest first)
-            const sortedNewMessages = [...response.messages].sort((a, b) => // Tạo bản sao trước khi sort
-                parseCustomDate(a.createdAt).getTime() - parseCustomDate(b.createdAt).getTime()
-            );
-
-
-            setMessages((prevMessages) => {
-                let updatedMessages;
-                if (requestedPage === 1) {
-                    updatedMessages = sortedNewMessages;
-                } else {
-                    // guard: prevMessages may contain undefined elements, use optional chaining
-                    const existingIds = new Set(prevMessages.map(m => m?._id));
-                    const uniqueNewMessages = sortedNewMessages.filter(m => !existingIds.has(m._id));
-                    updatedMessages = [...uniqueNewMessages, ...prevMessages]; // Prepend older
-                }
-                return updatedMessages;
-            });
-            const { total, page, pageSize } = response;
-            let calculatedHasMore = (page * pageSize) < total;
-            if (!calculatedHasMore) {
-                setHasMore(false);
+        setMessages((prevMessages) => {
+            let updatedMessages;
+            if (requestedPage === 1) {
+                updatedMessages = response.messages;
             } else {
-                setHasMore(true);
+                const existingIds = new Set(prevMessages.map(m => m?._id));
+                const uniqueNewMessages = response.messages.filter(m => !existingIds.has(m._id));
+                updatedMessages = [...uniqueNewMessages, ...prevMessages];
             }
+            console.log(`Fetched ${response.messages.length} messages for page ${requestedPage}. Total messages now: ${updatedMessages.length}`);
+            return updatedMessages;
+        });
 
-        } catch (err) {
-            console.error("Error fetching messages:", err);
-            setError(err instanceof Error ? err.message : "Failed to fetch messages");
-        } finally {
-            setLoadingInitial(false);
-            setLoadingMore(false);
-        }
-    }, [loadingMore, hasMore]);
+        const { total, page: responsePage, pageSize: responsePageSize } = response;
+        const calculatedHasMore = (responsePage * responsePageSize) < total;
+        setHasMore(calculatedHasMore);
+        console.log(`Page ${requestedPage}: hasMore=${calculatedHasMore}, total=${total}`);
 
-    // Effect reset khi chatId thay đổi
-    useEffect(() => {
-        if (chatId) {
-            setMessages([]);
-            setPage(1);
-            setHasMore(true);
-            setError(null);
-            fetchMessages(chatId, 1, pageSize);
-        } else {
-            setMessages([]);
-            setPage(1);
-            setHasMore(false);
-        }
-    }, [chatId, pageSize]);
+    } catch (err) {
+        console.error("Error fetching messages:", err);
+        setError(err instanceof Error ? err.message : "Failed to fetch messages");
+    } finally {
+        setLoadingInitial(false);
+        setLoadingMore(false);
+    }
+}, []); // FIX: Remove dependencies to prevent re-creation
 
+const loadMoreMessages = useCallback(() => {
+    if (loadingMore || !hasMore) {
+        console.log("Load more skipped:", { loadingMore, hasMore });
+        return;
+    }
+    console.log("Setting page to:", page + 1);
+    setPage((prevPage) => prevPage + 1);
+}, [loadingMore, hasMore]);
 
-     // Effect fetch khi page thay đổi (cho phân trang)
-    useEffect(() => {
-        if (page > 1 && chatId) {
-            
-            fetchMessages(chatId, page, pageSize);
-        }
-    }, [page, chatId, fetchMessages, pageSize]); 
+// FIX: Track previous page to avoid double fetches
+const previousPageRef = useRef<number>(1);
+const fetchInProgressRef = useRef(false);
+
+useEffect(() => {
+    if (chatId) {
+        setMessages([]);
+        setPage(1);
+        setHasMore(true);
+        setError(null);
+        previousPageRef.current = 1;
+        fetchInProgressRef.current = false;
+        fetchMessages(chatId, 1, pageSize);
+    } 
+}, [chatId]);
+
+// FIX: Only fetch when page actually changes
+useEffect(() => {
+    if (page > 1 && page !== previousPageRef.current && chatId && !fetchInProgressRef.current) {
+        console.log(`Fetching page ${page}...`);
+        fetchInProgressRef.current = true;
+        fetchMessages(chatId, page, pageSize);
+        previousPageRef.current = page;
+        
+        // Reset flag after fetch completes
+        setTimeout(() => {
+            fetchInProgressRef.current = false;
+        }, 500);
+    }
+}, [page, chatId, pageSize, fetchMessages]);
 
     useEffect(() => {
         const fetchUserId = async () => {
@@ -399,20 +407,7 @@ export const useMessages = (chatId: string) => {
         useEffect(() => {
             setPinnedMessages(pinned);
         }, [pinned]);
-
-    const loadMoreMessages = useCallback(() => {
-        if (!loadingMore && hasMore) {
-            setPage((prevPage) => prevPage + 1);
-        } else {
-            console.log("Load more skipped:", {loadingMore, hasMore});
-        }
-    }, [loadingMore, hasMore]);
-
-
-
-    
-
-    
+ 
     // Hàm xử lý gửi tin nhắn văn bản
     const handleSendMessageText = async (chatID: string, content: string) => {
         if (content.trim() === '') return;

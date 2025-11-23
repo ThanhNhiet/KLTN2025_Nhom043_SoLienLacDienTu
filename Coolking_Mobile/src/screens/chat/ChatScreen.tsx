@@ -109,7 +109,7 @@ type ItemReplyInfo = {
 
 // --- Component ChatItem (không đổi logic, chỉ áp dụng style mới) ---
 const ChatItem = ({ item, onPress, userID }: ChatItemProps) => {
-    const isUnread = item.lastMessage && item.lastMessage.senderID !== userID && !item.unread;
+    const isUnread = item.lastMessage && item.lastMessage.senderID !== userID && item.unread;
 
     const formatTimeUTC = (dateString: string) => {
         // Tách chuỗi đầu vào thành các phần ngày và giờ
@@ -261,7 +261,8 @@ export default function ChatScreen() {
     }, [refetch]);
 
     const handlePressChat = async (chat: ChatItemType) => {
-        if (!chat.unread) {
+        if (chat.unread===true) {
+            console.log("Marking messages as read for chat:", chat._id);
             await markMessagesAsRead(chat._id);
         }
         navigation.navigate("MessageScreen", { chatId: chat._id });

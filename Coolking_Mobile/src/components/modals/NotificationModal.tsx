@@ -19,8 +19,8 @@ export type NotificationItem = {
   body?: string;
   targetScope: "all" | "person" | string; // thêm union để IDE rõ hơn
   isRead?: boolean;
-  createdAt: string | number | Date;
-  updatedAt?: string | number | Date;
+  createdAt: string;
+  updatedAt?: string;
 };
 
 interface Props {
@@ -37,11 +37,20 @@ interface Props {
 
 const formatTime = (input: string | number | Date) => {
   const d = new Date(input);
+
+  // Kiểm tra xem đối tượng Date có hợp lệ không. Nếu không, trả về chuỗi lỗi.
+  if (isNaN(d.getTime())) {
+    // Giá trị không hợp lệ
+    return "Thời gian không hợp lệ"; 
+  }
+
   const hh = String(d.getHours()).padStart(2, "0");
   const mm = String(d.getMinutes()).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
-  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const mo = String(d.getMonth() + 1).padStart(2, "0"); // Tháng bắt đầu từ 0
   const yyyy = d.getFullYear();
+
+  // Định dạng theo yêu cầu (HH:MM • DD/MM/YYYY)
   return `${hh}:${mm} • ${dd}/${mo}/${yyyy}`;
 };
 
@@ -118,6 +127,7 @@ const handlePressItem = useCallback(
   }, [onMarkAllRead]);
 
   const renderItem = ({ item }: { item: NotificationItem }) => {
+     
   const unread = !item.isRead;
   const isSystem = item.targetScope === "all" && item.receiverID == null;
 
@@ -166,7 +176,7 @@ const handlePressItem = useCallback(
             {item.body}
           </Text>
         )}
-        <Text style={styles.itemTime}>{formatTime(item.createdAt)}</Text>
+        <Text style={styles.itemTime}>Ngày tạo: {item.createdAt}</Text>
       </View>
 
       {/* NÚT XÓA MỚI THÊM VÀO */}
@@ -371,6 +381,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#667085',
     marginTop: 4,
+    fontWeight:'bold'
   },
   separator: { height: 8 },
   empty: { alignItems: "center", paddingVertical: 30 },

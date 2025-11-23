@@ -71,7 +71,7 @@ export const useChat = () => {
     },[page]);
     useEffect(() => {
         getfetchChats(page,10);
-    },[page,getfetchChats]);
+    },[getfetchChats]);
 
     const searchChats = useCallback(async (query: string) => {
         setLoading(true);
