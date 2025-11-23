@@ -22,5 +22,19 @@ async function deleteDeviceToken(req, res) {
   await UserMobileDevice.removeUserToken(String(userId), String(token));
   res.json({ ok: true });
 }
+async function logoutDeviceToken(req, res) {
+  try{
+   
+    const {userId, token } = req.body || {};
+    if (!token) {
+      return res.status(400).json({ ok: false, error: 'Missing token' });
+    }
+    await UserMobileDevice.logoutDevice({ userId: String(userId), deviceToken: String(token) });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('logout device error', err);
+    res.status(500).json({ ok: false });
+  }
+}
 
-module.exports = { registerDeviceToken, deleteDeviceToken };
+module.exports = { registerDeviceToken, deleteDeviceToken, logoutDeviceToken };

@@ -37,4 +37,6 @@ router.post('/upsert-token', UserMobileDeviceController.registerDeviceToken);
 // POST /user-mobile-devices/remove-token  (dùng POST để đảm bảo body được gửi reliably)
 router.post('/remove-token', UserMobileDeviceController.deleteDeviceToken);
 
+// POST /user-mobile-devices/logout-device
+router.post('/logout-device',  UserMobileDeviceController.logoutDeviceToken);
 module.exports = router;
