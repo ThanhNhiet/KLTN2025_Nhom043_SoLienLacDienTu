@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import type { StudentWithScore, courseSectionWithStudents } from '../../../hooks/useStudent';
 import { useAlert } from '../../../hooks/useAlert';
-import { useStaff, type Staff } from '../../../hooks/useStaff';
 
 interface SendWarningModalProps {
   isOpen: boolean;
@@ -9,18 +8,18 @@ interface SendWarningModalProps {
   onSuccess: () => void;
   student: StudentWithScore;
   courseSectionData: courseSectionWithStudents;
+  studentInfo: any; // Thông tin chi tiết sinh viên bao gồm phụ huynh
 }
-
-const DEPARTMENT_PDT_QLHV = 'pdt-qlhv';
 
 const SendWarningModal: React.FC<SendWarningModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
   student,
-  courseSectionData
+  courseSectionData,
+  studentInfo
 }) => {
-  const defaultTitle = `Yêu cầu Cảnh báo học vụ - Sinh viên ${student.student_id} - LHP: ${courseSectionData.course_section_id} - Môn: ${courseSectionData.subjectName}`;
+  const defaultTitle = `Nhắc nhở học tập - Sinh viên ${student.student_id} - LHP: ${courseSectionData.course_section_id} - Môn: ${courseSectionData.subjectName}`;
   const defaultContent = `Thông báo đến sinh viên ${student.name} (MSSV: ${student.student_id}) và Quý Phụ huynh.
 
 Trong môn học ${courseSectionData.subjectName} (mã lớp học phần: ${courseSectionData.course_section_id}), thuộc lớp ${courseSectionData.className}, học kỳ ${courseSectionData.sessionName}, tôi nhận thấy rằng:
@@ -35,8 +34,6 @@ Trân trọng.`;
 
   const [title, setTitle] = useState(defaultTitle);
   const [content, setContent] = useState(defaultContent);
-  const [selectedAdmin, setSelectedAdmin] = useState<string>('');
-  const { staffs, loading: staffsLoading, getStaffsAdminByDepartment } = useStaff(); // staffsLoading is now the correct loading state for this operation
 
   const [toast, setToast] = useState<{
     show: boolean;
@@ -49,14 +46,6 @@ Trân trọng.`;
   });
   const { loading, sendAlertPersonal } = useAlert();
 
-  useEffect(() => {
-    if (isOpen) {
-      // Reset state before fetching
-      setSelectedAdmin('');
-      void getStaffsAdminByDepartment(DEPARTMENT_PDT_QLHV);
-    }
-  }, [isOpen, getStaffsAdminByDepartment]);
-
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ show: true, message, type });
     setTimeout(() => {
@@ -66,15 +55,38 @@ Trân trọng.`;
 
   const handleSend = async () => {
     try {
-      const receiverIDs = [selectedAdmin];
+      if (!studentInfo) {
+        showToast('Không có thông tin sinh viên', 'error');
+        return;
+      }
+      console.log('Student Info:', studentInfo);
+
+      // Tạo danh sách người nhận: sinh viên + phụ huynh
+      const receiverIDs: string[] = [];
+
+      // Thêm sinh viên
+      if (student.student_id) {
+        receiverIDs.push(student.student_id);
+      }
+
+      // Thêm phụ huynh từ studentInfo (single parent object)
+      if (studentInfo.parent && studentInfo.parent.parent_id) {
+        receiverIDs.push(studentInfo.parent.parent_id);
+      }
+
+      if (receiverIDs.length === 0) {
+        showToast('Không tìm thấy người nhận hợp lệ', 'error');
+        return;
+      }
+
       const response = await sendAlertPersonal(title, content, receiverIDs);
       if (response.success) {
         showToast('Gửi yêu cầu cảnh báo thành công!', 'success');
-        // setTimeout(() => {
-        //   onClose();
-        // }, 1500);
-        onClose();
-        onSuccess();
+        // Delay closing modal to show success toast
+        setTimeout(() => {
+          onClose();
+          onSuccess();
+        }, 500); // Wait 1 second before closing
       } else {
         showToast(response.error || 'Có lỗi xảy ra khi gửi yêu cầu', 'error');
       }
@@ -90,8 +102,8 @@ Trân trọng.`;
       {/* Toast Notification */}
       {toast.show && (
         <div className={`fixed top-4 right-4 z-[60] p-4 rounded-lg shadow-lg transform transition-all duration-300 ${toast.type === 'success'
-            ? 'bg-green-500 text-white'
-            : 'bg-red-500 text-white'
+          ? 'bg-green-500 text-white'
+          : 'bg-red-500 text-white'
           }`}>
           <div className="flex items-center">
             {toast.type === 'success' ? (
@@ -133,31 +145,32 @@ Trân trọng.`;
                 <div><span className="font-medium">Họ tên:</span> {student.name}</div>
                 <div><span className="font-medium">MSSV:</span> {student.student_id}</div>
                 <div><span className="font-medium">Ngày sinh:</span> {student.dob}</div>
-                <div><span className="font-medium">Đánh giá:</span> {student.initial_evaluate}</div>
+                <div><span className="font-medium">Đánh giá:</span> {student.initial_evaluate === "Not passed" ? "Cần nhắc nhở" : "Bình thường"}</div>
               </div>
             </div>
 
-            {/* Admin Selection */}
+            {/* Receivers Info */}
             <div className="mb-6">
-              <label htmlFor="admin-select" className="block text-sm font-medium text-gray-700 mb-2">
-                Gửi đến <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Người nhận
               </label>
-              <select
-                id="admin-select"
-                value={selectedAdmin}
-                onChange={(e) => setSelectedAdmin(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                disabled={loading || staffsLoading}
-              >
-                <option value="" disabled>
-                  {staffsLoading ? 'Đang tải danh sách...' : '-- Chọn quản trị viên --'}
-                </option>
-                {!staffsLoading && staffs.map((admin: Staff) => (
-                  <option key={admin.admin_id} value={admin.admin_id}>
-                    {admin.name} ({admin.admin_id})
-                  </option>
-                ))}
-              </select>
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="space-y-2">
+                  <div className="text-sm">
+                    <span className="font-medium text-gray-700">Sinh viên:</span> {student.name} ({student.student_id})
+                  </div>
+                  {studentInfo?.parent && (
+                    <div className="text-sm">
+                      <span className="font-medium text-gray-700">Phụ huynh:</span> {studentInfo.parent.name || 'N/A'} ({studentInfo.parent.parent_id || 'N/A'})
+                    </div>
+                  )}
+                  {!studentInfo?.parent && (
+                    <div className="text-sm text-gray-500">
+                      Không có thông tin phụ huynh
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
 
@@ -196,17 +209,18 @@ Trân trọng.`;
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end space-x-4 p-6 border-t bg-gray-50">
+          <div className="flex justify-end space-x-4 p-2 border-t bg-gray-50">
             <button
               onClick={onClose}
               disabled={loading}
-              className="px-4 py-2 text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-50"
+              // Bạn cũng nên thêm 'flex items-center justify-center' vào nút Hủy để chữ nằm giữa nút chuẩn hơn
+              className="px-4 py-2 text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center"
             >
               Hủy
             </button>
             <button
               onClick={handleSend}
-              disabled={loading || !title.trim() || !content.trim() || !selectedAdmin}
+              disabled={loading || !title.trim() || !content.trim()}
               className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
             >
               {loading && (
@@ -215,7 +229,7 @@ Trân trọng.`;
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
               )}
-              {loading ? 'Đang gửi...' : 'Gửi yêu cầu'}
+              {loading ? 'Đang gửi...' : 'Gửi'}
             </button>
           </div>
         </div>

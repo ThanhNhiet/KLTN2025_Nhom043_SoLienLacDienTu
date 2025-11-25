@@ -18,7 +18,7 @@ export interface StudentWithScore {
     dob: string;
     score: Score;
     initial_evaluate: string;
-    isWarningYet?: boolean;
+    isRemindYet?: boolean;
 }
 
 export interface Score {

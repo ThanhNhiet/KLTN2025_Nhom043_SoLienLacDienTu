@@ -20,8 +20,9 @@ const StudentListWithScorePage: React.FC = () => {
     }
   }, [course_section_id, fetchStudentsByCourseSection]);
 
-  const handleSendWarning = (student: StudentWithScore) => {
+  const handleSendWarning = async (student: StudentWithScore) => {
     setSelectedStudent(student);
+    await fetchStudentInfo(student.student_id);
     setShowWarningModal(true);
   };
 
@@ -33,9 +34,9 @@ const StudentListWithScorePage: React.FC = () => {
     }
   };
 
-  const handleStudentClick = (student: StudentWithScore) => {
+  const handleStudentClick = async (student: StudentWithScore) => {
     setSelectedStudent(student);
-    fetchStudentInfo(student.student_id);
+    await fetchStudentInfo(student.student_id);
     setShowStudentInfoModal(true);
   };
 
@@ -47,7 +48,7 @@ const StudentListWithScorePage: React.FC = () => {
     if (evaluate === 'danger' || evaluate === 'Not passed') {
       return (
         <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
-          Cần cảnh báo
+          Cần nhắc nhở
         </span>
       );
     } else {
@@ -231,14 +232,14 @@ const StudentListWithScorePage: React.FC = () => {
                             e.stopPropagation();
                             handleSendWarning(student);
                           }}
-                          disabled={student.initial_evaluate === 'ok' || student.isWarningYet === true}
+                          disabled={student.initial_evaluate === 'ok' || student.isRemindYet === true}
                           className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                            student.initial_evaluate !== 'ok' && !student.isWarningYet
+                            student.initial_evaluate !== 'ok' && !student.isRemindYet
                               ? 'bg-orange-600 hover:bg-orange-700 text-white'
                               : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                           }`}
                         >
-                          {student.isWarningYet ? 'Đã yêu cầu' : 'Gửi yêu cầu cảnh báo'}
+                          {student.isRemindYet ? 'Đã nhắc nhở' : 'Gửi nhắc nhở'}
                         </button>
                       </td>
                     </tr>
@@ -263,6 +264,7 @@ const StudentListWithScorePage: React.FC = () => {
           onSuccess={handleSendSuccess}
           student={selectedStudent}
           courseSectionData={courseSectionData}
+          studentInfo={studentInfo}
         />
       )}
 
