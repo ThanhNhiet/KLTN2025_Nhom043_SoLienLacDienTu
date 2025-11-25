@@ -1,102 +1,5 @@
-// const { Server } = require('socket.io');
-// const { getAllChatIdsForUser } = require('../repositories/chat.repo');
-// const { sendChatPush } = require('../services/pushService');
-
-// let io;
-// // Map<userId, Set<socket.id>>
-// const userSockets = new Map();
-
-// const initSocket = (httpServer) => {
-//     io = new Server(httpServer, {
-//         cors: {
-//             origin: process.env.CLIENT_ORIGIN || '*',
-//             methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-//             credentials: true,
-//         },
-//     });
-
-//     io.on('connection', (socket) => {
-//         console.log(`Client connected: ${socket.id}`);
-
-//         // User phải tham gia vào các phòng chat mà họ thuộc về
-//         socket.on('join_chat', (chat_id) => {
-//             socket.join(chat_id);
-//             console.log(`Socket ${socket.id} joined chat room: ${chat_id}`);
-//         });
-
-//         // Chỉ gửi tin nhắn tới những người trong phòng chat cụ thể
-//         socket.on('send_message', ({ chat_id, newMessage }) => {
-//             io.to(chat_id).emit('receive_message', { chat_id, newMessage });
-//         });
-
-//         socket.on('pin_message', ({ chat_id, pinnedMessage }) => {
-//             io.to(chat_id).emit('receive_pin_message', { chat_id, pinnedMessage });
-//         });
-
-//         socket.on('unpin_message', ({ chat_id, unpinnedMessage_id }) => {
-//             io.to(chat_id).emit('receive_unpin_message', { chat_id, unpinnedMessage_id });
-//         });
-
-//         socket.on('del_message', ({ chat_id, message_id }) => {
-//             io.to(chat_id).emit('render_message', { chat_id, message_id });
-//         });
-
-//         // Logic register để xử lý nhiều tab/thiết bị
-//         socket.on('register', async (user_id) => {
-//             // Gắn user_id vào socket để dễ truy xuất khi disconnect
-//             socket.user_id = user_id;
-
-//             if (!userSockets.has(user_id)) {
-//                 userSockets.set(user_id, new Set());
-//             }
-//             userSockets.get(user_id).add(socket.id);
-
-//             console.log(`📝 User ${user_id} registered with socket ${socket.id}`);
-//             console.log('Online users map:', userSockets);
-
-//             const userChatIds = await getAllChatIdsForUser(user_id);
-//             userChatIds.forEach(chatId => {
-//                 socket.join(chatId);
-//                 console.log(`Socket ${socket.id} tự động tham gia phòng ${chatId}`);
-//             });
-//         });
-
-//         // logic unregister khi ngắt kết nối
-//         socket.on('disconnect', () => {
-//             if (socket.user_id && userSockets.has(socket.user_id)) {
-//                 const userSocketSet = userSockets.get(socket.user_id);
-//                 userSocketSet.delete(socket.id);
-
-//                 // Nếu user không còn kết nối nào, xóa họ khỏi map
-//                 if (userSocketSet.size === 0) {
-//                     userSockets.delete(socket.user_id);
-//                 }
-//                 console.log(`User ${socket.user_id}'s socket ${socket.id} disconnected.`);
-//             } else {
-//                 console.log(`Client disconnected: ${socket.id}`);
-//             }
-//         });
-//     });
-
-//     console.log(`Socket.IO is running...`);
-// };
-
-// // Tạo một hàm để gửi sự kiện từ bên ngoài (ví dụ từ một API route)
-// const getIO = () => {
-//     if (!io) {
-//         throw new Error("Socket.IO not initialized!");
-//     }
-//     return io;
-// };
-
-// module.exports = {
-//     initSocket,
-//     getIO,
-//     userSockets // Tùy chọn: export map user để kiểm tra online
-// };
-
 const { Server } = require('socket.io');
-const { getAllChatIdsForUser, getMemberUserIdsByChat } = require('../repositories/chat.repo');
+const { getAllChatIdsForUser, getChatMembersWithMutedStatus } = require('../repositories/chat.repo');
 const { sendChatPush } = require('../services/pushService');
 
 let io;
@@ -155,45 +58,68 @@ const initSocket = (httpServer) => {
     // Gửi tin nhắn: broadcast + LUÔN push cho các member (trừ người gửi)
     socket.on('send_message', async ({ chat_id, newMessage }) => {
       const roomId = String(chat_id);
-      io.to(roomId).emit('receive_message', { chat_id: roomId, newMessage });
 
-      try {
-        // Lấy members & xác định sender
-        const {
-                userIds,
-                chatName
-            } = await getMemberUserIdsByChat(roomId);
-        const senderId =
-          String(
-            newMessage?.senderInfo?.userID ||
-            newMessage?.sender_info?.userID ||
-            newMessage?.senderId ||
-            newMessage?.sender_id ||
-            ''
-          );
+      // BƯỚC 1: Lấy danh sách thành viên và trạng thái Muted từ DB
+      const chatData = await getChatMembersWithMutedStatus(roomId);
 
-        for (const uid of userIds) {
-          const userId = String(uid);
-          if (userId === senderId) continue;
+      if (!chatData) {
+        console.error(`Chat ${roomId} not found`);
+        return;
+      }
 
-          // LUÔN đẩy push (kể cả offline / app đóng)
+      const { memberMutedMap, chatName } = chatData;
+
+      // Xác định senderId để loại trừ khi push notification
+      const senderId = String(
+        newMessage?.senderInfo?.userID ||
+        newMessage?.sender_info?.userID ||
+        newMessage?.senderId ||
+        newMessage?.sender_id ||
+        ''
+      );
+
+      // BƯỚC 2: Duyệt qua từng thành viên trong nhóm chat
+      for (const [uid, isMuted] of memberMutedMap.entries()) {
+        const userId = String(uid);
+
+        // A. GỬI SOCKET (Real-time)
+        // Kiểm tra xem user này có đang online không
+        if (userSockets.has(userId)) {
+          const socketIds = userSockets.get(userId);
+
+          // Tạo message riêng cho user này
+          newMessage.isMuted = isMuted; // Gắn trạng thái mute vào message
+          const customizedMessage = {
+            chat_id: roomId,
+            newMessage
+          };
+
+          // Gửi cho tất cả socket của user đó
+          socketIds.forEach(sid => {
+            io.to(sid).emit('receive_message', customizedMessage);
+          });
+        }
+
+        // B. GỬI PUSH NOTIFICATION
+        if (userId !== senderId) {
           if (!shouldThrottlePush(userId, roomId)) {
-            // Không chặn vòng lặp nếu FCM chậm
             let body =
               newMessage?.type === 'text' ? newMessage.content
-              : newMessage?.type === 'image' ? '📷 Hình ảnh'
-              : newMessage?.type === 'file' ? '📄 Tệp đính kèm'
-              : String(newMessage.content ?? '');
-            sendChatPush(userId, {
-              chatId: roomId,
-              senderName: newMessage?.senderInfo?.name || 'Tin nhắn mới',
-              text: body,
-              chatName: chatName
-            }).catch((e) => console.error('sendChatPush error:', e));
+                : newMessage?.type === 'image' ? '📷 Hình ảnh'
+                  : newMessage?.type === 'file' ? '📄 Tệp đính kèm'
+                    : String(newMessage.content ?? '');
+
+            // Nếu user đang mute thì không gửi push
+            if (!isMuted) {
+              sendChatPush(userId, {
+                chatId: roomId,
+                senderName: newMessage?.senderInfo?.name || 'Tin nhắn mới',
+                text: body,
+                chatName: chatName
+              }).catch((e) => console.error('sendChatPush error:', e));
+            }
           }
         }
-      } catch (err) {
-        console.error('send_message push error:', err);
       }
     });
 
@@ -218,10 +144,10 @@ const initSocket = (httpServer) => {
 
       console.log(`📝 User ${socket.user_id} registered with socket ${socket.id}`);
 
-      const userChatIds = await getAllChatIdsForUser(socket.user_id);
-      userChatIds.forEach((chatId) => {
-        socket.join(String(chatId));
-        console.log(`Socket ${socket.id} auto-joined room ${chatId}`);
+      const userChats = await getAllChatIdsForUser(socket.user_id);
+      userChats.forEach((chat) => {
+        socket.join(String(chat._id));
+        console.log(`Socket ${socket.id} auto-joined room ${chat._id}`);
       });
     });
 

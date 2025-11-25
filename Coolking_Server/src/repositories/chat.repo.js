@@ -633,8 +633,17 @@ const getUserChats = async (userID, roleAccount, page = 1, pageSize = 10) => {
  */
 const getAllChatIdsForUser = async (userID) => {
     try {
-        const chats = await Chat.find({ 'members.userID': userID }).select('_id').lean();
-        return chats.map(chat => chat._id.toString());
+        // Sử dụng projection members.$ để chỉ lấy subdocument của user đó
+        const chats = await Chat.find(
+            { 'members.userID': userID },
+            { _id: 1, 'members.$': 1 }
+        ).lean();
+
+        return chats.map(chat => ({
+            _id: chat._id.toString(),
+            // Lấy trạng thái muted từ phần tử member đầu tiên (và duy nhất do query)
+            muted: chat.members[0]?.muted || false
+        }));
     } catch (error) {
         console.error('Error getting chat IDs for user:', error);
         throw new Error(`Failed to get chat IDs for user: ${error.message}`);
@@ -663,6 +672,27 @@ const getMemberUserIdsByChat = async (chatId) => {
         throw new Error(`Failed to get member user IDs by chat: ${error.message}`);
     }
 }
+const getChatMembersWithMutedStatus = async (chatId) => {
+    try {
+        const chat = await Chat.findById(chatId).select('members type name').lean();
+        if (!chat) return null;
+
+        // Trả về danh sách user ID và trạng thái muted tương ứng
+        // Map: userID -> muted (boolean)
+        const memberMutedMap = new Map();
+        chat.members.forEach(m => {
+            memberMutedMap.set(m.userID, m.muted);
+        });
+
+        return {
+            chatName: chat.name,
+            memberMutedMap // Map<String, Boolean>
+        };
+    } catch (error) {
+        console.error('Error getting chat members:', error);
+        return null;
+    }
+};
 
 /**
  * Tìm kiếm chats theo từ khóa
@@ -1287,7 +1317,7 @@ const getNonChatCourseSections = async (faculty_id = "CNTT", page = 1, pageSize 
                         attributes: ['name']
                     }
                 ],
-                required: true 
+                required: true
             },
             {
                 model: models.Clazz,
@@ -1322,7 +1352,7 @@ const getNonChatCourseSections = async (faculty_id = "CNTT", page = 1, pageSize 
             }
         ];
 
-        
+
         const rows = await models.CourseSection.findAll({
             where: whereCondition,
             include: includeCondition,
@@ -1334,7 +1364,7 @@ const getNonChatCourseSections = async (faculty_id = "CNTT", page = 1, pageSize 
         rows.forEach(cs => {
             const lecturer = cs.lecturers_course_sections?.[0]?.lecturer;
             const baseRecord = {
-                subjectName: cs.subject.name, 
+                subjectName: cs.subject.name,
                 className: cs.clazz?.name || 'N/A',
                 course_section_id: cs.id,
                 facultyName: cs.subject.faculty.name,
@@ -1510,7 +1540,7 @@ const searchNonChatCourseSections = async (faculty_id = "CNTT", keyword, page = 
             attributes: ['id', 'createdAt', 'updatedAt'],
             order: [['updatedAt', 'DESC']]
         });
-       
+
         // LÀM PHẲNG KẾT QUẢ THEO SCHEDULE
         const allFlattenedRecords = [];
         rows.forEach(cs => {
@@ -1551,7 +1581,7 @@ const searchNonChatCourseSections = async (faculty_id = "CNTT", keyword, page = 
         });
 
         // Tổng số record BÂY GIỜ mới là tổng của mảng đã làm phẳng
-        const total = allFlattenedRecords.length; 
+        const total = allFlattenedRecords.length;
         if (total === 0) {
             return {
                 total: 0, page: page_num, pageSize: pageSize_num, totalPages: 0,
@@ -1674,7 +1704,7 @@ const createBulkGroupChats = async (admin_id, courseSections, sessionInfo) => {
             success: true, createdChats: [], failedChats: [],
             totalProcessed: courseSections.length
         };
-        
+
         // Lấy danh sách tất cả ID cần xử lý
         const allCourseSectionIds = courseSections.map(cs => cs.course_section_id);
 
@@ -1769,7 +1799,7 @@ const createBulkGroupChats = async (admin_id, courseSections, sessionInfo) => {
                 };
 
                 chatsToInsert.push(chatData);
-                
+
                 // Ghi nhận thành công (tạm thời)
                 results.createdChats.push({
                     course_section_id: courseSection.course_section_id,
@@ -1792,7 +1822,7 @@ const createBulkGroupChats = async (admin_id, courseSections, sessionInfo) => {
         // 5. Insert TẤT CẢ vào MongoDB
         if (chatsToInsert.length > 0) {
             try {
-                await Chat.insertMany(chatsToInsert, { ordered: false }); 
+                await Chat.insertMany(chatsToInsert, { ordered: false });
                 // ordered: false nghĩa là nếu 1 cái lỗi, nó vẫn insert những cái còn lại
             } catch (mongoError) {
                 console.error('Mongo insertMany error:', mongoError);
@@ -2379,5 +2409,6 @@ module.exports = {
     deleteMemberFromGroupChat4Admin,
 
     getAllChatIdsForUser, //not served api
-    getMemberUserIdsByChat //not served api
+    getMemberUserIdsByChat, //not served api
+    getChatMembersWithMutedStatus //not served api
 };
