@@ -336,21 +336,21 @@ const getStudentInfoById4Lecturer = async (student_id) => {
         const genderStudent = (student.gender === true || student.gender === '1' || student.gender === 1) ? "Nam" : "Nữ";
 
         // Normalize parent(s) to array regardless of alias ('parent' or 'parents')
-        const parentsField = student.parent || student.parents || null;
-        const parentsArr = parentsField ? (Array.isArray(parentsField) ? parentsField : [parentsField]) : [];
+        // const parentsField = student.parent || student.parents || null;
+        // const parentsArr = parentsField ? (Array.isArray(parentsField) ? parentsField : [parentsField]) : [];
 
-        const parentInforList = parentsArr.map(parent => {
-            const genderParent = (parent.gender === true || parent.gender === '1' || parent.gender === 1) ? "Nam" : "Nữ";
-            return {
-                parent_id: parent.parent_id,
-                name: parent.name,
-                dob: parent.dob ? datetimeFormatter.formatDateVN(parent.dob) : null,
-                gender: genderParent,
-                phone: parent.phone,
-                email: parent.email,
-                address: parent.address
-            };
-        });
+        // const parentInforList = parentsArr.map(parent => {
+        //     const genderParent = (parent.gender === true || parent.gender === '1' || parent.gender === 1) ? "Nam" : "Nữ";
+        //     return {
+        //         parent_id: parent.parent_id,
+        //         name: parent.name,
+        //         dob: parent.dob ? datetimeFormatter.formatDateVN(parent.dob) : null,
+        //         gender: genderParent,
+        //         phone: parent.phone,
+        //         email: parent.email,
+        //         address: parent.address
+        //     };
+        // });
 
         return {
             student_id: student.student_id,
@@ -364,7 +364,7 @@ const getStudentInfoById4Lecturer = async (student_id) => {
             className: student.clazz ? student.clazz.name : null,
             facultyName: student.clazz && student.clazz.faculty ? student.clazz.faculty.name : null,
             majorName: student.major ? student.major.name : null,
-            parents: parentInforList
+            parent: student.parent
         };
     } catch (error) {
         console.error("Error in getStudentInfoById4Lecturer:", error);
