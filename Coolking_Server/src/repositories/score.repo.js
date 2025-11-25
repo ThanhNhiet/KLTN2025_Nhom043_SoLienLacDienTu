@@ -3,6 +3,37 @@ const sequelize = require("../config/mariadb.conf");
 const initModels = require("../databases/mariadb/model/init-models");
 const models = initModels(sequelize);
 
+const convertToGrade4 = (score10) => {
+    if (score10 === null || score10 === undefined) return 0;
+    if (score10 >= 9.0) return 4.0;
+    if (score10 >= 8.5) return 3.7; 
+    if (score10 >= 8.0) return 3.5; 
+    if (score10 >= 7.0) return 3.0; 
+    if (score10 >= 6.0) return 2.5; 
+    if (score10 >= 5.5) return 2.0; 
+    if (score10 >= 5.0) return 1.5; 
+    if (score10 >= 4.0) return 1.0; 
+    return 0; 
+};
+
+const calculateGPA = (scoresList, type = '4') => {
+    if (!scoresList || scoresList.length === 0) return 0.00;
+    let totalScoreCredits = 0;
+    let totalCredits = 0;
+    for (const item of scoresList) {
+        if (item.avr !== null && item.avr !== undefined) {
+            const credits = (item.theo_credit || 0) + (item.pra_credit || 0);
+            if (credits > 0) {
+                let scoreToCalc = (type === '10') ? parseFloat(item.avr) : convertToGrade4(parseFloat(item.avr));
+                totalScoreCredits += scoreToCalc * credits;
+                totalCredits += credits;
+            }
+        }
+    }
+    if (totalCredits === 0) return 0.00;
+    return parseFloat((totalScoreCredits / totalCredits).toFixed(2));
+};
+
 // Thêm helper này phía trên hoặc ngoài hàm
 function safeParseJSON(value) {
   if (value == null) return null;
@@ -235,5 +266,6 @@ const  getScoreParentStudentBySession = async (ParentId, studentID) =>{
 
 module.exports = {
     getScoreStudentBySession,
-    getScoreParentStudentBySession
+    getScoreParentStudentBySession,
+    calculateGPA
 };

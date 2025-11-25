@@ -459,6 +459,9 @@ const deleteAlert4Receiver = async (alertID, receiverID) => {
         if (!alert) {
             throw new Error('Không tìm thấy thông báo');
         }
+        if (alert.header && alert.header.startsWith('Cảnh báo học vụ')) {
+            throw new Error('Không thể xóa thông báo cảnh báo học vụ. Vui lòng liên hệ admin để biết thêm chi tiết.');
+        }
 
         // Xóa thông báo
         await Alert.deleteOne({
@@ -807,21 +810,21 @@ const isWarningYet4Alert = async (header) => {
 
 /**
  * Kiểm tra xem sinh viên đã nhận được cảnh báo cho một lớp học phần cụ thể chưa
- * @param {string} course_section_id 
+ * @param {string} session_name
  * @param {string} student_id 
  * @returns {Promise<boolean>}
  */
-const isWarningYet4Student = async (course_section_id, student_id) => {
+const isWarningYet4Student = async (session_name, student_id) => {
     try {
-        if (!course_section_id || !student_id) {
+        if (!session_name || !student_id) {
             return false;
         }
 
-        // Tìm kiếm alert có header chứa "Cảnh báo", course_section_id và student_id
+        // Tìm kiếm alert có header chứa "Cảnh báo", session_name và student_id
         const existingAlert = await Alert.findOne({
             $and: [
-                { header: { $regex: '^Cảnh báo', $options: 'i' } },
-                { header: { $regex: course_section_id, $options: 'i' } },
+                { header: { $regex: '^Cảnh báo học vụ', $options: 'i' } },
+                { header: { $regex: session_name, $options: 'i' } },
                 { header: { $regex: student_id, $options: 'i' } }
             ]
         });

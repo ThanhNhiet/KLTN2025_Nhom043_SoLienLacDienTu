@@ -9,6 +9,7 @@ const { Chat, ChatType, MemberRole } = require('../databases/mongodb/schemas/Cha
 const mongoose = require('mongoose');
 const alertRepo = require("./alert.repo");
 const { where } = require("../databases/mongodb/schemas/Alert");
+const { calculateGPA } = require("./score.repo");
 
 /**
  *  Lấy danh sách sinh viên + điểm số bằng course_section_id - dùng cho giảng viên
@@ -924,156 +925,201 @@ const getStudentExamSchedule = async (student_id, options = {}) => {
 /**
  * Lấy danh sách phân trang sinh viên có điểm không đạt theo session_id và faculty_id
  * @param {string} session_id - ID của session (học kỳ)
+ * @param {string} session_name - Tên của học kỳ (VD: HK1 2024-2025)
  * @param {string} faculty_id - ID của khoa
  * @param {number} page - Trang hiện tại
  * @param {number} pageSize - Số lượng bản ghi trên một trang
  * @returns {Object} { total, page, pageSize, students, linkPrev, linkNext, pages }
  */
-const getFailedStudentsBySessionAndFaculty = async (session_id, faculty_id, option = 'all', page, pageSize = 10) => {
+const getFailedStudentsBySessionAndFaculty = async (session_id, session_name, faculty_id, option = 'all', page, pageSize = 10) => {
     try {
-        // Validate input
-        if (!session_id || !faculty_id) {
-            throw new Error('session_id and faculty_id are required');
+        if (!session_id || !session_name || !faculty_id) {
+            throw new Error('session_id, session_name and faculty_id are required');
         }
 
         const page_num = parseInt(page) || 1;
         const pageSize_num = parseInt(pageSize) || 10;
-        const offset = (page_num - 1) * pageSize_num;
 
-        // Tìm tất cả course_sections theo session_id và faculty_id
-        const courseSections = await models.CourseSection.findAll({
-            where: {
-                session_id: session_id
-            },
+        // BƯỚC 1: Lấy danh sách Student ID
+        const targetStudents = await models.Student.findAll({
+            attributes: ['student_id', 'name', 'parent_id', 'clazz_id'],
             include: [
                 {
-                    model: models.Subject,
-                    as: 'subject',
-                    where: {
-                        faculty_id: faculty_id
-                    },
-                    attributes: ['subject_id', 'name']
+                    model: models.Score,
+                    as: 'scores',
+                    attributes: [],
+                    required: true,
+                    include: [{
+                        model: models.CourseSection,
+                        as: 'course_section',
+                        attributes: [],
+                        where: { session_id: session_id },
+                        include: [{
+                            model: models.Subject,
+                            as: 'subject',
+                            attributes: [],
+                            where: { faculty_id: faculty_id }
+                        }]
+                    }]
                 }
             ],
-            attributes: ['id']
+            raw: true
         });
 
-        if (courseSections.length === 0) {
-            return {
-                total: 0,
-                page: page_num,
-                pageSize: pageSize_num,
-                students: [],
-                linkPrev: null,
-                linkNext: null,
-                pages: []
-            };
+        // Lấy danh sách ID duy nhất
+        const distinctStudentIds = [...new Set(targetStudents.map(s => s.student_id))];
+
+        if (distinctStudentIds.length === 0) {
+            return { total: 0, page: page_num, pageSize: pageSize_num, students: [], linkPrev: null, linkNext: null, pages: [] };
         }
 
-        const courseSectionIds = courseSections.map(cs => cs.id);
-        let failedStudents = [];
-
-        // Lấy tất cả điểm của các course section này
-        const scores = await models.Score.findAll({
+        // BƯỚC 2: Lấy TOÀN BỘ lịch sử điểm
+        const allHistoryScores = await models.Score.findAll({
             where: {
-                course_section_id: { [Op.in]: courseSectionIds },
-                [Op.or]: [
-                    { mid: { [Op.lt]: 4 } },
-                    { final: { [Op.lt]: 3 } },
-                    { avr: { [Op.lt]: 4 } }
-                ]
+                student_id: { [Op.in]: distinctStudentIds }
             },
             include: [
-                {
-                    model: models.Student,
-                    as: 'student',
-                    attributes: ['student_id', 'name', 'parent_id'],
-                    required: true
-                },
                 {
                     model: models.CourseSection,
                     as: 'course_section',
-                    attributes: ['id'],
-                    include: [{
-                        model: models.Subject,
-                        as: 'subject',
-                        attributes: ['name']
-                    }]
+                    where: { isCompleted: true }, 
+                    attributes: ['id', 'session_id', 'subject_id'],
+                    include: [
+                        {
+                            model: models.Subject,
+                            as: 'subject',
+                            attributes: ['theo_credit', 'pra_credit']
+                        },
+                        {
+                            model: models.Session,
+                            as: 'session',
+                            attributes: ['id', 'name', 'years']
+                        }
+                    ]
                 }
             ]
         });
 
-        // Xử lý và kiểm tra cảnh báo
-        const studentCheckPromises = scores.map(async (score) => {
-            const student = score.student;
-            const courseSection = score.course_section;
+        // BƯỚC 3: Xử lý logic tính toán
+        let processedStudents = [];
+        const currentSessionObj = await models.Session.findByPk(session_id);
+        
+        const getSessionOrder = (sessionName, sessionYear) => {
+            const yearPart = sessionYear ? parseInt(sessionYear.split('-')[0]) : 0;
+            let termPart = 0;
+            if (sessionName.includes('HK1')) termPart = 1;
+            else if (sessionName.includes('HK2')) termPart = 2;
+            else if (sessionName.includes('HK3')) termPart = 3;
+            return yearPart * 10 + termPart;
+        };
 
-            // Lấy thông tin phụ huynh
-            // const parent = await models.Parent.findOne({
-            //     where: { parent_id: student.parent_id },
-            //     attributes: ['parent_id']
-            // });
+        const currentSessionOrder = getSessionOrder(currentSessionObj.name, currentSessionObj.years);
 
-            // Kiểm tra đã cảnh báo chưa
-            const isWarningYet = await alertRepo.isWarningYet4Student(courseSection.id, student.student_id);
+        for (const studentId of distinctStudentIds) {
+            const studentInfo = targetStudents.find(s => s.student_id === studentId);
+            const studentScores = allHistoryScores.filter(s => s.student_id === studentId);
 
-            return {
-                course_section_id: courseSection.id,
-                subjectName: courseSection.subject.name,
-                student_id: student.student_id,
-                studentName: student.name,
-                theo_regular1: score.theo_regular1,
-                theo_regular2: score.theo_regular2,
-                theo_regular3: score.theo_regular3,
-                pra_regular1: score.pra_regular1,
-                pra_regular2: score.pra_regular2,
-                pra_regular3: score.pra_regular3,
-                mid: score.mid,
-                final: score.final,
-                avr: score.avr,
-                parent_id: student.parent_id || null,
-                isWarningYet: isWarningYet
-            };
-        });
+            const scoresInCurrentSession = [];
+            const scoresCumulativeCurrent = [];
+            const scoresCumulativePrev = [];
+            const learnedSessions = new Set();
 
-        failedStudents = await Promise.all(studentCheckPromises);
+            studentScores.forEach(score => {
+                // Kiểm tra null safety cho course_section (phòng hờ data rác)
+                if (!score.course_section || !score.course_section.session) return;
 
-        // Lọc theo option
-        if (option === 'notWarningYet') {
-            failedStudents = failedStudents.filter(student => !student.isWarningYet);
+                const cs = score.course_section;
+                const scoreSessionOrder = getSessionOrder(cs.session.name, cs.session.years);
+                learnedSessions.add(scoreSessionOrder);
+
+                const scoreData = {
+                    avr: score.avr,
+                    theo_credit: cs.subject ? cs.subject.theo_credit : 0,
+                    pra_credit: cs.subject ? cs.subject.pra_credit : 0
+                };
+
+                if (cs.session_id === session_id) scoresInCurrentSession.push(scoreData);
+                if (scoreSessionOrder <= currentSessionOrder) scoresCumulativeCurrent.push(scoreData);
+                if (scoreSessionOrder < currentSessionOrder) scoresCumulativePrev.push(scoreData);
+            });
+
+            const gpa10_in_session = calculateGPA(scoresInCurrentSession, '10');
+            const gpa4_in_session = calculateGPA(scoresInCurrentSession, '4');
+            const gpa10_cumulative = calculateGPA(scoresCumulativeCurrent, '10');
+            const gpa4_cumulative = calculateGPA(scoresCumulativeCurrent, '4');
+            const gpa4_cumulative_prev = calculateGPA(scoresCumulativePrev, '4');
+
+            const semesterIndex = Array.from(learnedSessions).filter(order => order <= currentSessionOrder).length;
+
+            let isFailBy_gpaInSession_continuous = false;
+            if (semesterIndex <= 2) {
+                if (gpa4_in_session < 0.8) isFailBy_gpaInSession_continuous = true;
+            } else {
+                if (gpa4_in_session < 1.0) isFailBy_gpaInSession_continuous = true;
+            }
+
+            let isFailBy_gpa_continuous = false;
+            if (scoresCumulativePrev.length > 0) {
+                if (gpa4_cumulative < 1.1 && gpa4_cumulative_prev < 1.1) {
+                    isFailBy_gpa_continuous = true;
+                }
+            }
+
+            const isWarningYet = await alertRepo.isWarningYet4Student(session_name, studentId);
+
+            if (isFailBy_gpaInSession_continuous || isFailBy_gpa_continuous) {
+                processedStudents.push({
+                    student_id: studentId,
+                    studentName: studentInfo.name,
+                    gpa10_in_session: gpa10_in_session,
+                    gpa4_in_session: gpa4_in_session,
+                    gpa10: gpa10_cumulative,
+                    gpa4: gpa4_cumulative,
+                    isFailBy_gpaInSession_continuous,
+                    isFailBy_gpa_continuous,
+                    parent_id: studentInfo.parent_id || null,
+                    isWarningYet: isWarningYet
+                });
+            }
         }
 
-        // Sắp xếp theo tên sinh viên
-        failedStudents.sort((a, b) => {
+        // BƯỚC 4: Filter Options
+        if (option === 'notWarningYet') {
+            processedStudents = processedStudents.filter(s => !s.isWarningYet);
+        } else if (option === 'warned') {
+            processedStudents = processedStudents.filter(s => s.isWarningYet);
+        }
+
+        // BƯỚC 5: Sort
+        processedStudents.sort((a, b) => {
             const lastNameA = a.studentName.split(' ').pop() || '';
             const lastNameB = b.studentName.split(' ').pop() || '';
             const nameComparison = lastNameA.localeCompare(lastNameB, 'vi');
-            if (nameComparison !== 0) {
-                return nameComparison;
-            }
-            return a.studentName.localeCompare(b.studentName, 'vi');
+            return nameComparison !== 0 ? nameComparison : a.studentName.localeCompare(b.studentName, 'vi');
         });
 
-        // Tính toán phân trang
-        const total = failedStudents.length;
+        // BƯỚC 6: Pagination
+        const total = processedStudents.length;
         const totalPages = Math.ceil(total / pageSize_num);
-        const paginatedStudents = failedStudents.slice(offset, offset + pageSize_num);
+        const currentPage = Math.max(1, Math.min(page_num, totalPages || 1));
+        const offsetCalculated = (currentPage - 1) * pageSize_num;
+        
+        // Fix lỗi slice nếu mảng rỗng
+        const paginatedStudents = total > 0 ? processedStudents.slice(offsetCalculated, offsetCalculated + pageSize_num) : [];
 
-        // Tạo link phân trang
-        const linkPrev = page_num > 1 ?
-            `/api/students/failed?sessionId=${session_id}&facultyId=${faculty_id}&option=${option}&page=${page_num - 1}&pageSize=${pageSize_num}` : null;
-        const linkNext = page_num < totalPages ?
-            `/api/students/failed?sessionId=${session_id}&facultyId=${faculty_id}&option=${option}&page=${page_num + 1}&pageSize=${pageSize_num}` : null;
+        const linkPrev = currentPage > 1 ?
+            `/api/students/failed?sessionId=${session_id}&facultyId=${faculty_id}&option=${option}&page=${currentPage - 1}&pageSize=${pageSize_num}` : null;
+        const linkNext = currentPage < totalPages ?
+            `/api/students/failed?sessionId=${session_id}&facultyId=${faculty_id}&option=${option}&page=${currentPage + 1}&pageSize=${pageSize_num}` : null;
 
-        // Tạo danh sách 3 trang liên tiếp
         const pages = [];
-        for (let i = page_num; i < page_num + 3 && i <= totalPages; i++) {
+        for (let i = currentPage; i < currentPage + 3 && i <= totalPages; i++) {
             pages.push(i);
         }
 
         return {
             total,
-            page: page_num,
+            page: currentPage,
             pageSize: pageSize_num,
             students: paginatedStudents,
             linkPrev,
