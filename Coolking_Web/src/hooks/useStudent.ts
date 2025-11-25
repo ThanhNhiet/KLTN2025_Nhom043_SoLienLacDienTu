@@ -68,6 +68,7 @@ export const useStudent = () => {
     // option: all, notWarningYet
     const fetchStudentsWarningList = useCallback(async (params: {
         sessionId: string;
+        sessionName: string;
         facultyId: string;
         option: string;
         page: number;

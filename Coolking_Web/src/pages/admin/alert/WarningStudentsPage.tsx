@@ -13,6 +13,7 @@ const WarningStudentsPage: React.FC = () => {
 
     // Dropdown states
     const [selectedSession, setSelectedSession] = useState('');
+    const [selectedSessionName, setSelectedSessionName] = useState('');
     const [selectedFaculty, setSelectedFaculty] = useState('');
     const [sessionSearch, setSessionSearch] = useState('');
     const [facultySearch, setFacultySearch] = useState('');
@@ -41,11 +42,12 @@ const WarningStudentsPage: React.FC = () => {
     const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
     // Fetch danh sách sinh viên cần cảnh cáo
     const handleFetchStudents = async () => {
-        if (!selectedSession || !selectedFaculty || !selectedOption) return;
+        if (!selectedSession || !selectedSessionName || !selectedFaculty || !selectedOption) return;
         setSearchResult(null);
         try {
             const params = {
                 sessionId: selectedSession,
+                sessionName: selectedSessionName,
                 facultyId: selectedFaculty,
                 option: selectedOption,
                 page,
@@ -161,6 +163,7 @@ const WarningStudentsPage: React.FC = () => {
                                                     key={session.id}
                                                     onClick={() => {
                                                         setSelectedSession(session.id);
+                                                        setSelectedSessionName(session.nameSession);
                                                         setSessionSearch('');
                                                         setShowSessionDropdown(false);
                                                     }}

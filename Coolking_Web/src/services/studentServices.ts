@@ -17,6 +17,7 @@ class StudentServices {
     // option: all, notWarningYet
     async getStudentsWarningList(params: {
         sessionId: string;
+        sessionName: string;
         facultyId: string;
         option: string;
         page: number;
