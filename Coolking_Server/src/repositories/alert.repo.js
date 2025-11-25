@@ -808,34 +808,6 @@ const isWarningYet4Alert = async (header) => {
     }
 };
 
-/**
- * Kiểm tra xem sinh viên đã nhận được cảnh báo cho một lớp học phần cụ thể chưa
- * @param {string} session_name
- * @param {string} student_id 
- * @returns {Promise<boolean>}
- */
-const isWarningYet4Student = async (session_name, student_id) => {
-    try {
-        if (!session_name || !student_id) {
-            return false;
-        }
-
-        // Tìm kiếm alert có header chứa "Cảnh báo", session_name và student_id
-        const existingAlert = await Alert.findOne({
-            $and: [
-                { header: { $regex: '^Cảnh báo học vụ', $options: 'i' } },
-                { header: { $regex: session_name, $options: 'i' } },
-                { header: { $regex: student_id, $options: 'i' } }
-            ]
-        });
-
-        return !!existingAlert;
-
-    } catch (error) {
-        console.error('Error in isWarningYet4Student:', error);
-        return false;
-    }
-};
 
 module.exports = {
     sendAlertToAll,
@@ -850,6 +822,5 @@ module.exports = {
     searchAlertsByKeyword,
     getAlertsBySender,
     markSystemAlertAsRead,
-    deleteAlertSystem4Receiver,
-    isWarningYet4Student
+    deleteAlertSystem4Receiver
 };

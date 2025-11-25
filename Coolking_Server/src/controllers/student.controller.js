@@ -276,7 +276,7 @@ exports.getWarnedStudents = async (req, res) => {
     }
 };
 
-// GET /students/warn-list/search?sessionId=&facultyId=&studentId=
+// GET /students/warn-list/search?sessionId=&sessionName=&facultyId=&studentId=
 exports.searchWarnedStudents = async (req, res) => {
     try {
         const authHeader = req.headers['authorization'];
@@ -286,9 +286,10 @@ exports.searchWarnedStudents = async (req, res) => {
             return res.status(403).json({ message: 'Forbidden' });
         }
         const sessionId = req.query.sessionId;
+        const sessionName = req.query.sessionName;
         const facultyId = req.query.facultyId;
         const studentId = req.query.studentId;
-        const student = await studentRepo.searchFailedStudentBySessionAndFacultyWithStudentId(sessionId, facultyId, studentId);
+        const student = await studentRepo.searchFailedStudentBySessionAndFacultyWithStudentId(sessionId, sessionName, facultyId, studentId);
         res.status(200).json(student);
     } catch (error) {
         res.status(500).json({ message: error.message });
