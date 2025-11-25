@@ -534,24 +534,12 @@ const getAllAlerts4Admin = async (page = 1, pageSize = 10) => {
             .limit(pageSize)
             .select('_id senderID receiverID header body targetScope isRead createdAt updatedAt')
             .lean();
-
-        // Chuẩn bị các promise để kiểm tra isWarningYet
-        const warningCheckPromises = alerts.map(alert => {
-            if (alert.header && alert.header.startsWith('Yêu cầu Cảnh báo học vụ')) {
-                return isWarningYet4Alert(alert.header);
-            }
-            return Promise.resolve(null); // Trả về null cho các trường hợp khác
-        });
-
-        // Thực thi các promise song song
-        const warningResults = await Promise.all(warningCheckPromises);
-
         
         // Đếm tổng số
         const total = await Alert.countDocuments({});
 
         // Chuẩn hóa dữ liệu trả về
-        const processedAlerts = alerts.map((alert, index) => ({
+        const processedAlerts = alerts.map((alert) => ({
             _id: alert._id,
             senderID: alert.senderID || 'System',
             receiverID: alert.receiverID || 'All',
@@ -559,7 +547,6 @@ const getAllAlerts4Admin = async (page = 1, pageSize = 10) => {
             body: alert.body,
             targetScope: alert.targetScope,
             isRead: alert.isRead,
-            isWarningYet: warningResults[index], // Gán kết quả kiểm tra
             createdAt: alert.createdAt ? datetimeFormatter.formatDateTimeVN(alert.createdAt) : null, 
             updatedAt: alert.updatedAt ? datetimeFormatter.formatDateTimeVN(alert.updatedAt) : null
         }));
