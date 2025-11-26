@@ -967,9 +967,25 @@ const getFailedStudentsBySessionAndFaculty = async (session_id, session_name, fa
                             where: { faculty_id: faculty_id }
                         }]
                     }]
+                },
+                {
+                    model: models.Clazz,
+                    as: 'clazz',
+                    attributes: ['name'],
+                    required: true,
+                    include: [
+                        {
+                            model: models.Faculty,
+                            as: 'faculty',
+                            attributes: ['name'],
+                            where: { faculty_id: faculty_id },
+                            required: true
+                        }
+                    ]
                 }
             ],
-            raw: true
+            raw: true,
+            nest: true
         });
 
         // Lấy danh sách ID duy nhất
@@ -1015,7 +1031,12 @@ const getFailedStudentsBySessionAndFaculty = async (session_id, session_name, fa
         const allAlerts = await Alert.find({
             $and: [
                 { header: { $regex: '^Cảnh báo học vụ', $options: 'i' } },
-                { header: { $regex: studentIdsRegexString, $options: 'i' } } // Tìm bất kỳ SV nào trong list
+                {
+                    $or: [
+                        { header: { $regex: studentIdsRegexString, $options: 'i' } }, // Tìm trong header
+                        { receiverID: { $in: distinctStudentIds } } // Tìm theo receiverID
+                    ]
+                }
             ]
         });
 
@@ -1027,16 +1048,26 @@ const getFailedStudentsBySessionAndFaculty = async (session_id, session_name, fa
             alertMap[id] = { isWarningYet: false, count: 0 };
         });
 
-        // Duyệt qua kết quả MongoDB để phân loại vào Map
+        // Nhóm các Alert theo header để tránh đếm trùng khi gửi cho cả sinh viên và phụ huynh
+        const groupedAlerts = {};
         allAlerts.forEach(alert => {
+            const header = alert.header || "";
+            if (!groupedAlerts[header]) {
+                groupedAlerts[header] = alert;
+            }
+        });
+
+        // Duyệt qua các Alert đã được nhóm để phân loại vào Map
+        Object.values(groupedAlerts).forEach(alert => {
             const header = alert.header || "";
 
             // Tìm xem alert này thuộc về sinh viên nào trong danh sách
-            // (Vì header là text nên phải scan xem nó chứa ID nào)
             distinctStudentIds.forEach(studentId => {
                 // Kiểm tra header chứa studentId (Case insensitive)
-                if (new RegExp(studentId, 'i').test(header)) {
-                    // Tăng biến đếm tổng
+                const matchedByHeader = new RegExp(studentId, 'i').test(header);
+                
+                if (matchedByHeader) {
+                    // Tăng biến đếm tổng (chỉ đếm 1 lần cho mỗi header duy nhất)
                     alertMap[studentId].count += 1;
 
                     // Kiểm tra xem alert này có thuộc session hiện tại không
@@ -1094,36 +1125,92 @@ const getFailedStudentsBySessionAndFaculty = async (session_id, session_name, fa
             const gpa4_in_session = calculateGPA(scoresInCurrentSession, '4');
             const gpa10_cumulative = calculateGPA(scoresCumulativeCurrent, '10');
             const gpa4_cumulative = calculateGPA(scoresCumulativeCurrent, '4');
-            const gpa4_cumulative_prev = calculateGPA(scoresCumulativePrev, '4');
 
             const semesterIndex = Array.from(learnedSessions).filter(order => order <= currentSessionOrder).length;
 
-            let isFailBy_gpaInSession_continuous = false;
-            if (semesterIndex <= 2) {
-                if (gpa4_in_session < 0.8) isFailBy_gpaInSession_continuous = true;
-            } else {
-                if (gpa4_in_session < 1.0) isFailBy_gpaInSession_continuous = true;
-            }
+            const isSummerSession = session_name.toUpperCase().includes('HK3');
+            let need2Warn = false;
 
-            let isFailBy_gpa_continuous = false;
-            if (scoresCumulativePrev.length > 0) {
-                if (gpa4_cumulative < 1.1 && gpa4_cumulative_prev < 1.1) {
-                    isFailBy_gpa_continuous = true;
+            // CHỈ XÉT CẢNH BÁO NẾU KHÔNG PHẢI LÀ HK3
+            if (!isSummerSession) {
+                // Logic cảnh báo:
+                // a) ĐTBCHK: dưới 0.80 đối với học kỳ đầu của khóa học, dưới 1.00 đối với các học kỳ tiếp theo
+                let failBySessionGPA = false;
+                if (semesterIndex === 1) {
+                    // Học kỳ đầu của khóa học
+                    if (gpa4_in_session < 0.80) failBySessionGPA = true;
+                } else {
+                    // Các học kỳ tiếp theo
+                    if (gpa4_in_session < 1.00) failBySessionGPA = true;
                 }
-            }
 
+                // b) ĐTBCTL: dưới 1.20 (năm 1), dưới 1.40 (năm 2), dưới 1.60 (năm 3), dưới 1.80 (năm 4+)
+                // Chỉ áp dụng ĐTBCTL khi sinh viên đã hoàn thành ít nhất 1 năm học (có HK2 hoặc nhiều hơn)
+                let failByCumulativeGPA = false;
+
+                // Kiểm tra xem sinh viên đã hoàn thành năm học nào chưa
+                // CHỈ XÉT CÁC HỌC KỲ TRƯỚC HOẶC BẰNG HỌC KỲ HIỆN TẠI
+                const academicYearSessions = {};
+                Array.from(learnedSessions)
+                    .filter(sessionOrder => sessionOrder <= currentSessionOrder) // Chỉ lấy học kỳ <= hiện tại
+                    .forEach(sessionOrder => {
+                        const year = Math.floor(sessionOrder / 10);
+                        const semester = sessionOrder % 10;
+                        if (!academicYearSessions[year]) academicYearSessions[year] = [];
+                        academicYearSessions[year].push(semester);
+                    });
+
+
+
+                // Đếm số năm học đã hoàn thành (có ít nhất HK2 hoặc HK3)
+                let completedAcademicYears = 0;
+                let currentYearStatus = 'incomplete'; // Chưa hoàn thành năm hiện tại
+
+                Object.keys(academicYearSessions).forEach(year => {
+                    const semesters = academicYearSessions[year];
+                    const currentYear = Math.floor(currentSessionOrder / 10);
+                    
+                    if (parseInt(year) < currentYear) {
+                        // Năm học trước đây - tính là đã hoàn thành
+                        completedAcademicYears++;
+                    } else if (parseInt(year) === currentYear) {
+                        // Năm học hiện tại - kiểm tra xem đã qua HK1 chưa
+                        if (semesters.includes(2) || semesters.includes(3)) {
+                            currentYearStatus = 'in_progress'; // Đang trong năm nhưng đã qua HK1
+                        }
+                    }
+                });
+
+                // Chỉ áp dụng ĐTBCTL nếu sinh viên không phải mới chỉ học HK1 duy nhất
+                if (completedAcademicYears > 0 || currentYearStatus === 'in_progress') {
+                    const academicYear = completedAcademicYears + (currentYearStatus === 'in_progress' ? 1 : 0);
+                    
+                    if (academicYear === 1 && gpa4_cumulative < 1.20) {
+                        failByCumulativeGPA = true;
+                    } else if (academicYear === 2 && gpa4_cumulative < 1.40) {
+                        failByCumulativeGPA = true;
+                    } else if (academicYear === 3 && gpa4_cumulative < 1.60) {
+                        failByCumulativeGPA = true;
+                    } else if (academicYear >= 4 && gpa4_cumulative < 1.80) {
+                        failByCumulativeGPA = true;
+                    }
+                }
+
+                need2Warn = failBySessionGPA || failByCumulativeGPA;
+            }
             const warningStatus = alertMap[studentId];
 
-            if (isFailBy_gpaInSession_continuous || isFailBy_gpa_continuous) {
+            if (need2Warn) {
                 processedStudents.push({
                     student_id: studentId,
                     studentName: studentInfo.name,
+                    className: studentInfo.clazz ? studentInfo.clazz.name : null,
+                    facultyName: studentInfo.clazz && studentInfo.clazz.faculty ? studentInfo.clazz.faculty.name : null,
                     gpa10_in_session: gpa10_in_session,
                     gpa4_in_session: gpa4_in_session,
                     gpa10: gpa10_cumulative,
                     gpa4: gpa4_cumulative,
-                    isFailBy_gpaInSession_continuous,
-                    isFailBy_gpa_continuous,
+                    need2Warn: need2Warn,
                     parent_id: studentInfo.parent_id || null,
                     isWarningYet: warningStatus.isWarningYet,
                     totalWarnings: warningStatus.count
@@ -1217,9 +1304,25 @@ const searchFailedStudentBySessionAndFacultyWithStudentId = async (session_id, s
                             where: { faculty_id: faculty_id }
                         }]
                     }]
+                },
+                {
+                    model: models.Clazz,
+                    as: 'clazz',
+                    attributes: ['name'],
+                    required: true,
+                    include: [
+                        {
+                            model: models.Faculty,
+                            as: 'faculty',
+                            attributes: ['name'],
+                            where: { faculty_id: faculty_id },
+                            required: true
+                        }
+                    ]
                 }
             ],
-            raw: true
+            raw: true,
+            nest: true
         });
 
         // Nếu không tìm thấy sinh viên trong khoa/kỳ này -> Return null
@@ -1297,59 +1400,131 @@ const searchFailedStudentBySessionAndFacultyWithStudentId = async (session_id, s
         const gpa4_in_session = calculateGPA(scoresInCurrentSession, '4');
         const gpa10_cumulative = calculateGPA(scoresCumulativeCurrent, '10');
         const gpa4_cumulative = calculateGPA(scoresCumulativeCurrent, '4');
-        const gpa4_cumulative_prev = calculateGPA(scoresCumulativePrev, '4');
 
-        // Logic xét cảnh báo
+        // Logic xét cảnh báo theo quy định mới
         const semesterIndex = Array.from(learnedSessions).filter(order => order <= currentSessionOrder).length;
 
-        let isFailBy_gpaInSession_continuous = false;
-        if (semesterIndex <= 2) {
-            if (gpa4_in_session < 0.8) isFailBy_gpaInSession_continuous = true;
-        } else {
-            if (gpa4_in_session < 1.0) isFailBy_gpaInSession_continuous = true;
-        }
+        const isSummerSession = session_name.toUpperCase().includes('HK3');
+        let need2Warn = false;
 
-        let isFailBy_gpa_continuous = false;
-        if (scoresCumulativePrev.length > 0) {
-            if (gpa4_cumulative < 1.1 && gpa4_cumulative_prev < 1.1) {
-                isFailBy_gpa_continuous = true;
+        // CHỈ XÉT CẢNH BÁO NẾU KHÔNG PHẢI LÀ HK3
+        if (!isSummerSession) {
+            // a) ĐTBCHK: dưới 0.80 đối với học kỳ đầu của khóa học, dưới 1.00 đối với các học kỳ tiếp theo
+            let failBySessionGPA = false;
+            if (semesterIndex === 1) {
+                // Học kỳ đầu của khóa học
+                if (gpa4_in_session < 0.80) failBySessionGPA = true;
+            } else {
+                // Các học kỳ tiếp theo
+                if (gpa4_in_session < 1.00) failBySessionGPA = true;
             }
+
+            // b) ĐTBCTL: dưới 1.20 (năm 1), dưới 1.40 (năm 2), dưới 1.60 (năm 3), dưới 1.80 (năm 4+)
+            // Chỉ áp dụng ĐTBCTL khi sinh viên đã hoàn thành ít nhất 1 năm học (có HK2 hoặc nhiều hơn)
+            let failByCumulativeGPA = false;
+
+            // Kiểm tra xem sinh viên đã hoàn thành năm học nào chưa
+            // CHỈ XÉT CÁC HỌC KỲ TRƯỚC HOẶC BẰNG HỌC KỲ HIỆN TẠI
+            const academicYearSessions = {};
+            Array.from(learnedSessions)
+                .filter(sessionOrder => sessionOrder <= currentSessionOrder) // Chỉ lấy học kỳ <= hiện tại
+                .forEach(sessionOrder => {
+                    const year = Math.floor(sessionOrder / 10);
+                    const semester = sessionOrder % 10;
+                    if (!academicYearSessions[year]) academicYearSessions[year] = [];
+                    academicYearSessions[year].push(semester);
+                });
+
+            // Đếm số năm học đã hoàn thành (có ít nhất HK2 hoặc HK3)
+            let completedAcademicYears = 0;
+            let currentYearStatus = 'incomplete'; // Chưa hoàn thành năm hiện tại
+
+            Object.keys(academicYearSessions).forEach(year => {
+                const semesters = academicYearSessions[year];
+                const currentYear = Math.floor(currentSessionOrder / 10);
+                
+                if (parseInt(year) < currentYear) {
+                    // Năm học trước đây - tính là đã hoàn thành
+                    completedAcademicYears++;
+                } else if (parseInt(year) === currentYear) {
+                    // Năm học hiện tại - kiểm tra xem đã qua HK1 chưa
+                    if (semesters.includes(2) || semesters.includes(3)) {
+                        currentYearStatus = 'in_progress'; // Đang trong năm nhưng đã qua HK1
+                    }
+                }
+            });
+
+            // Chỉ áp dụng ĐTBCTL nếu sinh viên không phải mới chỉ học HK1 duy nhất
+            if (completedAcademicYears > 0 || currentYearStatus === 'in_progress') {
+                const academicYear = completedAcademicYears + (currentYearStatus === 'in_progress' ? 1 : 0);
+                
+                if (academicYear === 1 && gpa4_cumulative < 1.20) {
+                    failByCumulativeGPA = true;
+                } else if (academicYear === 2 && gpa4_cumulative < 1.40) {
+                    failByCumulativeGPA = true;
+                } else if (academicYear === 3 && gpa4_cumulative < 1.60) {
+                    failByCumulativeGPA = true;
+                } else if (academicYear >= 4 && gpa4_cumulative < 1.80) {
+                    failByCumulativeGPA = true;
+                }
+            }
+
+            need2Warn = failBySessionGPA || failByCumulativeGPA;
         }
 
         // BƯỚC 4: Kiểm tra trạng thái Alert trong MongoDB
         const sessionNameRegexString = session_name.replace(/-/g, '.*-.*');
 
-        // Đếm cảnh báo trong kỳ hiện tại
-        const countCurrentSession = await Alert.countDocuments({
+        // Đếm cảnh báo trong kỳ hiện tại (sử dụng distinct header để tránh đếm trùng)
+        const currentSessionAlerts = await Alert.find({
             $and: [
                 { header: { $regex: '^Cảnh báo học vụ', $options: 'i' } },
                 { header: { $regex: sessionNameRegexString, $options: 'i' } },
-                { header: { $regex: student_id, $options: 'i' } }
+                {
+                    $or: [
+                        { header: { $regex: student_id, $options: 'i' } },
+                        { receiverID: student_id }
+                    ]
+                }
             ]
         });
+        
+        // Đếm số header duy nhất
+        const uniqueCurrentHeaders = new Set(currentSessionAlerts.map(alert => alert.header));
+        const countCurrentSession = uniqueCurrentHeaders.size;
 
-        // Đếm tổng cảnh báo
-        const countTotal = await Alert.countDocuments({
+        // Đếm tổng cảnh báo (sử dụng distinct header để tránh đếm trùng)
+        const totalAlerts = await Alert.find({
             $and: [
                 { header: { $regex: '^Cảnh báo học vụ', $options: 'i' } },
-                { header: { $regex: student_id, $options: 'i' } }
+                {
+                    $or: [
+                        { header: { $regex: student_id, $options: 'i' } },
+                        { receiverID: student_id }
+                    ]
+                }
             ]
         });
+        
+        // Đếm số header duy nhất
+        const uniqueTotalHeaders = new Set(totalAlerts.map(alert => alert.header));
+        const countTotal = uniqueTotalHeaders.size;
 
         const isWarningYet = countCurrentSession > 0;
 
         // BƯỚC 5: Trả về kết quả
         // Chỉ trả về data nếu sinh viên vi phạm quy chế (Fail)
-        if (isFailBy_gpaInSession_continuous || isFailBy_gpa_continuous) {
+        if (need2Warn) {
             return {
                 student_id: student_id,
                 studentName: targetStudent.name,
+                className: targetStudent.clazz ? targetStudent.clazz.name : null,
+                facultyName: targetStudent.clazz && targetStudent.clazz.faculty ? targetStudent.clazz.faculty.name : null,
                 gpa10_in_session: gpa10_in_session,
                 gpa4_in_session: gpa4_in_session,
                 gpa10: gpa10_cumulative,
                 gpa4: gpa4_cumulative,
-                isFailBy_gpaInSession_continuous,
-                isFailBy_gpa_continuous,
+                need2Warn: need2Warn,
                 parent_id: targetStudent.parent_id || null,
                 isWarningYet: isWarningYet,
                 totalWarnings: countTotal
