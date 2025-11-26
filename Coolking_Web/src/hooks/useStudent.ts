@@ -18,7 +18,7 @@ export interface StudentWithScore {
     dob: string;
     score: Score;
     initial_evaluate: string;
-    isWarningYet?: boolean;
+    isRemindYet?: boolean;
 }
 
 export interface Score {
@@ -68,6 +68,7 @@ export const useStudent = () => {
     // option: all, notWarningYet
     const fetchStudentsWarningList = useCallback(async (params: {
         sessionId: string;
+        sessionName: string;
         facultyId: string;
         option: string;
         page: number;
@@ -88,6 +89,7 @@ export const useStudent = () => {
     // search student warning
     const searchStudentWarningSubject = useCallback(async (params: {
         sessionId: string;
+        sessionName: string;
         facultyId: string;
         studentId: string;
     }) => {

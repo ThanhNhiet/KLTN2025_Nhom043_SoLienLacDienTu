@@ -121,7 +121,7 @@ const StudentInfoModal: React.FC<StudentInfoModalProps> = ({
                     </div>
                     <div>
                       <span className="text-sm font-medium text-gray-600">Giới tính:</span>
-                      <div className="text-base text-gray-800">{studentInfo.parent.gender}</div>
+                      <div className="text-base text-gray-800">{studentInfo.parent.gender ? "Nam" : "Nữ"}</div>
                     </div>
                     <div>
                       <span className="text-sm font-medium text-gray-600">Số điện thoại:</span>

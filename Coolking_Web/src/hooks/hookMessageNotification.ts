@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useSocket } from '../contexts/SocketContext';
 import { useChat } from './useChat';
 import authService from '../services/authService';
+import messSound from '../assets/sound/mess-sound-effect.mp3';
 
 interface MessageNotificationHook {
     newMessNav: boolean;
@@ -49,7 +50,7 @@ export const useMessageNotification = (): MessageNotificationHook => {
                 await getChats4AllUser(1, 1);
                 setHasCheckedInitial(true); // Đánh dấu đã check
                 sessionStorage.setItem('message-notification-checked', 'true'); // Lưu vào session
-                
+
                 // Logic check sẽ được thực hiện trong useEffect khác để lắng nghe chatItems
             } catch (error) {
                 console.error('🔔 Error checking unread messages:', error);
@@ -77,7 +78,7 @@ export const useMessageNotification = (): MessageNotificationHook => {
         if (chatItems) {
             // Kiểm tra xem có chat nào có unread = true không
             let hasUnread = false;
-            
+
             if (Array.isArray(chatItems)) {
                 // Nếu chatItems là array
                 hasUnread = chatItems.some(chat => chat.unread === true);
@@ -85,9 +86,9 @@ export const useMessageNotification = (): MessageNotificationHook => {
                 // Nếu chatItems là single object
                 hasUnread = chatItems.unread === true;
             }
-            
+
             // console.log('🔔 ChatItems changed, hasUnread:', hasUnread);
-            
+
             if (hasUnread) {
                 // console.log('🔔 Setting notification to true from chatItems');
                 setNewMessNav(true);
@@ -103,15 +104,29 @@ export const useMessageNotification = (): MessageNotificationHook => {
             // Lấy thông tin user hiện tại
             const tokenData = authService.parseToken();
             const currentUserId = tokenData?.user_id;
-            
+
             // Chỉ hiển thị notification nếu tin nhắn không phải từ chính user hiện tại
             const senderId = newMessage.senderInfo?.userID || newMessage.senderID;
             // console.log('🔔 Received message from:', senderId, 'current user:', currentUserId);
-            
+            console.log('🔔 Received new message:', newMessage);
+
             if (senderId !== currentUserId) {
                 // console.log('🔔 Setting notification to true');
                 setNewMessNav(true);
                 sessionStorage.setItem('new-message-notification', 'true');
+
+                // Phát âm thanh thông báo nếu không bị muted
+                if (!newMessage.isMuted) {
+                    try {
+                        const audio = new Audio(messSound);
+                        audio.volume = 0.5; // Đặt âm lượng 50%
+                        audio.play().catch(error => {
+                            console.warn('🔔 Could not play notification sound:', error);
+                        });
+                    } catch (error) {
+                        console.warn('🔔 Error creating audio:', error);
+                    }
+                }
             }
         };
 
@@ -127,7 +142,7 @@ export const useMessageNotification = (): MessageNotificationHook => {
     useEffect(() => {
         const currentPath = location.pathname;
         // console.log('🔔 Current path:', currentPath, 'newMessNav:', newMessNav);
-        
+
         if (currentPath === '/lecturer/chat' || currentPath === '/admin/chat') {
             if (newMessNav) {
                 // console.log('🔔 Clearing notification because on chat route');
@@ -137,9 +152,40 @@ export const useMessageNotification = (): MessageNotificationHook => {
         }
     }, [location.pathname, newMessNav]);
 
+    // Quản lý tiêu đề tab
+    useEffect(() => {
+        const originalTitle = 'Coolking E-Contact';
+        const newMessageTitle = 'Coolking E-Contact - Có tin nhắn mới';
+
+        if (newMessNav) {
+            document.title = newMessageTitle;
+        } else {
+            document.title = originalTitle;
+        }
+
+        // Lắng nghe sự kiện khi user focus vào tab (quay lại tab)
+        const handleVisibilityChange = () => {
+            if (!document.hidden && newMessNav) {
+                // Khi user quay lại tab và có tin nhắn mới, đổi về tiêu đề gốc
+                document.title = originalTitle;
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        // Cleanup
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            // Reset về tiêu đề gốc khi component unmount
+            document.title = originalTitle;
+        };
+    }, [newMessNav]);
+
     const markAsRead = async () => {
         setNewMessNav(false);
         sessionStorage.setItem('new-message-notification', 'false');
+        // Đặt lại tiêu đề về gốc
+        document.title = 'Coolking E-Contact';
     };
 
     return {

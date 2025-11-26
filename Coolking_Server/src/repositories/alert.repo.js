@@ -459,6 +459,9 @@ const deleteAlert4Receiver = async (alertID, receiverID) => {
         if (!alert) {
             throw new Error('Không tìm thấy thông báo');
         }
+        if (alert.header && alert.header.startsWith('Cảnh báo học vụ')) {
+            throw new Error('Không thể xóa thông báo cảnh báo học vụ. Vui lòng liên hệ admin để biết thêm chi tiết.');
+        }
 
         // Xóa thông báo
         await Alert.deleteOne({
@@ -531,24 +534,12 @@ const getAllAlerts4Admin = async (page = 1, pageSize = 10) => {
             .limit(pageSize)
             .select('_id senderID receiverID header body targetScope isRead createdAt updatedAt')
             .lean();
-
-        // Chuẩn bị các promise để kiểm tra isWarningYet
-        const warningCheckPromises = alerts.map(alert => {
-            if (alert.header && alert.header.startsWith('Yêu cầu Cảnh báo học vụ')) {
-                return isWarningYet4Alert(alert.header);
-            }
-            return Promise.resolve(null); // Trả về null cho các trường hợp khác
-        });
-
-        // Thực thi các promise song song
-        const warningResults = await Promise.all(warningCheckPromises);
-
         
         // Đếm tổng số
         const total = await Alert.countDocuments({});
 
         // Chuẩn hóa dữ liệu trả về
-        const processedAlerts = alerts.map((alert, index) => ({
+        const processedAlerts = alerts.map((alert) => ({
             _id: alert._id,
             senderID: alert.senderID || 'System',
             receiverID: alert.receiverID || 'All',
@@ -556,7 +547,6 @@ const getAllAlerts4Admin = async (page = 1, pageSize = 10) => {
             body: alert.body,
             targetScope: alert.targetScope,
             isRead: alert.isRead,
-            isWarningYet: warningResults[index], // Gán kết quả kiểm tra
             createdAt: alert.createdAt ? datetimeFormatter.formatDateTimeVN(alert.createdAt) : null, 
             updatedAt: alert.updatedAt ? datetimeFormatter.formatDateTimeVN(alert.updatedAt) : null
         }));
@@ -805,34 +795,6 @@ const isWarningYet4Alert = async (header) => {
     }
 };
 
-/**
- * Kiểm tra xem sinh viên đã nhận được cảnh báo cho một lớp học phần cụ thể chưa
- * @param {string} course_section_id 
- * @param {string} student_id 
- * @returns {Promise<boolean>}
- */
-const isWarningYet4Student = async (course_section_id, student_id) => {
-    try {
-        if (!course_section_id || !student_id) {
-            return false;
-        }
-
-        // Tìm kiếm alert có header chứa "Cảnh báo", course_section_id và student_id
-        const existingAlert = await Alert.findOne({
-            $and: [
-                { header: { $regex: '^Cảnh báo', $options: 'i' } },
-                { header: { $regex: course_section_id, $options: 'i' } },
-                { header: { $regex: student_id, $options: 'i' } }
-            ]
-        });
-
-        return !!existingAlert;
-
-    } catch (error) {
-        console.error('Error in isWarningYet4Student:', error);
-        return false;
-    }
-};
 
 module.exports = {
     sendAlertToAll,
@@ -847,6 +809,5 @@ module.exports = {
     searchAlertsByKeyword,
     getAlertsBySender,
     markSystemAlertAsRead,
-    deleteAlertSystem4Receiver,
-    isWarningYet4Student
+    deleteAlertSystem4Receiver
 };

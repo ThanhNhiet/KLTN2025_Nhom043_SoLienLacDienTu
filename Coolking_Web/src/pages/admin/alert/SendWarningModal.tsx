@@ -2,15 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { useAlert } from '../../../hooks/useAlert';
 
 interface StudentWarningData {
-  course_section_id: string;
-  subjectName: string;
   student_id: string;
   studentName: string;
+  className?: string;
+  facultyName?: string;
   parent_id?: string;
-  mid?: number | null;
-  final?: number | null;
-  avr?: number | null;
-  // Add other scores if needed for display
+  gpa10_in_session?: number;
+  gpa4_in_session?: number;
+  gpa10?: number;
+  gpa4?: number;
+  isFailBy_gpaInSession_continuously?: boolean;
+  isFailBy_gpa_continuous?: boolean;
+  totalWarnings?: number;
 }
 
 interface SendWarningModalProps {
@@ -18,26 +21,36 @@ interface SendWarningModalProps {
   onClose: () => void;
   onSuccess: () => void;
   studentData: StudentWarningData;
+  sessionName: string;
 }
 
 const SendWarningModal: React.FC<SendWarningModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
-  studentData
+  studentData,
+  sessionName
 }) => {
-  const defaultTitle = `Cảnh báo học vụ - Sinh viên ${studentData.student_id} - LHP: ${studentData.course_section_id} - Môn: ${studentData.subjectName}`;
-  const defaultContent = `Thông báo đến sinh viên ${studentData.studentName} (MSSV: ${studentData.student_id}) và Quý Phụ huynh.
+  const defaultTitle = `Cảnh báo học vụ - Sinh viên ${studentData.student_id} - ${sessionName}`;
+  const defaultContent = `Kính gửi: Sinh viên ${studentData.studentName} và Quý Phụ huynh
 
-Trong môn học ${studentData.subjectName} (mã lớp học phần: ${studentData.course_section_id}), tôi nhận thấy rằng:
+Mã số sinh viên: ${studentData.student_id}
+Lớp: ${studentData.className || '[Mã lớp]'} - ${studentData.facultyName || '[Tên khoa]'}
 
-Kết quả học tập vừa qua của em đang ở mức dưới trung bình. Đây là kết quả rất đáng lo ngại và có ảnh hưởng lớn đến điểm tổng kết của môn học. Kết quả này cho thấy em đang bị hổng kiến thức nghiêm trọng và có nguy cơ rất cao sẽ không đạt môn học này.
+Căn cứ vào Quy chế đào tạo đại học hệ tín chỉ hiện hành của Trường;
+Căn cứ vào kết quả học tập của sinh viên trong học kỳ ${sessionName};
 
-Đề nghị sinh viên nghiêm túc xem lại và củng cố lại toàn bộ kiến thức đã học và bài kiểm tra vừa rồi. Lên kế hoạch học tập chi tiết cho phần còn lại của học kỳ.
+Phòng Đào tạo xin thông báo về tình hình học tập của sinh viên như sau:
+Điểm trung bình học kỳ: ${studentData.gpa4_in_session !== undefined ? studentData.gpa4_in_session.toFixed(2) : '-' } (theo thang điểm 4)
+Điểm trung bình tích lũy: ${studentData.gpa4 !== undefined ? studentData.gpa4.toFixed(2) : '-' } (theo thang điểm 4)
+Số lần cảnh báo học vụ trước đây: ${studentData.totalWarnings || 0}
 
-Nhà trường và giảng viên luôn tạo điều kiện hỗ trợ, nhưng sự nỗ lực từ chính bản thân em mới là yếu tố quyết định.
+Hệ quả và yêu cầu:
+(Cảnh cáo lần 1): Sinh viên cần cải thiện kết quả học tập trong học kỳ tới.
+(Cảnh cáo lần 2): Nếu không cải thiện ở kỳ tới, sinh viên sẽ bị buộc thôi học.
+(Cảnh cáo lần 3): Sinh viên làm thủ tục thôi học theo quy định.
 
-Trân trọng.`;
+Đề nghị sinh viên và gia đình lưu ý để có phương án điều chỉnh kịp thời.`;
 
   const [title, setTitle] = useState(defaultTitle);
   const [content, setContent] = useState(defaultContent);
@@ -56,18 +69,27 @@ Trân trọng.`;
   // Reset state when modal opens with new data
   useEffect(() => {
     if (isOpen && studentData) {
-      setTitle(`Cảnh báo học vụ - Sinh viên ${studentData.student_id} - LHP: ${studentData.course_section_id} - Môn: ${studentData.subjectName}`);
-      setContent(`Thông báo đến sinh viên ${studentData.studentName} (MSSV: ${studentData.student_id}) và Quý Phụ huynh.
+      setTitle(`Cảnh báo học vụ - ${studentData.student_id} - ${sessionName}`);
+      setContent(`Kính gửi: Sinh viên ${studentData.studentName} và Quý Phụ huynh
 
-Trong môn học ${studentData.subjectName} (mã lớp học phần: ${studentData.course_section_id}), tôi nhận thấy rằng:
+Mã số sinh viên: ${studentData.student_id}
+Lớp: ${studentData.className || '[Mã lớp]'} - ${studentData.facultyName || '[Tên khoa]'}
 
-Kết quả học tập vừa qua của em đang ở mức dưới trung bình. Đây là kết quả rất đáng lo ngại và có ảnh hưởng lớn đến điểm tổng kết của môn học. Kết quả này cho thấy em đang bị hổng kiến thức nghiêm trọng và có nguy cơ rất cao sẽ không đạt môn học này.
+Căn cứ vào Quy chế đào tạo đại học hệ tín chỉ hiện hành của Trường;
+Căn cứ vào kết quả học tập của sinh viên trong học kỳ ${sessionName};
 
-Đề nghị sinh viên nghiêm túc xem lại và củng cố lại toàn bộ kiến thức đã học và bài kiểm tra vừa rồi. Lên kế hoạch học tập chi tiết cho phần còn lại của học kỳ.
+Phòng Đào tạo xin thông báo về tình hình học tập của sinh viên như sau:
+Điểm trung bình học kỳ: ${studentData.gpa4_in_session !== undefined ? studentData.gpa4_in_session.toFixed(2) : '-' } (theo thang điểm 4)
+Điểm trung bình tích lũy: ${studentData.gpa4 !== undefined ? studentData.gpa4.toFixed(2) : '-' } (theo thang điểm 4)
+Số lần cảnh báo học vụ trước đây: ${studentData.totalWarnings || 0}
 
-Nhà trường và giảng viên luôn tạo điều kiện hỗ trợ, nhưng sự nỗ lực từ chính bản thân em mới là yếu tố quyết định.
+Hệ quả và yêu cầu:
+(Cảnh cáo lần 1): Sinh viên cần cải thiện kết quả học tập trong học kỳ tới.
+(Cảnh cáo lần 2): Nếu không cải thiện ở kỳ tới, sinh viên sẽ bị buộc thôi học.
+(Cảnh cáo lần 3): Sinh viên làm thủ tục thôi học theo quy định.
 
-Trân trọng.`);
+Đề nghị sinh viên và gia đình lưu ý để có phương án điều chỉnh kịp thời.
+      `);
     }
   }, [isOpen, studentData]);
 
@@ -98,9 +120,9 @@ Trân trọng.`);
     }
   };
 
-  const formatScore = (score: number | null | undefined) => {
-    return score !== null && score !== undefined ? score.toFixed(1) : '-';
-  };
+  // const formatScore = (score: number | null | undefined) => {
+  //   return score !== null && score !== undefined ? score.toFixed(1) : '-';
+  // };
 
   if (!isOpen) return null;
 
@@ -148,17 +170,10 @@ Trân trọng.`);
             {/* Student Info */}
             <div className="mb-6 p-4 bg-blue-50 rounded-lg">
               <h3 className="font-semibold text-blue-800 mb-2">Thông tin sinh viên</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+              <div className="grid grid-cols-1 md:grid-cols-2 md:grid-cols-3 gap-2 text-sm">
                 <div><span className="font-medium">Họ tên:</span> {studentData.studentName}</div>
                 <div><span className="font-medium">MSSV:</span> {studentData.student_id}</div>
-                <div><span className="font-medium">Môn học:</span> {studentData.subjectName}</div>
-                <div><span className="font-medium">LHP:</span> {studentData.course_section_id}</div>
-              </div>
-              <h3 className="font-semibold text-red-800 mt-4 mb-2">Điểm số đáng chú ý</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
-                <div><span className="font-medium">Điểm giữa kỳ:</span> {formatScore(studentData.mid)}</div>
-                <div><span className="font-medium">Điểm cuối kỳ:</span> {formatScore(studentData.final)}</div>
-                <div><span className="font-medium">Điểm trung bình:</span> {formatScore(studentData.avr)}</div>
+                <div><span className="font-medium">Số lần cảnh cáo trước đây:</span> {studentData.totalWarnings}</div>
               </div>
             </div>
 
@@ -197,7 +212,7 @@ Trân trọng.`);
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end space-x-4 p-6 border-t bg-gray-50">
+          <div className="flex justify-end space-x-4 p-2 border-t bg-gray-50">
             <button
               onClick={onClose}
               disabled={loading}

@@ -6,9 +6,10 @@ const datetimeFormatter = require("../utils/format/datetime-formatter");
 const cloudinaryService = require("../services/cloudinary.service");
 const cloudinaryUtils = require("../utils/cloudinary.utils");
 const { Chat, ChatType, MemberRole } = require('../databases/mongodb/schemas/Chat');
+const { Alert } = require('../databases/mongodb/schemas');
 const mongoose = require('mongoose');
-const alertRepo = require("./alert.repo");
 const { where } = require("../databases/mongodb/schemas/Alert");
+const { calculateGPA } = require("./score.repo");
 
 /**
  *  Lấy danh sách sinh viên + điểm số bằng course_section_id - dùng cho giảng viên
@@ -87,58 +88,48 @@ const getStudentsScoreByCourseSectionId4Lecturer = async (course_section_id) => 
             };
         }
 
-        // Lấy thông tin từng sinh viên và điểm số
-        const studentPromises = studentCourseSections.map(async (scs, i) => {
-            const studentId = scs.student_id;
+        const studentIds = studentCourseSections.map(scs => scs.student_id);
 
-            // Lấy thông tin sinh viên từ Student bằng student_id
-            const student = await models.Student.findOne({
-                where: { student_id: studentId },
+        // Lấy thông tin Student và Score song song
+        const [studentsInfo, scores] = await Promise.all([
+            models.Student.findAll({
+                where: { student_id: studentIds },
                 attributes: ['student_id', 'name', 'dob']
-            });
-
-            if (!student) {
-                console.warn(`Student not found with id: ${studentId}`);
-                return null;
-            }
-
-            // Lấy thông tin điểm từ Score theo từng student_id và course_section_id
-            const score = await models.Score.findOne({
+            }),
+            models.Score.findAll({
                 where: {
-                    student_id: studentId,
+                    student_id: studentIds,
                     course_section_id: course_section_id
-                },
-                attributes: [
-                    'theo_regular1', 'theo_regular2', 'theo_regular3',
-                    'pra_regular1', 'pra_regular2', 'pra_regular3',
-                    'mid', 'final', 'avr'
-                ]
-            });
+                }
+            })
+        ]);
 
-            // Tạo object điểm số (nếu không có điểm thì để null)
+        // Tạo Map để lookup nhanh
+        const studentMap = new Map(studentsInfo.map(s => [s.student_id, s]));
+        const scoreMap = new Map(scores.map(s => [s.student_id, s]));
+
+        // Xử lý logic đánh giá
+        let processedStudents = [];
+        let studentsNeedCheckAlert = [];
+
+        for (let i = 0; i < studentIds.length; i++) {
+            const studentId = studentIds[i];
+            const student = studentMap.get(studentId);
+            const score = scoreMap.get(studentId);
+
+            if (!student) continue;
+
             const scoreData = score ? {
-                theo_regular1: score.theo_regular1,
-                theo_regular2: score.theo_regular2,
-                theo_regular3: score.theo_regular3,
-                pra_regular1: score.pra_regular1,
-                pra_regular2: score.pra_regular2,
-                pra_regular3: score.pra_regular3,
-                mid: score.mid,
-                final: score.final,
-                avr: score.avr
+                theo_regular1: score.theo_regular1, theo_regular2: score.theo_regular2, theo_regular3: score.theo_regular3,
+                pra_regular1: score.pra_regular1, pra_regular2: score.pra_regular2, pra_regular3: score.pra_regular3,
+                mid: score.mid, final: score.final, avr: score.avr
             } : {
-                theo_regular1: null,
-                theo_regular2: null,
-                theo_regular3: null,
-                pra_regular1: null,
-                pra_regular2: null,
-                pra_regular3: null,
-                mid: null,
-                final: null,
-                avr: null
+                theo_regular1: null, theo_regular2: null, theo_regular3: null,
+                pra_regular1: null, pra_regular2: null, pra_regular3: null,
+                mid: null, final: null, avr: null
             };
 
-            // Tính toán initial_evaluate
+            // initial_evaluate
             let initial_evaluate = 'ok';
 
             if (score) {
@@ -168,47 +159,63 @@ const getStudentsScoreByCourseSectionId4Lecturer = async (course_section_id) => 
                 }
             }
 
-            const studentData = {
-                no: i + 1, // STT
+            // Đẩy vào danh sách tạm
+            const studentObj = {
+                no: 0, // Sẽ update sau khi sort
                 student_id: student.student_id,
                 name: student.name,
                 dob: datetimeFormatter.formatDateVN(student.dob),
                 score: scoreData,
-                initial_evaluate: initial_evaluate
+                initial_evaluate: initial_evaluate,
+                isRemindYet: false // Mặc định false
             };
+
+            processedStudents.push(studentObj);
 
             // Nếu cần cảnh báo, kiểm tra xem đã cảnh báo chưa
             if (initial_evaluate !== 'ok') {
-                studentData.isWarningYet = await alertRepo.isWarningYet4Student(course_section_id, student.student_id);
+                studentsNeedCheckAlert.push(studentId);
             }
+        };
 
-            return studentData;
-        });
+        // Batch Query MongoDB.
+        if (studentsNeedCheckAlert.length > 0) {
+            // Tạo regex pattern để tìm bất kỳ sinh viên nào trong danh sách: "SV001|SV002|..."
+            const studentIdsRegex = studentsNeedCheckAlert.join('|');
 
-        let students = (await Promise.all(studentPromises)).filter(s => s !== null);
+            // Tìm tất cả Alert liên quan đến lớp và danh sách sinh viên này
+            const existingAlerts = await Alert.find({
+                $and: [
+                    { header: { $regex: '^Nhắc nhở học tập', $options: 'i' } },
+                    { header: { $regex: course_section_id, $options: 'i' } },
+                    { header: { $regex: studentIdsRegex, $options: 'i' } }
+                ]
+            });
+
+            // Duyệt lại danh sách sinh viên để map kết quả từ MongoDB
+            // Với mỗi sinh viên cần check, xem có alert nào match ID của họ không
+            processedStudents.forEach(student => {
+                if (student.initial_evaluate !== 'ok') {
+                    // Kiểm tra xem có alert nào chứa student_id của SV này không
+                    const hasAlert = existingAlerts.some(alert =>
+                        new RegExp(student.student_id, 'i').test(alert.header)
+                    );
+                    student.isRemindYet = hasAlert;
+                }
+            });
+        }
 
         // Sắp xếp danh sách sinh viên theo tên tiếng Việt
-        students.sort((a, b) => {
-            // Tách tên ra khỏi họ và tên đệm
+        processedStudents.sort((a, b) => {
             const lastNameA = a.name.split(' ').pop() || '';
             const lastNameB = b.name.split(' ').pop() || '';
-
-            // So sánh tên trước
             const nameComparison = lastNameA.localeCompare(lastNameB, 'vi');
-
-            // Nếu tên khác nhau, trả về kết quả so sánh tên
-            if (nameComparison !== 0) {
-                return nameComparison;
-            }
-
-            // Nếu tên giống nhau, so sánh toàn bộ họ tên để giữ trật tự họ và tên đệm
+            if (nameComparison !== 0) return nameComparison;
             return a.name.localeCompare(b.name, 'vi');
         });
 
-        // Gán lại số thứ tự (no) sau khi đã sắp xếp
-        students.forEach((student, index) => {
-            student.no = index + 1;
-        });
+        // Đánh số thứ tự lại
+        processedStudents.forEach((s, index) => s.no = index + 1);
 
         // Trả về kết quả hoàn chỉnh
         return {
@@ -218,7 +225,7 @@ const getStudentsScoreByCourseSectionId4Lecturer = async (course_section_id) => 
             sessionName: courseSectionDetail?.session ? courseSectionDetail.session.name + ' ' + courseSectionDetail.session.years : 'N/A',
             facultyName: courseSectionDetail.subject?.faculty?.name || 'N/A',
             lecturerName: courseSectionDetail.lecturers_course_sections?.[0]?.lecturer?.name || 'N/A',
-            students: students
+            students: processedStudents
         };
 
     } catch (error) {
@@ -329,21 +336,21 @@ const getStudentInfoById4Lecturer = async (student_id) => {
         const genderStudent = (student.gender === true || student.gender === '1' || student.gender === 1) ? "Nam" : "Nữ";
 
         // Normalize parent(s) to array regardless of alias ('parent' or 'parents')
-        const parentsField = student.parent || student.parents || null;
-        const parentsArr = parentsField ? (Array.isArray(parentsField) ? parentsField : [parentsField]) : [];
+        // const parentsField = student.parent || student.parents || null;
+        // const parentsArr = parentsField ? (Array.isArray(parentsField) ? parentsField : [parentsField]) : [];
 
-        const parentInforList = parentsArr.map(parent => {
-            const genderParent = (parent.gender === true || parent.gender === '1' || parent.gender === 1) ? "Nam" : "Nữ";
-            return {
-                parent_id: parent.parent_id,
-                name: parent.name,
-                dob: parent.dob ? datetimeFormatter.formatDateVN(parent.dob) : null,
-                gender: genderParent,
-                phone: parent.phone,
-                email: parent.email,
-                address: parent.address
-            };
-        });
+        // const parentInforList = parentsArr.map(parent => {
+        //     const genderParent = (parent.gender === true || parent.gender === '1' || parent.gender === 1) ? "Nam" : "Nữ";
+        //     return {
+        //         parent_id: parent.parent_id,
+        //         name: parent.name,
+        //         dob: parent.dob ? datetimeFormatter.formatDateVN(parent.dob) : null,
+        //         gender: genderParent,
+        //         phone: parent.phone,
+        //         email: parent.email,
+        //         address: parent.address
+        //     };
+        // });
 
         return {
             student_id: student.student_id,
@@ -357,7 +364,7 @@ const getStudentInfoById4Lecturer = async (student_id) => {
             className: student.clazz ? student.clazz.name : null,
             facultyName: student.clazz && student.clazz.faculty ? student.clazz.faculty.name : null,
             majorName: student.major ? student.major.name : null,
-            parents: parentInforList
+            parent: student.parent
         };
     } catch (error) {
         console.error("Error in getStudentInfoById4Lecturer:", error);
@@ -924,156 +931,330 @@ const getStudentExamSchedule = async (student_id, options = {}) => {
 /**
  * Lấy danh sách phân trang sinh viên có điểm không đạt theo session_id và faculty_id
  * @param {string} session_id - ID của session (học kỳ)
+ * @param {string} session_name - Tên của học kỳ (VD: HK1 2024-2025)
  * @param {string} faculty_id - ID của khoa
  * @param {number} page - Trang hiện tại
  * @param {number} pageSize - Số lượng bản ghi trên một trang
  * @returns {Object} { total, page, pageSize, students, linkPrev, linkNext, pages }
  */
-const getFailedStudentsBySessionAndFaculty = async (session_id, faculty_id, option = 'all', page, pageSize = 10) => {
+const getFailedStudentsBySessionAndFaculty = async (session_id, session_name, faculty_id, option = 'all', page, pageSize = 10) => {
     try {
-        // Validate input
-        if (!session_id || !faculty_id) {
-            throw new Error('session_id and faculty_id are required');
+        if (!session_id || !session_name || !faculty_id) {
+            throw new Error('session_id, session_name and faculty_id are required');
         }
 
         const page_num = parseInt(page) || 1;
         const pageSize_num = parseInt(pageSize) || 10;
-        const offset = (page_num - 1) * pageSize_num;
 
-        // Tìm tất cả course_sections theo session_id và faculty_id
-        const courseSections = await models.CourseSection.findAll({
-            where: {
-                session_id: session_id
-            },
+        // BƯỚC 1: Lấy danh sách Student ID
+        const targetStudents = await models.Student.findAll({
+            attributes: ['student_id', 'name', 'parent_id', 'clazz_id'],
             include: [
                 {
-                    model: models.Subject,
-                    as: 'subject',
-                    where: {
-                        faculty_id: faculty_id
-                    },
-                    attributes: ['subject_id', 'name']
+                    model: models.Score,
+                    as: 'scores',
+                    attributes: [],
+                    required: true,
+                    include: [{
+                        model: models.CourseSection,
+                        as: 'course_section',
+                        attributes: [],
+                        where: { session_id: session_id },
+                        include: [{
+                            model: models.Subject,
+                            as: 'subject',
+                            attributes: [],
+                            where: { faculty_id: faculty_id }
+                        }]
+                    }]
+                },
+                {
+                    model: models.Clazz,
+                    as: 'clazz',
+                    attributes: ['name'],
+                    required: true,
+                    include: [
+                        {
+                            model: models.Faculty,
+                            as: 'faculty',
+                            attributes: ['name'],
+                            where: { faculty_id: faculty_id },
+                            required: true
+                        }
+                    ]
                 }
             ],
-            attributes: ['id']
+            raw: true,
+            nest: true
         });
 
-        if (courseSections.length === 0) {
-            return {
-                total: 0,
-                page: page_num,
-                pageSize: pageSize_num,
-                students: [],
-                linkPrev: null,
-                linkNext: null,
-                pages: []
-            };
+        // Lấy danh sách ID duy nhất
+        const distinctStudentIds = [...new Set(targetStudents.map(s => s.student_id))];
+
+        if (distinctStudentIds.length === 0) {
+            return { total: 0, page: page_num, pageSize: pageSize_num, students: [], linkPrev: null, linkNext: null, pages: [] };
         }
 
-        const courseSectionIds = courseSections.map(cs => cs.id);
-        let failedStudents = [];
-
-        // Lấy tất cả điểm của các course section này
-        const scores = await models.Score.findAll({
+        // BƯỚC 2: Lấy TOÀN BỘ lịch sử điểm
+        const allHistoryScores = await models.Score.findAll({
             where: {
-                course_section_id: { [Op.in]: courseSectionIds },
-                [Op.or]: [
-                    { mid: { [Op.lt]: 4 } },
-                    { final: { [Op.lt]: 3 } },
-                    { avr: { [Op.lt]: 4 } }
-                ]
+                student_id: { [Op.in]: distinctStudentIds }
             },
             include: [
-                {
-                    model: models.Student,
-                    as: 'student',
-                    attributes: ['student_id', 'name', 'parent_id'],
-                    required: true
-                },
                 {
                     model: models.CourseSection,
                     as: 'course_section',
-                    attributes: ['id'],
-                    include: [{
-                        model: models.Subject,
-                        as: 'subject',
-                        attributes: ['name']
-                    }]
+                    where: { isCompleted: true },
+                    attributes: ['id', 'session_id', 'subject_id'],
+                    include: [
+                        {
+                            model: models.Subject,
+                            as: 'subject',
+                            attributes: ['theo_credit', 'pra_credit']
+                        },
+                        {
+                            model: models.Session,
+                            as: 'session',
+                            attributes: ['id', 'name', 'years']
+                        }
+                    ]
                 }
             ]
         });
 
-        // Xử lý và kiểm tra cảnh báo
-        const studentCheckPromises = scores.map(async (score) => {
-            const student = score.student;
-            const courseSection = score.course_section;
+        // BƯỚC 2.1: TỐI ƯU HÓA - Fetch Alert một lần duy nhất cho toàn bộ danh sách sinh viên
+        // Tạo Regex để tìm tất cả sinh viên trong 1 query: "SV001|SV002|SV003"
+        const studentIdsRegexString = distinctStudentIds.join('|');
+        const sessionNameRegexString = session_name.replace(/-/g, '.*-.*'); // Fix lỗi khoảng trắng
 
-            // Lấy thông tin phụ huynh
-            // const parent = await models.Parent.findOne({
-            //     where: { parent_id: student.parent_id },
-            //     attributes: ['parent_id']
-            // });
-
-            // Kiểm tra đã cảnh báo chưa
-            const isWarningYet = await alertRepo.isWarningYet4Student(courseSection.id, student.student_id);
-
-            return {
-                course_section_id: courseSection.id,
-                subjectName: courseSection.subject.name,
-                student_id: student.student_id,
-                studentName: student.name,
-                theo_regular1: score.theo_regular1,
-                theo_regular2: score.theo_regular2,
-                theo_regular3: score.theo_regular3,
-                pra_regular1: score.pra_regular1,
-                pra_regular2: score.pra_regular2,
-                pra_regular3: score.pra_regular3,
-                mid: score.mid,
-                final: score.final,
-                avr: score.avr,
-                parent_id: student.parent_id || null,
-                isWarningYet: isWarningYet
-            };
+        // Query MongoDB 1 lần lấy hết cảnh báo của nhóm sinh viên này
+        const allAlerts = await Alert.find({
+            $and: [
+                { header: { $regex: '^Cảnh báo học vụ', $options: 'i' } },
+                {
+                    $or: [
+                        { header: { $regex: studentIdsRegexString, $options: 'i' } }, // Tìm trong header
+                        { receiverID: { $in: distinctStudentIds } } // Tìm theo receiverID
+                    ]
+                }
+            ]
         });
 
-        failedStudents = await Promise.all(studentCheckPromises);
+        // Tạo Map để tra cứu nhanh: student_id -> { isWarningYet, count }
+        const alertMap = {};
 
-        // Lọc theo option
-        if (option === 'notWarningYet') {
-            failedStudents = failedStudents.filter(student => !student.isWarningYet);
+        // Khởi tạo map mặc định
+        distinctStudentIds.forEach(id => {
+            alertMap[id] = { isWarningYet: false, count: 0 };
+        });
+
+        // Nhóm các Alert theo header để tránh đếm trùng khi gửi cho cả sinh viên và phụ huynh
+        const groupedAlerts = {};
+        allAlerts.forEach(alert => {
+            const header = alert.header || "";
+            if (!groupedAlerts[header]) {
+                groupedAlerts[header] = alert;
+            }
+        });
+
+        // Duyệt qua các Alert đã được nhóm để phân loại vào Map
+        Object.values(groupedAlerts).forEach(alert => {
+            const header = alert.header || "";
+
+            // Tìm xem alert này thuộc về sinh viên nào trong danh sách
+            distinctStudentIds.forEach(studentId => {
+                // Kiểm tra header chứa studentId (Case insensitive)
+                const matchedByHeader = new RegExp(studentId, 'i').test(header);
+                
+                if (matchedByHeader) {
+                    // Tăng biến đếm tổng (chỉ đếm 1 lần cho mỗi header duy nhất)
+                    alertMap[studentId].count += 1;
+
+                    // Kiểm tra xem alert này có thuộc session hiện tại không
+                    if (new RegExp(sessionNameRegexString, 'i').test(header)) {
+                        alertMap[studentId].isWarningYet = true;
+                    }
+                }
+            });
+        });
+
+        // BƯỚC 3: Xử lý logic tính toán
+        let processedStudents = [];
+        const currentSessionObj = await models.Session.findByPk(session_id);
+
+        const getSessionOrder = (sessionName, sessionYear) => {
+            const yearPart = sessionYear ? parseInt(sessionYear.split('-')[0]) : 0;
+            let termPart = 0;
+            if (sessionName.includes('HK1')) termPart = 1;
+            else if (sessionName.includes('HK2')) termPart = 2;
+            else if (sessionName.includes('HK3')) termPart = 3;
+            return yearPart * 10 + termPart;
+        };
+
+        const currentSessionOrder = getSessionOrder(currentSessionObj.name, currentSessionObj.years);
+
+        for (const studentId of distinctStudentIds) {
+            const studentInfo = targetStudents.find(s => s.student_id === studentId);
+            const studentScores = allHistoryScores.filter(s => s.student_id === studentId);
+
+            const scoresInCurrentSession = [];
+            const scoresCumulativeCurrent = [];
+            const scoresCumulativePrev = [];
+            const learnedSessions = new Set();
+
+            studentScores.forEach(score => {
+                // Kiểm tra null safety cho course_section (phòng hờ data rác)
+                if (!score.course_section || !score.course_section.session) return;
+
+                const cs = score.course_section;
+                const scoreSessionOrder = getSessionOrder(cs.session.name, cs.session.years);
+                learnedSessions.add(scoreSessionOrder);
+
+                const scoreData = {
+                    avr: score.avr,
+                    theo_credit: cs.subject ? cs.subject.theo_credit : 0,
+                    pra_credit: cs.subject ? cs.subject.pra_credit : 0
+                };
+
+                if (cs.session_id === session_id) scoresInCurrentSession.push(scoreData);
+                if (scoreSessionOrder <= currentSessionOrder) scoresCumulativeCurrent.push(scoreData);
+                if (scoreSessionOrder < currentSessionOrder) scoresCumulativePrev.push(scoreData);
+            });
+
+            const gpa10_in_session = calculateGPA(scoresInCurrentSession, '10');
+            const gpa4_in_session = calculateGPA(scoresInCurrentSession, '4');
+            const gpa10_cumulative = calculateGPA(scoresCumulativeCurrent, '10');
+            const gpa4_cumulative = calculateGPA(scoresCumulativeCurrent, '4');
+
+            const semesterIndex = Array.from(learnedSessions).filter(order => order <= currentSessionOrder).length;
+
+            const isSummerSession = session_name.toUpperCase().includes('HK3');
+            let need2Warn = false;
+
+            // CHỈ XÉT CẢNH BÁO NẾU KHÔNG PHẢI LÀ HK3
+            if (!isSummerSession) {
+                // Logic cảnh báo:
+                // a) ĐTBCHK: dưới 0.80 đối với học kỳ đầu của khóa học, dưới 1.00 đối với các học kỳ tiếp theo
+                let failBySessionGPA = false;
+                if (semesterIndex === 1) {
+                    // Học kỳ đầu của khóa học
+                    if (gpa4_in_session < 0.80) failBySessionGPA = true;
+                } else {
+                    // Các học kỳ tiếp theo
+                    if (gpa4_in_session < 1.00) failBySessionGPA = true;
+                }
+
+                // b) ĐTBCTL: dưới 1.20 (năm 1), dưới 1.40 (năm 2), dưới 1.60 (năm 3), dưới 1.80 (năm 4+)
+                // Chỉ áp dụng ĐTBCTL khi sinh viên đã hoàn thành ít nhất 1 năm học (có HK2 hoặc nhiều hơn)
+                let failByCumulativeGPA = false;
+
+                // Kiểm tra xem sinh viên đã hoàn thành năm học nào chưa
+                // CHỈ XÉT CÁC HỌC KỲ TRƯỚC HOẶC BẰNG HỌC KỲ HIỆN TẠI
+                const academicYearSessions = {};
+                Array.from(learnedSessions)
+                    .filter(sessionOrder => sessionOrder <= currentSessionOrder) // Chỉ lấy học kỳ <= hiện tại
+                    .forEach(sessionOrder => {
+                        const year = Math.floor(sessionOrder / 10);
+                        const semester = sessionOrder % 10;
+                        if (!academicYearSessions[year]) academicYearSessions[year] = [];
+                        academicYearSessions[year].push(semester);
+                    });
+
+
+
+                // Đếm số năm học đã hoàn thành (có ít nhất HK2 hoặc HK3)
+                let completedAcademicYears = 0;
+                let currentYearStatus = 'incomplete'; // Chưa hoàn thành năm hiện tại
+
+                Object.keys(academicYearSessions).forEach(year => {
+                    const semesters = academicYearSessions[year];
+                    const currentYear = Math.floor(currentSessionOrder / 10);
+                    
+                    if (parseInt(year) < currentYear) {
+                        // Năm học trước đây - tính là đã hoàn thành
+                        completedAcademicYears++;
+                    } else if (parseInt(year) === currentYear) {
+                        // Năm học hiện tại - kiểm tra xem đã qua HK1 chưa
+                        if (semesters.includes(2) || semesters.includes(3)) {
+                            currentYearStatus = 'in_progress'; // Đang trong năm nhưng đã qua HK1
+                        }
+                    }
+                });
+
+                // Chỉ áp dụng ĐTBCTL nếu sinh viên không phải mới chỉ học HK1 duy nhất
+                if (completedAcademicYears > 0 || currentYearStatus === 'in_progress') {
+                    const academicYear = completedAcademicYears + (currentYearStatus === 'in_progress' ? 1 : 0);
+                    
+                    if (academicYear === 1 && gpa4_cumulative < 1.20) {
+                        failByCumulativeGPA = true;
+                    } else if (academicYear === 2 && gpa4_cumulative < 1.40) {
+                        failByCumulativeGPA = true;
+                    } else if (academicYear === 3 && gpa4_cumulative < 1.60) {
+                        failByCumulativeGPA = true;
+                    } else if (academicYear >= 4 && gpa4_cumulative < 1.80) {
+                        failByCumulativeGPA = true;
+                    }
+                }
+
+                need2Warn = failBySessionGPA || failByCumulativeGPA;
+            }
+            const warningStatus = alertMap[studentId];
+
+            if (need2Warn) {
+                processedStudents.push({
+                    student_id: studentId,
+                    studentName: studentInfo.name,
+                    className: studentInfo.clazz ? studentInfo.clazz.name : null,
+                    facultyName: studentInfo.clazz && studentInfo.clazz.faculty ? studentInfo.clazz.faculty.name : null,
+                    gpa10_in_session: gpa10_in_session,
+                    gpa4_in_session: gpa4_in_session,
+                    gpa10: gpa10_cumulative,
+                    gpa4: gpa4_cumulative,
+                    need2Warn: need2Warn,
+                    parent_id: studentInfo.parent_id || null,
+                    isWarningYet: warningStatus.isWarningYet,
+                    totalWarnings: warningStatus.count
+                });
+            }
         }
 
-        // Sắp xếp theo tên sinh viên
-        failedStudents.sort((a, b) => {
+        // BƯỚC 4: Filter Options
+        if (option === 'notWarningYet') {
+            processedStudents = processedStudents.filter(s => !s.isWarningYet);
+        } else if (option === 'warned') {
+            processedStudents = processedStudents.filter(s => s.isWarningYet);
+        }
+
+        // BƯỚC 5: Sort
+        processedStudents.sort((a, b) => {
             const lastNameA = a.studentName.split(' ').pop() || '';
             const lastNameB = b.studentName.split(' ').pop() || '';
             const nameComparison = lastNameA.localeCompare(lastNameB, 'vi');
-            if (nameComparison !== 0) {
-                return nameComparison;
-            }
-            return a.studentName.localeCompare(b.studentName, 'vi');
+            return nameComparison !== 0 ? nameComparison : a.studentName.localeCompare(b.studentName, 'vi');
         });
 
-        // Tính toán phân trang
-        const total = failedStudents.length;
+        // BƯỚC 6: Pagination
+        const total = processedStudents.length;
         const totalPages = Math.ceil(total / pageSize_num);
-        const paginatedStudents = failedStudents.slice(offset, offset + pageSize_num);
+        const currentPage = Math.max(1, Math.min(page_num, totalPages || 1));
+        const offsetCalculated = (currentPage - 1) * pageSize_num;
 
-        // Tạo link phân trang
-        const linkPrev = page_num > 1 ?
-            `/api/students/failed?sessionId=${session_id}&facultyId=${faculty_id}&option=${option}&page=${page_num - 1}&pageSize=${pageSize_num}` : null;
-        const linkNext = page_num < totalPages ?
-            `/api/students/failed?sessionId=${session_id}&facultyId=${faculty_id}&option=${option}&page=${page_num + 1}&pageSize=${pageSize_num}` : null;
+        // Fix lỗi slice nếu mảng rỗng
+        const paginatedStudents = total > 0 ? processedStudents.slice(offsetCalculated, offsetCalculated + pageSize_num) : [];
 
-        // Tạo danh sách 3 trang liên tiếp
+        const linkPrev = currentPage > 1 ?
+            `/api/students/failed?sessionId=${session_id}&facultyId=${faculty_id}&option=${option}&page=${currentPage - 1}&pageSize=${pageSize_num}` : null;
+        const linkNext = currentPage < totalPages ?
+            `/api/students/failed?sessionId=${session_id}&facultyId=${faculty_id}&option=${option}&page=${currentPage + 1}&pageSize=${pageSize_num}` : null;
+
         const pages = [];
-        for (let i = page_num; i < page_num + 3 && i <= totalPages; i++) {
+        for (let i = currentPage; i < currentPage + 3 && i <= totalPages; i++) {
             pages.push(i);
         }
 
         return {
             total,
-            page: page_num,
+            page: currentPage,
             pageSize: pageSize_num,
             students: paginatedStudents,
             linkPrev,
@@ -1094,99 +1275,264 @@ const getFailedStudentsBySessionAndFaculty = async (session_id, faculty_id, opti
  * @param {string} student_id
  * @returns {Object} student info
  */
-const searchFailedStudentBySessionAndFacultyWithStudentId = async (session_id, faculty_id, student_id) => {
+const searchFailedStudentBySessionAndFacultyWithStudentId = async (session_id, session_name, faculty_id, student_id) => {
     try {
         // Validate input
-        if (!session_id || !faculty_id || !student_id) {
-            throw new Error('session_id, faculty_id, and student_id are required');
+        if (!session_id || !session_name || !faculty_id || !student_id) {
+            throw new Error('session_id, session_name, faculty_id and student_id are required');
         }
 
-        // Tìm tất cả course_sections theo session_id và faculty_id
-        const courseSections = await models.CourseSection.findAll({
-            where: { session_id },
-            include: [{
-                model: models.Subject,
-                as: 'subject',
-                where: { faculty_id },
-                attributes: []
-            }],
-            attributes: ['id'],
-            raw: true
+        // BƯỚC 1: Tìm thông tin sinh viên cụ thể trong Session và Faculty đó
+        const targetStudent = await models.Student.findOne({
+            where: { student_id: student_id },
+            attributes: ['student_id', 'name', 'parent_id', 'clazz_id'],
+            include: [
+                {
+                    model: models.Score,
+                    as: 'scores',
+                    attributes: [],
+                    required: true,
+                    include: [{
+                        model: models.CourseSection,
+                        as: 'course_section',
+                        attributes: [],
+                        where: { session_id: session_id },
+                        include: [{
+                            model: models.Subject,
+                            as: 'subject',
+                            attributes: [],
+                            where: { faculty_id: faculty_id }
+                        }]
+                    }]
+                },
+                {
+                    model: models.Clazz,
+                    as: 'clazz',
+                    attributes: ['name'],
+                    required: true,
+                    include: [
+                        {
+                            model: models.Faculty,
+                            as: 'faculty',
+                            attributes: ['name'],
+                            where: { faculty_id: faculty_id },
+                            required: true
+                        }
+                    ]
+                }
+            ],
+            raw: true,
+            nest: true
         });
 
-        if (courseSections.length === 0) {
-            return {
-                success: false,
-                message: 'Không tìm thấy lớp học phần nào cho khoa và học kỳ này.',
-                student: null
-            };
+        // Nếu không tìm thấy sinh viên trong khoa/kỳ này -> Return null
+        if (!targetStudent) {
+            return null;
         }
 
-        const courseSectionIds = courseSections.map(cs => cs.id);
-
-        // Lấy điểm không đạt của sinh viên trong các lớp học phần đó
-        const failedScores = await models.Score.findAll({
+        // BƯỚC 2: Lấy TOÀN BỘ lịch sử điểm của sinh viên này
+        const allHistoryScores = await models.Score.findAll({
             where: {
-                student_id,
-                course_section_id: { [Op.in]: courseSectionIds },
-                [Op.or]: [
-                    { mid: { [Op.lt]: 4 } },
-                    { final: { [Op.lt]: 3 } },
-                    { avr: { [Op.lt]: 4 } }
-                ]
+                student_id: student_id
             },
-            attributes: { exclude: ['createdAt', 'updatedAt', 'id', 'student_id'] },
             include: [
-                { model: models.Student, as: 'student', attributes: ['student_id', 'name', 'parent_id'], required: true },
                 {
                     model: models.CourseSection,
                     as: 'course_section',
-                    attributes: ['id'],
-                    include: [{ model: models.Subject, as: 'subject', attributes: ['name'] }]
+                    where: { isCompleted: true },
+                    attributes: ['id', 'session_id', 'subject_id'],
+                    include: [
+                        {
+                            model: models.Subject,
+                            as: 'subject',
+                            attributes: ['theo_credit', 'pra_credit']
+                        },
+                        {
+                            model: models.Session,
+                            as: 'session',
+                            attributes: ['id', 'name', 'years']
+                        }
+                    ]
                 }
             ]
         });
 
-        if (failedScores.length === 0) {
+        // BƯỚC 3: Xử lý logic tính toán
+        const currentSessionObj = await models.Session.findByPk(session_id);
+
+        const getSessionOrder = (sessionName, sessionYear) => {
+            const yearPart = sessionYear ? parseInt(sessionYear.split('-')[0]) : 0;
+            let termPart = 0;
+            if (sessionName.includes('HK1')) termPart = 1;
+            else if (sessionName.includes('HK2')) termPart = 2;
+            else if (sessionName.includes('HK3')) termPart = 3;
+            return yearPart * 10 + termPart;
+        };
+
+        const currentSessionOrder = getSessionOrder(currentSessionObj.name, currentSessionObj.years);
+
+        // Phân loại điểm
+        const scoresInCurrentSession = [];
+        const scoresCumulativeCurrent = [];
+        const scoresCumulativePrev = [];
+        const learnedSessions = new Set();
+
+        allHistoryScores.forEach(score => {
+            if (!score.course_section || !score.course_section.session) return;
+
+            const cs = score.course_section;
+            const scoreSessionOrder = getSessionOrder(cs.session.name, cs.session.years);
+            learnedSessions.add(scoreSessionOrder);
+
+            const scoreData = {
+                avr: score.avr,
+                theo_credit: cs.subject ? cs.subject.theo_credit : 0,
+                pra_credit: cs.subject ? cs.subject.pra_credit : 0
+            };
+
+            if (cs.session_id === session_id) scoresInCurrentSession.push(scoreData);
+            if (scoreSessionOrder <= currentSessionOrder) scoresCumulativeCurrent.push(scoreData);
+            if (scoreSessionOrder < currentSessionOrder) scoresCumulativePrev.push(scoreData);
+        });
+
+        // Tính GPA
+        const gpa10_in_session = calculateGPA(scoresInCurrentSession, '10');
+        const gpa4_in_session = calculateGPA(scoresInCurrentSession, '4');
+        const gpa10_cumulative = calculateGPA(scoresCumulativeCurrent, '10');
+        const gpa4_cumulative = calculateGPA(scoresCumulativeCurrent, '4');
+
+        // Logic xét cảnh báo theo quy định mới
+        const semesterIndex = Array.from(learnedSessions).filter(order => order <= currentSessionOrder).length;
+
+        const isSummerSession = session_name.toUpperCase().includes('HK3');
+        let need2Warn = false;
+
+        // CHỈ XÉT CẢNH BÁO NẾU KHÔNG PHẢI LÀ HK3
+        if (!isSummerSession) {
+            // a) ĐTBCHK: dưới 0.80 đối với học kỳ đầu của khóa học, dưới 1.00 đối với các học kỳ tiếp theo
+            let failBySessionGPA = false;
+            if (semesterIndex === 1) {
+                // Học kỳ đầu của khóa học
+                if (gpa4_in_session < 0.80) failBySessionGPA = true;
+            } else {
+                // Các học kỳ tiếp theo
+                if (gpa4_in_session < 1.00) failBySessionGPA = true;
+            }
+
+            // b) ĐTBCTL: dưới 1.20 (năm 1), dưới 1.40 (năm 2), dưới 1.60 (năm 3), dưới 1.80 (năm 4+)
+            // Chỉ áp dụng ĐTBCTL khi sinh viên đã hoàn thành ít nhất 1 năm học (có HK2 hoặc nhiều hơn)
+            let failByCumulativeGPA = false;
+
+            // Kiểm tra xem sinh viên đã hoàn thành năm học nào chưa
+            // CHỈ XÉT CÁC HỌC KỲ TRƯỚC HOẶC BẰNG HỌC KỲ HIỆN TẠI
+            const academicYearSessions = {};
+            Array.from(learnedSessions)
+                .filter(sessionOrder => sessionOrder <= currentSessionOrder) // Chỉ lấy học kỳ <= hiện tại
+                .forEach(sessionOrder => {
+                    const year = Math.floor(sessionOrder / 10);
+                    const semester = sessionOrder % 10;
+                    if (!academicYearSessions[year]) academicYearSessions[year] = [];
+                    academicYearSessions[year].push(semester);
+                });
+
+            // Đếm số năm học đã hoàn thành (có ít nhất HK2 hoặc HK3)
+            let completedAcademicYears = 0;
+            let currentYearStatus = 'incomplete'; // Chưa hoàn thành năm hiện tại
+
+            Object.keys(academicYearSessions).forEach(year => {
+                const semesters = academicYearSessions[year];
+                const currentYear = Math.floor(currentSessionOrder / 10);
+                
+                if (parseInt(year) < currentYear) {
+                    // Năm học trước đây - tính là đã hoàn thành
+                    completedAcademicYears++;
+                } else if (parseInt(year) === currentYear) {
+                    // Năm học hiện tại - kiểm tra xem đã qua HK1 chưa
+                    if (semesters.includes(2) || semesters.includes(3)) {
+                        currentYearStatus = 'in_progress'; // Đang trong năm nhưng đã qua HK1
+                    }
+                }
+            });
+
+            // Chỉ áp dụng ĐTBCTL nếu sinh viên không phải mới chỉ học HK1 duy nhất
+            if (completedAcademicYears > 0 || currentYearStatus === 'in_progress') {
+                const academicYear = completedAcademicYears + (currentYearStatus === 'in_progress' ? 1 : 0);
+                
+                if (academicYear === 1 && gpa4_cumulative < 1.20) {
+                    failByCumulativeGPA = true;
+                } else if (academicYear === 2 && gpa4_cumulative < 1.40) {
+                    failByCumulativeGPA = true;
+                } else if (academicYear === 3 && gpa4_cumulative < 1.60) {
+                    failByCumulativeGPA = true;
+                } else if (academicYear >= 4 && gpa4_cumulative < 1.80) {
+                    failByCumulativeGPA = true;
+                }
+            }
+
+            need2Warn = failBySessionGPA || failByCumulativeGPA;
+        }
+
+        // BƯỚC 4: Kiểm tra trạng thái Alert trong MongoDB
+        const sessionNameRegexString = session_name.replace(/-/g, '.*-.*');
+
+        // Đếm cảnh báo trong kỳ hiện tại (sử dụng distinct header để tránh đếm trùng)
+        const currentSessionAlerts = await Alert.find({
+            $and: [
+                { header: { $regex: '^Cảnh báo học vụ', $options: 'i' } },
+                { header: { $regex: sessionNameRegexString, $options: 'i' } },
+                {
+                    $or: [
+                        { header: { $regex: student_id, $options: 'i' } },
+                        { receiverID: student_id }
+                    ]
+                }
+            ]
+        });
+        
+        // Đếm số header duy nhất
+        const uniqueCurrentHeaders = new Set(currentSessionAlerts.map(alert => alert.header));
+        const countCurrentSession = uniqueCurrentHeaders.size;
+
+        // Đếm tổng cảnh báo (sử dụng distinct header để tránh đếm trùng)
+        const totalAlerts = await Alert.find({
+            $and: [
+                { header: { $regex: '^Cảnh báo học vụ', $options: 'i' } },
+                {
+                    $or: [
+                        { header: { $regex: student_id, $options: 'i' } },
+                        { receiverID: student_id }
+                    ]
+                }
+            ]
+        });
+        
+        // Đếm số header duy nhất
+        const uniqueTotalHeaders = new Set(totalAlerts.map(alert => alert.header));
+        const countTotal = uniqueTotalHeaders.size;
+
+        const isWarningYet = countCurrentSession > 0;
+
+        // BƯỚC 5: Trả về kết quả
+        // Chỉ trả về data nếu sinh viên vi phạm quy chế (Fail)
+        if (need2Warn) {
             return {
-                success: true,
-                message: 'Sinh viên không có môn nào không đạt trong khoa và học kỳ này.',
-                student: null
+                student_id: student_id,
+                studentName: targetStudent.name,
+                className: targetStudent.clazz ? targetStudent.clazz.name : null,
+                facultyName: targetStudent.clazz && targetStudent.clazz.faculty ? targetStudent.clazz.faculty.name : null,
+                gpa10_in_session: gpa10_in_session,
+                gpa4_in_session: gpa4_in_session,
+                gpa10: gpa10_cumulative,
+                gpa4: gpa4_cumulative,
+                need2Warn: need2Warn,
+                parent_id: targetStudent.parent_id || null,
+                isWarningYet: isWarningYet,
+                totalWarnings: countTotal
             };
         }
 
-        // Xử lý và kiểm tra cảnh báo cho từng môn học không đạt
-        const failedSubjects = await Promise.all(
-            failedScores.map(async (score) => {
-                const plain = score.get({ plain: true });
-                const isWarningYet = await alertRepo.isWarningYet4Student(
-                    plain.course_section.id,
-                    student_id
-                );
-
-                return {
-                    course_section_id: plain.course_section.id,
-                    subjectName: plain.course_section.subject.name,
-                    theo_regular1: plain.theo_regular1,
-                    theo_regular2: plain.theo_regular2,
-                    theo_regular3: plain.theo_regular3,
-                    pra_regular1: plain.pra_regular1,
-                    pra_regular2: plain.pra_regular2,
-                    pra_regular3: plain.pra_regular3,
-                    mid: plain.mid,
-                    final: plain.final,
-                    avr: plain.avr,
-                    isWarningYet
-                };
-            })
-        );
-
-        return {
-            student_id: failedScores[0].student.student_id,
-            studentName: failedScores[0].student.name,
-            parent_id: failedScores[0].student.parent_id || null,
-            failedSubjects
-        };
+        // Nếu sinh viên không bị cảnh báo
+        return null;
 
     } catch (error) {
         console.error('Error in searchFailedStudentBySessionAndFacultyWithStudentId:', error);

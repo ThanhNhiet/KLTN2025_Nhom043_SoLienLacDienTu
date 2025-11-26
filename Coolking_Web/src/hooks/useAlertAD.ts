@@ -9,7 +9,6 @@ export interface Alert {
     body: string;
     targetScope: 'all' | 'person';
     isRead: boolean;
-    isWarningYet?: boolean;
     createdAt: string;
     updatedAt: string;
 }

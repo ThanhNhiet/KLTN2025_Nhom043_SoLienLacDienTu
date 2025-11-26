@@ -4,7 +4,6 @@ import { useAlert, type Alert } from '../../../hooks/useAlertAD';
 import HeaderAdCpn from '../../../components/admin/HeaderAdCpn';
 import FooterAdCpn from '../../../components/admin/FooterAdCpn';
 import SendFormModal from './SendFormModal';
-import SendWarning4LeReqModal from './SendWarning4LeReqModal';
 import AlertDetailModal from './AlertDetailModal';
 import EditFormModal from './EditFormModal';
 
@@ -19,8 +18,6 @@ const AlertDashboardPage: React.FC = () => {
   const [showSuccessNotification, setShowSuccessNotification] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [showActionMenu, setShowActionMenu] = useState<string | null>(null);
-  const [showSendWarningModal, setShowSendWarningModal] = useState(false);
-  const [alertToSendWarning, setAlertToSendWarning] = useState<Alert | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingAlert, setEditingAlert] = useState<Alert | null>(null);
   const navigate = useNavigate();
@@ -48,12 +45,6 @@ const AlertDashboardPage: React.FC = () => {
 
   const handleActionClick = (alertId: string) => {
     setShowActionMenu(showActionMenu === alertId ? null : alertId);
-  };
-
-  const handleSendWarningClick = (alert: Alert) => {
-    setAlertToSendWarning(alert);
-    setShowSendWarningModal(true);
-    setShowActionMenu(null);
   };
 
   const handleEditClick = (alert: Alert) => {
@@ -290,18 +281,6 @@ const AlertDashboardPage: React.FC = () => {
                                 <span className="text-red-500">🗑️</span>
                                 <span>Xóa</span>
                               </button>
-                              {alert.isWarningYet !== null && alert.isWarningYet !== false && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleSendWarningClick(alert);
-                                  }}
-                                  className="w-full text-left px-4 py-2 hover:bg-yellow-50 text-sm text-gray-700 transition-colors duration-200 flex items-center gap-2"
-                                >
-                                  <span className="text-yellow-500">⚠️</span>
-                                  <span>Gửi cảnh báo học vụ</span>
-                                </button>
-                              )}
                             </div>
                           </div>
                         )}
@@ -415,14 +394,6 @@ const AlertDashboardPage: React.FC = () => {
         isOpen={showSendModal}
         onClose={() => setShowSendModal(false)}
         onSuccess={handleSendSuccess}
-      />
-
-      {/* Send Warning Modal */}
-      <SendWarning4LeReqModal
-        isOpen={showSendWarningModal}
-        onClose={() => setShowSendWarningModal(false)}
-        onSuccess={handleSendSuccess}
-        alert={alertToSendWarning}
       />
 
       {/* Alert Detail Modal */}
