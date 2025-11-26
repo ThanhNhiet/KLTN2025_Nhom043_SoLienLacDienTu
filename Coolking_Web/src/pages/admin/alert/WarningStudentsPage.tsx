@@ -311,10 +311,12 @@ const WarningStudentsPage: React.FC = () => {
                                         <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900">{searchResult.totalWarnings}</td>
                                         <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900">
                                             <button
-                                                disabled={searchResult.isWarningYet || (!searchResult.isFailBy_gpaInSession_continuous && !searchResult.isFailBy_gpa_continuous)}
+                                                disabled={searchResult.isWarningYet || !searchResult.need2Warn}
                                                 className={`px-3 py-2 rounded-lg font-medium transition-colors duration-200 ${
-                                                    searchResult.isWarningYet || (!searchResult.isFailBy_gpaInSession_continuous && !searchResult.isFailBy_gpa_continuous)
+                                                    searchResult.isWarningYet || !searchResult.need2Warn
                                                         ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                                                        : searchResult.totalWarnings === 2 && !searchResult.isWarningYet
+                                                        ? 'bg-orange-500 hover:bg-orange-600 text-white'
                                                         : 'bg-red-500 hover:bg-red-600 text-white'
                                                 }`}
                                                 onClick={() => {
@@ -323,7 +325,8 @@ const WarningStudentsPage: React.FC = () => {
                                                 }}
                                             >
                                                 {searchResult.isWarningYet ? 'Đã cảnh báo' : 
-                                                 (!searchResult.isFailBy_gpaInSession_continuous && !searchResult.isFailBy_gpa_continuous) ? 'Không đủ điều kiện' : 'Gửi cảnh báo'}
+                                                 !searchResult.need2Warn ? 'Không đủ điều kiện' :
+                                                 searchResult.totalWarnings === 2 && !searchResult.isWarningYet ? 'Buộc thôi học' : 'Gửi cảnh báo'}
                                             </button>
                                         </td>
                                     </tr>
@@ -348,10 +351,12 @@ const WarningStudentsPage: React.FC = () => {
                                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900">{student.totalWarnings}</td>
                                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900">
                                                     <button
-                                                        disabled={student.isWarningYet || (!student.isFailBy_gpaInSession_continuous && !student.isFailBy_gpa_continuous)}
+                                                        disabled={student.isWarningYet || !student.need2Warn}
                                                         className={`px-3 py-2 rounded-lg font-medium transition-colors duration-200 ${
-                                                            student.isWarningYet || (!student.isFailBy_gpaInSession_continuous && !student.isFailBy_gpa_continuous)
+                                                            student.isWarningYet || !student.need2Warn
                                                                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                                                                : student.totalWarnings === 2 && !student.isWarningYet
+                                                                ? 'bg-orange-500 hover:bg-orange-600 text-white'
                                                                 : 'bg-red-500 hover:bg-red-600 text-white'
                                                         }`}
                                                         onClick={() => {
@@ -360,7 +365,8 @@ const WarningStudentsPage: React.FC = () => {
                                                         }}
                                                     >
                                                         {student.isWarningYet ? 'Đã cảnh báo' : 
-                                                         (!student.isFailBy_gpaInSession_continuous && !student.isFailBy_gpa_continuous) ? 'Không đủ điều kiện' : 'Gửi cảnh báo'}
+                                                         !student.need2Warn ? 'Không đủ điều kiện' :
+                                                         student.totalWarnings === 2 && !student.isWarningYet ? 'Buộc thôi học' : 'Gửi cảnh báo'}
                                                     </button>
                                                 </td>
                                             </tr>
