@@ -89,6 +89,7 @@ export const useStudent = () => {
     // search student warning
     const searchStudentWarningSubject = useCallback(async (params: {
         sessionId: string;
+        sessionName: string;
         facultyId: string;
         studentId: string;
     }) => {

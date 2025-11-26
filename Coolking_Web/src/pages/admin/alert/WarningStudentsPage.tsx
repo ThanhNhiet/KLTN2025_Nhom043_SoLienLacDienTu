@@ -76,6 +76,7 @@ const WarningStudentsPage: React.FC = () => {
         try {
             const params = {
                 sessionId: selectedSession,
+                sessionName: selectedSessionName,
                 facultyId: selectedFaculty,
                 studentId: studentSearch.trim()
             };
@@ -274,26 +275,20 @@ const WarningStudentsPage: React.FC = () => {
                         <table className="w-full">
                             <thead className="bg-gray-50 border-b border-gray-200">
                                 <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mã lớp học phần</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tên môn học</th>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">MSSV</th>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Họ tên</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">LT TK1</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">LT TK2</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">LT TK3</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">TH TK1</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">TH TK2</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">TH TK3</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">GK</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CK</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">TB</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hành động</th>
+                                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Điểm TBHK Hệ 10</th>
+                                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Điểm TBHK Hệ 4</th>
+                                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Điểm TBTL Hệ 10</th>
+                                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Điểm TBTL Hệ 4</th>
+                                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Số lần cảnh cáo</th>
+                                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Hành động</th>
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200 relative">
                                 {loading && (
                                     <tr>
-                                        <td colSpan={14} className="px-4 py-6 text-center text-gray-500">
+                                        <td colSpan={8} className="px-4 py-6 text-center text-gray-500">
                                             <div className="flex items-center justify-center">
                                                 <svg className="animate-spin h-5 w-5 mr-2 text-blue-500" viewBox="0 0 24 24">
                                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -306,50 +301,36 @@ const WarningStudentsPage: React.FC = () => {
                                 )}
                                 {/* Nếu có searchResult thì hiển thị riêng */}
                                 {searchResult ? (
-                                    searchResult.failedSubjects && searchResult.failedSubjects.length > 0 ? (
-                                        searchResult.failedSubjects.map((subject: any, idx: number) => (
-                                            <tr key={idx}>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-900">{subject.course_section_id}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{subject.subjectName}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{searchResult.student_id}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{searchResult.studentName}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{subject.theo_regular1}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{subject.theo_regular2}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{subject.theo_regular3}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{subject.pra_regular1}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{subject.pra_regular2}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{subject.pra_regular3}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{subject.mid}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{subject.final}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{subject.avr}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                                    <button
-                                                        disabled={subject.isWarningYet}
-                                                        className={`px-3 py-2 rounded-lg font-medium transition-colors duration-200 ${subject.isWarningYet ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600 text-white'}`}
-                                                        onClick={() => {
-                                                            setSelectedStudent({
-                                                                ...subject,
-                                                                student_id: searchResult.student_id,
-                                                                studentName: searchResult.studentName,
-                                                                parent_id: searchResult.parent_id
-                                                            });
-                                                            setShowWarningModal(true);
-                                                        }}
-                                                    >
-                                                        Gửi cảnh báo
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={14} className="px-4 py-6 text-center text-gray-500">Không có dữ liệu</td>
-                                        </tr>
-                                    )
+                                    <tr>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-900">{searchResult.student_id}</td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{searchResult.studentName}</td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900">{searchResult.gpa10_in_session}</td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900">{searchResult.gpa4_in_session}</td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900">{searchResult.gpa10}</td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900">{searchResult.gpa4}</td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900">{searchResult.totalWarnings}</td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900">
+                                            <button
+                                                disabled={searchResult.isWarningYet || (!searchResult.isFailBy_gpaInSession_continuous && !searchResult.isFailBy_gpa_continuous)}
+                                                className={`px-3 py-2 rounded-lg font-medium transition-colors duration-200 ${
+                                                    searchResult.isWarningYet || (!searchResult.isFailBy_gpaInSession_continuous && !searchResult.isFailBy_gpa_continuous)
+                                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                                                        : 'bg-red-500 hover:bg-red-600 text-white'
+                                                }`}
+                                                onClick={() => {
+                                                    setSelectedStudent(searchResult);
+                                                    setShowWarningModal(true);
+                                                }}
+                                            >
+                                                {searchResult.isWarningYet ? 'Đã cảnh báo' : 
+                                                 (!searchResult.isFailBy_gpaInSession_continuous && !searchResult.isFailBy_gpa_continuous) ? 'Không đủ điều kiện' : 'Gửi cảnh báo'}
+                                            </button>
+                                        </td>
+                                    </tr>
                                 ) : (
                                     !loading && (students.length === 0 || error) ? (
                                         <tr>
-                                            <td colSpan={14} className="px-4 py-6 text-center text-gray-500">
+                                            <td colSpan={8} className="px-4 py-6 text-center text-gray-500">
                                                 {error ? (
                                                     <span className="text-red-500">{error}</span>
                                                 ) : 'Không có dữ liệu hoặc bạn chưa chọn Học kỳ và Khoa để tìm kiếm.'}
@@ -358,29 +339,28 @@ const WarningStudentsPage: React.FC = () => {
                                     ) : (
                                         !loading && students.map((student, idx) => (
                                             <tr key={idx}>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-900">{student.course_section_id}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{student.subjectName}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{student.student_id}</td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-900">{student.student_id}</td>
                                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{student.studentName}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{student.theo_regular1}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{student.theo_regular2}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{student.theo_regular3}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{student.pra_regular1}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{student.pra_regular2}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{student.pra_regular3}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{student.mid}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{student.final}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{student.avr}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900">{student.gpa10_in_session}</td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900">{student.gpa4_in_session}</td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900">{student.gpa10}</td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900">{student.gpa4}</td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900">{student.totalWarnings}</td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900">
                                                     <button
-                                                        disabled={student.isWarningYet}
-                                                        className={`px-3 py-2 rounded-lg font-medium transition-colors duration-200 ${student.isWarningYet ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+                                                        disabled={student.isWarningYet || (!student.isFailBy_gpaInSession_continuous && !student.isFailBy_gpa_continuous)}
+                                                        className={`px-3 py-2 rounded-lg font-medium transition-colors duration-200 ${
+                                                            student.isWarningYet || (!student.isFailBy_gpaInSession_continuous && !student.isFailBy_gpa_continuous)
+                                                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                                                                : 'bg-red-500 hover:bg-red-600 text-white'
+                                                        }`}
                                                         onClick={() => {
                                                             setSelectedStudent(student);
                                                             setShowWarningModal(true);
                                                         }}
                                                     >
-                                                        Gửi cảnh báo
+                                                        {student.isWarningYet ? 'Đã cảnh báo' : 
+                                                         (!student.isFailBy_gpaInSession_continuous && !student.isFailBy_gpa_continuous) ? 'Không đủ điều kiện' : 'Gửi cảnh báo'}
                                                     </button>
                                                 </td>
                                             </tr>
@@ -432,6 +412,7 @@ const WarningStudentsPage: React.FC = () => {
                             }}
                             onSuccess={handleFetchStudents} // Refresh list on success
                             studentData={selectedStudent}
+                            sessionName={selectedSessionName}
                         />
                     )}
                 </div>

@@ -30,6 +30,7 @@ class StudentServices {
     // GET /api/students/warn-list/search?sessionId=&facultyId=&studentId=
     async searchStudentWarningSubject(params: {
         sessionId: string;
+        sessionName: string;
         facultyId: string;
         studentId: string;
     }) {
