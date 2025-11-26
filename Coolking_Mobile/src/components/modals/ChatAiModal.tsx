@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState,useEffect,useCallback,useRef} from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import {
   ScrollView,
     Image,
  ActivityIndicator,
+ NativeSyntheticEvent,
+ NativeScrollEvent
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { useMessageAi } from '@/src/services/useapi/chat/UseMessageAi';
@@ -75,6 +77,8 @@ type ChatAiModalProps = {
 };
 
 const ChatAiModal = ({ visible, onClose, chatId }: ChatAiModalProps) => {
+  const flatListRef = useRef<FlatList<ItemMessage>>(null);
+  const [isAtBottom, setIsAtBottom] = useState(true);
   
   
   // --- 1. State chỉ lưu 1 FAQ (hoặc null) ---
@@ -103,6 +107,70 @@ const ChatAiModal = ({ visible, onClose, chatId }: ChatAiModalProps) => {
         loadMoreMessages, 
         handleSendPress,
     } = useMessageAi(chatId);
+
+     const lastLoadTime = useRef(0);
+    const loadingTriggered = useRef(false);
+    const previousScrollY = useRef(0);
+    const isFirstLoad = useRef(true);
+    
+    // FIX: Đơn giản hóa logic load more
+    const handleLoadMore = useCallback(() => {
+        const now = Date.now();
+        
+        // Kiểm tra tất cả điều kiện
+        if (loadingMore || !hasMore || loadingTriggered.current) {
+            return;
+        }
+        
+        // Kiểm tra timing
+        if (now - lastLoadTime.current < 1500) {
+            return;
+        }
+        
+        loadingTriggered.current = true;
+        lastLoadTime.current = now;
+        console.log("✅ Loading more messages...");
+        
+        loadMoreMessages();
+        
+        // Reset flag sau 2 giây
+        setTimeout(() => {
+            loadingTriggered.current = false;
+        }, 2000);
+    }, [loadingMore, hasMore, loadMoreMessages]);
+    
+    // FIX: Cải thiện scroll detection
+    const handleOnScroll = useCallback(({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) => {
+        const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+        
+        // Kiểm tra đã đến đáy hay chưa
+        const isAtBottomNow = layoutMeasurement.height + contentOffset.y >= contentSize.height - 50;
+        setIsAtBottom(isAtBottomNow);
+        
+        // Chỉ load more khi scroll lên gần top
+        const currentScrollY = contentOffset.y;
+        const isScrollingUp = currentScrollY < previousScrollY.current;
+        previousScrollY.current = currentScrollY;
+        
+        // Load khi gần top
+        const isNearTop = currentScrollY < 50 && contentSize.height > layoutMeasurement.height;
+        
+        if (isScrollingUp && isNearTop && hasMore && !loadingMore && !loadingTriggered.current) {
+            console.log("📍 Near top - triggering load more");
+            handleLoadMore();
+        }
+    }, [hasMore, loadingMore, handleLoadMore]);
+    
+    // Scroll to end khi load xong
+    useEffect(() => {
+        if (isFirstLoad.current && messages.length > 0 && !loading) {
+            const timer = setTimeout(() => {
+                flatListRef.current?.scrollToEnd({ animated: false });
+                isFirstLoad.current = false;
+            }, 50);
+            return () => clearTimeout(timer);
+        }
+    }, [messages.length, loading]);
 
   // --- 4. Hàm xử lý khi nhấn FAQ (Đã cập nhật) ---
   const handleFaqPress = (faqText: string) => {
@@ -188,20 +256,43 @@ const ChatAiModal = ({ visible, onClose, chatId }: ChatAiModalProps) => {
             style={styles.keyboardView}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0} 
           >
-            <FlatList
-              data={messages}
-              renderItem={renderMessage}
-              keyExtractor={item => item._id}
-              style={styles.list}
-              contentContainerStyle={{ paddingBottom: 20 }}
-              onEndReached={loadMoreMessages} 
-              
-              // 2. Ngưỡng kích hoạt (cách đỉnh 50%)
-              onEndReachedThreshold={0.5} 
-              
-              // 3. Hiển thị spinner ở ĐỈNH (vì list 'inverted')
-              ListFooterComponent={renderLoadingFooter}
-            />
+           <FlatList
+                                           ref={flatListRef}
+                                           data={messages}
+                                           keyExtractor={(item, index) => `${item._id}-${index}`}
+                                           renderItem={({ item }) => (
+                                                renderMessage({ item })
+                                               
+                                           )}
+                                           onScroll={handleOnScroll}
+                                           scrollEventThrottle={1000}
+                                           scrollEnabled={true}
+                                           nestedScrollEnabled={true}
+                                           style={styles.messageList}
+                                           contentContainerStyle={{
+                                               paddingVertical: 10,
+                                               paddingHorizontal: 10,
+                                               flexGrow: 1,
+                                               justifyContent: 'flex-end'
+                                           }}
+                                           ListHeaderComponent={() => {
+                                               if (!loadingMore) return null;
+                                               return (
+                                                   <View style={styles.loadingMoreContainer}>
+                                                       <ActivityIndicator size="small" color="#007AFF" />
+                                                   </View>
+                                               );
+                                           }}
+                                           maintainVisibleContentPosition={{
+                                               minIndexForVisible: 0,
+                                               autoscrollToTopThreshold: 50
+                                           }}
+                                           onContentSizeChange={() => {
+                                               if (!isFirstLoad.current && isAtBottom) {
+                                                   flatListRef.current?.scrollToEnd({ animated: true });
+                                               }
+                                           }}
+                                       />
 
             {/* --- 5. KHUNG FAQ (Cập nhật logic `isSelected`) --- */}
             <View style={styles.faqContainer}>
@@ -333,6 +424,14 @@ const styles = StyleSheet.create({
         alignSelf: 'flex-start',  // Căn toàn bộ sang trái
         marginBottom: 10,         // Giữ khoảng cách với tin nhắn dưới
         maxWidth: '85%',          // Giới hạn chiều rộng
+    },
+    loadingMoreContainer: {
+        padding: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    messageList: {
+        flex: 1,
     },
     
     // 2. Style cho Avatar

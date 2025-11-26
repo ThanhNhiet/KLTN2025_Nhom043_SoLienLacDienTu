@@ -10,13 +10,13 @@ const getBaseUrl = () => {
     if (Platform.OS === 'web') {
         return 'http://localhost:3000';
     }
-    return API_URL;
+    return API_URL|| 'https://e-contact-book-coolking-kvt4.onrender.com';
 };
 
 // Set base URL to AsyncStorage for axiosInstance
 const initializeBaseUrl = async () => {
     const baseUrl = getBaseUrl();
-    console.log("Base URL set to:", baseUrl);
+    //console.log("Base URL set to:", baseUrl);
     await AsyncStorage.setItem('url', baseUrl);
 };
 
