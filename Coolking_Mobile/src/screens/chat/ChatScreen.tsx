@@ -12,6 +12,7 @@ import {
     Alert
 } from 'react-native';
 import { useNavigation } from "@react-navigation/native";
+import { useIsFocused } from '@react-navigation/native';
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import TopNavigations_Chat from '@/src/components/navigations/TopNavigations_Chat';
 import ChatAiModal from '@/src/components/modals/ChatAiModal';
@@ -24,6 +25,8 @@ let socket: any = null;
 try {
     if (API_URL) {
         socket = io(API_URL, { transports: ['websocket'] });
+    } else {
+        socket = io('https://e-contact-book-coolking-kvt4.onrender.com', { transports: ['websocket'] });
     }
 } catch (e) {
     // If socket initialization fails, keep socket as null and log the error
@@ -109,6 +112,7 @@ type ItemReplyInfo = {
 
 // --- Component ChatItem (không đổi logic, chỉ áp dụng style mới) ---
 const ChatItem = ({ item, onPress, userID }: ChatItemProps) => {
+    
     const isUnread = item.lastMessage && item.lastMessage.senderID !== userID && item.unread;
 
     const formatTimeUTC = (dateString: string) => {
@@ -179,11 +183,15 @@ export default function ChatScreen() {
     const [localChats, setLocalChats] = useState<ChatItemType[]>([]);
      const [modalVisible, setModalVisible] = useState(false);
      const [chatAIId, setChatAIId] = useState<string | null>(null);
+     const isFocused = useIsFocused();
 
-    // Initialize localChats when chats changes
-    useEffect(() => {
-        setLocalChats(chats);
-    }, [chats]);
+     useEffect(() => {
+    if (isFocused) {
+        refetch();
+      setLocalChats(chats);
+    }
+  }, [isFocused, chats]);
+
 
     const handleCreatePrivateChatAI = async () => {
         const newChat = await createPrivateChatAI();

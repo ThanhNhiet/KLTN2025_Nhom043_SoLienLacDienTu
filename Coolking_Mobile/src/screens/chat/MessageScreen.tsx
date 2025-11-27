@@ -665,7 +665,6 @@ const handleLoadMore = useCallback(() => {
     
     loadingTriggered.current = true;
     lastLoadTime.current = now;
-    console.log("✅ Loading more messages...");
     
     loadMoreMessages();
     
@@ -692,7 +691,7 @@ const handleOnScroll = useCallback(({ nativeEvent }: NativeSyntheticEvent<Native
     const isNearTop = currentScrollY < 50 && contentSize.height > layoutMeasurement.height;
     
     if (isScrollingUp && isNearTop && hasMore && !loadingMore && !loadingTriggered.current) {
-        console.log("📍 Near top - triggering load more");
+        
         handleLoadMore();
     }
 }, [hasMore, loadingMore, handleLoadMore]);

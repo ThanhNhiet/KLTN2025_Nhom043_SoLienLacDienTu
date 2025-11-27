@@ -42,7 +42,7 @@ const setAuthHeader = (config: AxiosRequestConfig, token: string) => {
 
 const getBase = async () => {
   const base = await AsyncStorage.getItem('url');
-  return base || '';
+  return base || 'https://e-contact-book-coolking-kvt4.onrender.com';
 };
 
 // ====== Request Interceptor ======

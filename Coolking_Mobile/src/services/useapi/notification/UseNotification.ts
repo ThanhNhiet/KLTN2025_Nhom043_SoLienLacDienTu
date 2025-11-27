@@ -39,9 +39,9 @@ export const UseNotification = () => {
         }
     };
 
-    useEffect(() => {
-        fetchNotifications();
-    }, []);
+    // useEffect(() => {
+    //     fetchNotifications();
+    // }, []);
     
 
     const markNotificationAsRead = async (alertId: string) => {
@@ -105,6 +105,20 @@ export const UseNotification = () => {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        // gọi ngay lần đầu
+        fetchNotifications();
+
+        const interval = setInterval(() => {
+            fetchNotifications();
+        }, 60_000); // 1 phút
+
+        return () => {
+            clearInterval(interval); // cleanup khi unmount
+        };
+    }, []);
+
 
 
 

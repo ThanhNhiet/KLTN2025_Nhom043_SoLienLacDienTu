@@ -18,11 +18,19 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { set } from "date-fns";
 import {API_URL} from "@env";
-
 import { io } from 'socket.io-client';
-import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
-const socket = io(API_URL, { transports: ['websocket'] });
+let socket: any = null;
+try {
+    if (API_URL) {
+        socket = io(API_URL, { transports: ['websocket'] });
+    } else {
+        socket = io('https://e-contact-book-coolking-kvt4.onrender.com', { transports: ['websocket'] });
+    }
+} catch (e) {
+    // If socket initialization fails, keep socket as null and log the error
+    console.warn('Socket initialization failed:', e);
+    socket = null;
+}
 
 
 
@@ -199,14 +207,14 @@ export const useMessages = (chatId: string) => {
                 const uniqueNewMessages = response.messages.filter(m => !existingIds.has(m._id));
                 updatedMessages = [...uniqueNewMessages, ...prevMessages];
             }
-            console.log(`Fetched ${response.messages.length} messages for page ${requestedPage}. Total messages now: ${updatedMessages.length}`);
+           
             return updatedMessages;
         });
 
         const { total, page: responsePage, pageSize: responsePageSize } = response;
         const calculatedHasMore = (responsePage * responsePageSize) < total;
         setHasMore(calculatedHasMore);
-        console.log(`Page ${requestedPage}: hasMore=${calculatedHasMore}, total=${total}`);
+        
 
     } catch (err) {
         console.error("Error fetching messages:", err);
@@ -219,10 +227,10 @@ export const useMessages = (chatId: string) => {
 
 const loadMoreMessages = useCallback(() => {
     if (loadingMore || !hasMore) {
-        console.log("Load more skipped:", { loadingMore, hasMore });
+      
         return;
     }
-    console.log("Setting page to:", page + 1);
+   
     setPage((prevPage) => prevPage + 1);
 }, [loadingMore, hasMore]);
 
@@ -245,7 +253,7 @@ useEffect(() => {
 // FIX: Only fetch when page actually changes
 useEffect(() => {
     if (page > 1 && page !== previousPageRef.current && chatId && !fetchInProgressRef.current) {
-        console.log(`Fetching page ${page}...`);
+       
         fetchInProgressRef.current = true;
         fetchMessages(chatId, page, pageSize);
         previousPageRef.current = page;
