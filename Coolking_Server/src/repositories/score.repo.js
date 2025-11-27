@@ -166,14 +166,10 @@ const getScoreParentStudentBySession = async (ParentId, studentID) => {
           sub.name AS subject_name,
           sub.theo_credit,
           sub.pra_credit,
-          g.theo_regular1,
-          g.theo_regular2,
-          g.theo_regular3,
-          g.pra_regular1,
-          g.pra_regular2,
-          g.pra_regular3,
-          g.mid,
-          g.final,
+          (COALESCE(sub.theo_credit, 0) + COALESCE(sub.pra_credit, 0)) AS total_credit,
+          g.theo_regular1, g.theo_regular2, g.theo_regular3,
+          g.pra_regular1, g.pra_regular2, g.pra_regular3,
+          g.mid, g.final,
           g.avr AS score,
           CASE 
             WHEN g.avr >= 9.0 THEN 4.0
@@ -189,7 +185,7 @@ const getScoreParentStudentBySession = async (ParentId, studentID) => {
         FROM scores g
         INNER JOIN students s ON g.student_id = s.student_id AND s.isDeleted = false
         INNER JOIN clazz c ON s.clazz_id = c.id 
-        INNER JOIN course_sections cs ON g.course_section_id = cs.id AND cs.isCompleted = false
+        INNER JOIN course_sections cs ON g.course_section_id = cs.id 
         INNER JOIN subjects sub ON cs.subject_id = sub.subject_id AND sub.isDeleted = false
         INNER JOIN sessions sem ON cs.session_id = sem.id
         INNER JOIN parents p ON s.parent_id = p.parent_id
@@ -204,31 +200,36 @@ const getScoreParentStudentBySession = async (ParentId, studentID) => {
         JSON_ARRAYAGG(
           JSON_OBJECT(
             'subject_name', subject_name,
-            'credits', (COALESCE(theo_credit, 0) + COALESCE(pra_credit, 0)),
+            'credits', total_credit,
             'theo_credit', theo_credit,
             'pra_credit', pra_credit,
-            'theo_regular1', IF(theo_regular1 IS NULL, '-', FORMAT(theo_regular1, 1)),
-            'theo_regular2', IF(theo_regular2 IS NULL, '-', FORMAT(theo_regular2, 1)),
-            'theo_regular3', IF(theo_regular3 IS NULL, '-', FORMAT(theo_regular3, 1)),
-            'pra_regular1', IF(pra_regular1 IS NULL, '-', FORMAT(pra_regular1, 1)),
-            'pra_regular2', IF(pra_regular2 IS NULL, '-', FORMAT(pra_regular2, 1)),
-            'pra_regular3', IF(pra_regular3 IS NULL, '-', FORMAT(pra_regular3, 1)),
-            'midterm', IF(mid IS NULL, '-', FORMAT(mid, 1)),
-            'final', IF(final IS NULL, '-', FORMAT(final, 1)),
-            'average', IF(score IS NULL, '-', FORMAT(score, 1)),
-            'grade_point', FORMAT(grade_point, 1)
+            'theo_regular1', IFNULL(theo_regular1, '-'),
+            'theo_regular2', IFNULL(theo_regular2, '-'),
+            'theo_regular3', IFNULL(theo_regular3, '-'),
+            'pra_regular1', IFNULL(pra_regular1, '-'),
+            'pra_regular2', IFNULL(pra_regular2, '-'),
+            'pra_regular3', IFNULL(pra_regular3, '-'),
+            'midterm', IFNULL(mid, '-'),
+            'final', IFNULL(final, '-'),
+            'average', IFNULL(score, '-'),
+            'grade_point', grade_point
           )
         ) AS subjects,
         COUNT(*) as total_subjects,
-        SUM(COALESCE(theo_credit, 0) + COALESCE(pra_credit, 0)) as total_credits,
+        SUM(total_credit) as total_credits,
         FORMAT(
-          AVG(grade_point * (COALESCE(theo_credit, 0) + COALESCE(pra_credit, 0))) / 
-          AVG(COALESCE(theo_credit, 0) + COALESCE(pra_credit, 0)), 
+          SUM(
+            CASE WHEN score IS NOT NULL THEN grade_point * total_credit ELSE 0 END
+          ) /
+          NULLIF(SUM(
+            CASE WHEN score IS NOT NULL THEN total_credit ELSE 0 END
+          ), 0),
           2
-        ) as gpa
+        ) AS gpa
       FROM ScoreData
       GROUP BY student_id, name, class_name, academic_year, semester
-      ORDER BY academic_year DESC, semester ASC`;
+      ORDER BY academic_year DESC, semester ASC
+    `;
 
     const results = await sequelize.query(query, {
       replacements: { ParentId, studentID },
@@ -242,22 +243,21 @@ const getScoreParentStudentBySession = async (ParentId, studentID) => {
       };
     }
 
-    // Parse the JSON string in subjects field
     const formattedResults = results.map(result => ({
       ...result,
       subjects: safeParseJSON(result.subjects)
     }));
 
-
     return {
-      data: formattedResults,
+      data: formattedResults
     };
 
   } catch (error) {
     console.error('Error fetching student scores:', error);
     throw new Error('Lỗi khi lấy điểm sinh viên');
   }
-}
+};
+
 
 
 
