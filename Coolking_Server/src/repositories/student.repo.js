@@ -1040,12 +1040,25 @@ const getFailedStudentsBySessionAndFaculty = async (session_id, session_name, fa
             ]
         });
 
-        // Tạo Map để tra cứu nhanh: student_id -> { isWarningYet, count }
+        // Query MongoDB 1 lần Lấy hết Thông báo buộc thôi học của nhóm sinh viên này
+        const allExpulsionAlerts = await Alert.find({
+            $and: [
+                { header: { $regex: '^Thông báo buộc thôi học', $options: 'i' } },
+                {
+                    $or: [
+                        { header: { $regex: studentIdsRegexString, $options: 'i' } }, // Tìm trong header
+                        { receiverID: { $in: distinctStudentIds } } // Tìm theo receiverID
+                    ]
+                }
+            ]
+        });
+
+        // Tạo Map để tra cứu nhanh: student_id -> { isWarningYet, count, gotExpelAlertYet }
         const alertMap = {};
 
         // Khởi tạo map mặc định
         distinctStudentIds.forEach(id => {
-            alertMap[id] = { isWarningYet: false, count: 0 };
+            alertMap[id] = { isWarningYet: false, count: 0, gotExpelAlertYet: false };
         });
 
         // Nhóm các Alert theo header để tránh đếm trùng khi gửi cho cả sinh viên và phụ huynh
@@ -1074,6 +1087,24 @@ const getFailedStudentsBySessionAndFaculty = async (session_id, session_name, fa
                     if (new RegExp(sessionNameRegexString, 'i').test(header)) {
                         alertMap[studentId].isWarningYet = true;
                     }
+                }
+            });
+        });
+
+        // Xử lý Expulsion Alerts - chỉ cần kiểm tra có hay không, không cần so session
+        allExpulsionAlerts.forEach(alert => {
+            const receiverID = alert.receiverID;
+            
+            // Kiểm tra receiverID có trong danh sách không
+            if (receiverID && alertMap[receiverID]) {
+                alertMap[receiverID].gotExpelAlertYet = true;
+            }
+            
+            // Cũng kiểm tra trong header (backup)
+            const header = alert.header || "";
+            distinctStudentIds.forEach(studentId => {
+                if (new RegExp(studentId, 'i').test(header)) {
+                    alertMap[studentId].gotExpelAlertYet = true;
                 }
             });
         });
@@ -1213,7 +1244,8 @@ const getFailedStudentsBySessionAndFaculty = async (session_id, session_name, fa
                     need2Warn: need2Warn,
                     parent_id: studentInfo.parent_id || null,
                     isWarningYet: warningStatus.isWarningYet,
-                    totalWarnings: warningStatus.count
+                    totalWarnings: warningStatus.count,
+                    gotExpelAlertYet: warningStatus.gotExpelAlertYet
                 });
             }
         }
@@ -1512,6 +1544,21 @@ const searchFailedStudentBySessionAndFacultyWithStudentId = async (session_id, s
 
         const isWarningYet = countCurrentSession > 0;
 
+        // Kiểm tra thông báo buộc thôi học
+        const expulsionAlerts = await Alert.find({
+            $and: [
+                { header: { $regex: '^Thông báo buộc thôi học', $options: 'i' } },
+                {
+                    $or: [
+                        { header: { $regex: student_id, $options: 'i' } },
+                        { receiverID: student_id }
+                    ]
+                }
+            ]
+        });
+        
+        const gotExpelAlertYet = expulsionAlerts.length > 0;
+
         // BƯỚC 5: Trả về kết quả
         // Chỉ trả về data nếu sinh viên vi phạm quy chế (Fail)
         if (need2Warn) {
@@ -1527,7 +1574,8 @@ const searchFailedStudentBySessionAndFacultyWithStudentId = async (session_id, s
                 need2Warn: need2Warn,
                 parent_id: targetStudent.parent_id || null,
                 isWarningYet: isWarningYet,
-                totalWarnings: countTotal
+                totalWarnings: countTotal,
+                gotExpelAlertYet: gotExpelAlertYet
             };
         }
 
