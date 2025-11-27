@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import SendWarningModal from './SendWarningModal';
+import SendExpelModal from './SendExpelModal';
 import { useNavigate } from 'react-router-dom';
 import { useStudent } from '../../../hooks/useStudent';
 import { useStatistics } from '../../../hooks/useStatistics';
@@ -39,6 +40,7 @@ const WarningStudentsPage: React.FC = () => {
     const [pages, setPages] = useState<number[]>([]);
     const [searchResult, setSearchResult] = useState<any | null>(null);
     const [showWarningModal, setShowWarningModal] = useState(false);
+    const [showExpelModal, setShowExpelModal] = useState(false);
     const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
     // Fetch danh sách sinh viên cần cảnh cáo
     const handleFetchStudents = async () => {
@@ -311,9 +313,9 @@ const WarningStudentsPage: React.FC = () => {
                                         <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900">{searchResult.totalWarnings}</td>
                                         <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900">
                                             <button
-                                                disabled={searchResult.isWarningYet || !searchResult.need2Warn}
+                                                disabled={searchResult.isWarningYet || !searchResult.need2Warn || searchResult.gotExpelAlertYet}
                                                 className={`px-3 py-2 rounded-lg font-medium transition-colors duration-200 ${
-                                                    searchResult.isWarningYet || !searchResult.need2Warn
+                                                    searchResult.isWarningYet || !searchResult.need2Warn || searchResult.gotExpelAlertYet
                                                         ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
                                                         : searchResult.totalWarnings === 2 && !searchResult.isWarningYet
                                                         ? 'bg-orange-500 hover:bg-orange-600 text-white'
@@ -321,10 +323,15 @@ const WarningStudentsPage: React.FC = () => {
                                                 }`}
                                                 onClick={() => {
                                                     setSelectedStudent(searchResult);
-                                                    setShowWarningModal(true);
+                                                    if (searchResult.totalWarnings === 2 && !searchResult.isWarningYet) {
+                                                        setShowExpelModal(true);
+                                                    } else {
+                                                        setShowWarningModal(true);
+                                                    }
                                                 }}
                                             >
-                                                {searchResult.isWarningYet ? 'Đã cảnh báo' : 
+                                                {searchResult.gotExpelAlertYet ? 'Đã buộc thôi học' :
+                                                 searchResult.isWarningYet ? 'Đã cảnh báo' : 
                                                  !searchResult.need2Warn ? 'Không đủ điều kiện' :
                                                  searchResult.totalWarnings === 2 && !searchResult.isWarningYet ? 'Buộc thôi học' : 'Gửi cảnh báo'}
                                             </button>
@@ -351,9 +358,9 @@ const WarningStudentsPage: React.FC = () => {
                                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900">{student.totalWarnings}</td>
                                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900">
                                                     <button
-                                                        disabled={student.isWarningYet || !student.need2Warn}
+                                                        disabled={student.isWarningYet || !student.need2Warn || student.gotExpelAlertYet}
                                                         className={`px-3 py-2 rounded-lg font-medium transition-colors duration-200 ${
-                                                            student.isWarningYet || !student.need2Warn
+                                                            student.isWarningYet || !student.need2Warn || student.gotExpelAlertYet
                                                                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
                                                                 : student.totalWarnings === 2 && !student.isWarningYet
                                                                 ? 'bg-orange-500 hover:bg-orange-600 text-white'
@@ -361,10 +368,15 @@ const WarningStudentsPage: React.FC = () => {
                                                         }`}
                                                         onClick={() => {
                                                             setSelectedStudent(student);
-                                                            setShowWarningModal(true);
+                                                            if (student.totalWarnings === 2 && !student.isWarningYet) {
+                                                                setShowExpelModal(true);
+                                                            } else {
+                                                                setShowWarningModal(true);
+                                                            }
                                                         }}
                                                     >
-                                                        {student.isWarningYet ? 'Đã cảnh báo' : 
+                                                        {student.gotExpelAlertYet ? 'Đã buộc thôi học' :
+                                                         student.isWarningYet ? 'Đã cảnh báo' : 
                                                          !student.need2Warn ? 'Không đủ điều kiện' :
                                                          student.totalWarnings === 2 && !student.isWarningYet ? 'Buộc thôi học' : 'Gửi cảnh báo'}
                                                     </button>
@@ -414,6 +426,20 @@ const WarningStudentsPage: React.FC = () => {
                             isOpen={showWarningModal}
                             onClose={() => {
                                 setShowWarningModal(false);
+                                setSelectedStudent(null);
+                            }}
+                            onSuccess={handleFetchStudents} // Refresh list on success
+                            studentData={selectedStudent}
+                            sessionName={selectedSessionName}
+                        />
+                    )}
+
+                    {/* Modal buộc thôi học */}
+                    {showExpelModal && selectedStudent && (
+                        <SendExpelModal
+                            isOpen={showExpelModal}
+                            onClose={() => {
+                                setShowExpelModal(false);
                                 setSelectedStudent(null);
                             }}
                             onSuccess={handleFetchStudents} // Refresh list on success

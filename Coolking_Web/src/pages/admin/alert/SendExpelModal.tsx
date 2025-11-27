@@ -29,26 +29,26 @@ const SendWarningModal: React.FC<SendWarningModalProps> = ({
   studentData,
   sessionName
 }) => {
-  const defaultTitle = `Cảnh báo học vụ - Sinh viên ${studentData.student_id} - ${sessionName}`;
+  const defaultTitle = `Thông báo buộc thôi học - Sinh viên ${studentData.student_id}`;
   const defaultContent = `Kính gửi: Sinh viên ${studentData.studentName} và Quý Phụ huynh
 
+Căn cứ vào Quy chế đào tạo đại học hệ tín chỉ hiện hành của Trường;
+Căn cứ vào kết quả học tập của sinh viên trong học kỳ ${sessionName} và các học kỳ trước;
+Căn cứ vào các lần cảnh báo học vụ trước đây;
+
+Nhà trường xin thông báo đến sinh viên và quý phụ huynh của sinh viên có thông tin như sau:
 Mã số sinh viên: ${studentData.student_id}
 Lớp: ${studentData.className || '[Mã lớp]'} - ${studentData.facultyName || '[Tên khoa]'}
 
-Căn cứ vào Quy chế đào tạo đại học hệ tín chỉ hiện hành của Trường;
-Căn cứ vào kết quả học tập của sinh viên trong học kỳ ${sessionName};
+Đã bị buộc thôi học do không đạt yêu cầu về kết quả học tập.
 
-Phòng Đào tạo xin thông báo về tình hình học tập của sinh viên như sau:
+Lý do buộc thôi học:
+Đã nhận 2 lần cảnh báo học vụ do kết quả học tập không đạt yêu cầu trong các học kỳ trước và tiếp tục không đạt yêu cầu trong học kỳ ${sessionName}.
 Điểm trung bình học kỳ: ${studentData.gpa4_in_session !== undefined ? studentData.gpa4_in_session.toFixed(2) : '-' } (theo thang điểm 4)
 Điểm trung bình tích lũy: ${studentData.gpa4 !== undefined ? studentData.gpa4.toFixed(2) : '-' } (theo thang điểm 4)
-Số lần cảnh báo học vụ trước đây: ${studentData.totalWarnings || 0}
 
-Hệ quả và yêu cầu:
-(Cảnh cáo lần 1): Sinh viên cần cải thiện kết quả học tập trong học kỳ tới.
-(Cảnh cáo lần 2): Nếu không cải thiện ở kỳ tới, sinh viên sẽ bị buộc thôi học.
-(Cảnh cáo lần 3): Sinh viên làm thủ tục thôi học theo quy định.
-
-Đề nghị sinh viên và gia đình lưu ý để có phương án điều chỉnh kịp thời.`;
+Mọi chi tiết Quý phụ huynh và Sinh viên vui lòng liên hệ Phòng Công tác sinh viên, tầng trệt, nhà D hoặc qua số điện thoại 0283xxxxxxx để được giải đáp.
+Đơn thông báo buộc thôi học sẽ được gửi đến Sinh viên và Quý phụ huynh qua đường bưu điện.`;
 
   const [title, setTitle] = useState(defaultTitle);
   const [content, setContent] = useState(defaultContent);
@@ -67,27 +67,26 @@ Hệ quả và yêu cầu:
   // Reset state when modal opens with new data
   useEffect(() => {
     if (isOpen && studentData) {
-      setTitle(`Cảnh báo học vụ - ${studentData.student_id} - ${sessionName}`);
+      setTitle(`Thông báo buộc thôi học - Sinh viên ${studentData.student_id}`);
       setContent(`Kính gửi: Sinh viên ${studentData.studentName} và Quý Phụ huynh
 
+Căn cứ vào Quy chế đào tạo đại học hệ tín chỉ hiện hành của Trường;
+Căn cứ vào kết quả học tập của sinh viên trong học kỳ ${sessionName} và các học kỳ trước;
+Căn cứ vào các lần cảnh báo học vụ trước đây;
+
+Nhà trường xin thông báo đến sinh viên và quý phụ huynh của sinh viên có thông tin như sau:
 Mã số sinh viên: ${studentData.student_id}
 Lớp: ${studentData.className || '[Mã lớp]'} - ${studentData.facultyName || '[Tên khoa]'}
 
-Căn cứ vào Quy chế đào tạo đại học hệ tín chỉ hiện hành của Trường;
-Căn cứ vào kết quả học tập của sinh viên trong học kỳ ${sessionName};
+Đã bị buộc thôi học do không đạt yêu cầu về kết quả học tập.
 
-Phòng Đào tạo xin thông báo về tình hình học tập của sinh viên như sau:
+Lý do buộc thôi học:
+Đã nhận 2 lần cảnh báo học vụ do kết quả học tập không đạt yêu cầu trong các học kỳ trước và tiếp tục không đạt yêu cầu trong học kỳ ${sessionName}.
 Điểm trung bình học kỳ: ${studentData.gpa4_in_session !== undefined ? studentData.gpa4_in_session.toFixed(2) : '-' } (theo thang điểm 4)
 Điểm trung bình tích lũy: ${studentData.gpa4 !== undefined ? studentData.gpa4.toFixed(2) : '-' } (theo thang điểm 4)
-Số lần cảnh báo học vụ trước đây: ${studentData.totalWarnings || 0}
 
-Hệ quả và yêu cầu:
-(Cảnh cáo lần 1): Sinh viên cần cải thiện kết quả học tập trong học kỳ tới.
-(Cảnh cáo lần 2): Nếu không cải thiện ở kỳ tới, sinh viên sẽ bị buộc thôi học.
-(Cảnh cáo lần 3): Sinh viên làm thủ tục thôi học theo quy định.
-
-Đề nghị sinh viên và gia đình lưu ý để có phương án điều chỉnh kịp thời.
-      `);
+Mọi chi tiết Quý phụ huynh và Sinh viên vui lòng liên hệ Phòng Công tác sinh viên, tầng trệt, nhà D hoặc qua số điện thoại 0283xxxxxxx để được giải đáp.
+Đơn thông báo buộc thôi học sẽ được gửi đến Sinh viên và Quý phụ huynh qua đường bưu điện.`);
     }
   }, [isOpen, studentData]);
 
@@ -107,7 +106,7 @@ Hệ quả và yêu cầu:
 
       const response = await sendAlertPersonal(title, content, receiverIDs);
       if (response.success) {
-        showToast(`Gửi cảnh báo đến ${receiverIDs.join(', ')} thành công!`, 'success');
+        showToast(`Gửi thông báo buộc thôi học đến ${receiverIDs.join(', ')} thành công!`, 'success');
         setTimeout(() => { onClose(); }, 1500);
         onSuccess();
       } else {
@@ -151,7 +150,7 @@ Hệ quả và yêu cầu:
         <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
           {/* Header */}
           <div className="flex justify-between items-center p-6 border-b">
-            <h2 className="text-xl font-semibold text-gray-900">Gửi cảnh báo học vụ</h2>
+            <h2 className="text-xl font-semibold text-gray-900">Gửi thông báo buộc thôi học</h2>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -186,7 +185,7 @@ Hệ quả và yêu cầu:
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                placeholder="Nhập tiêu đề cảnh báo"
+                placeholder="Nhập tiêu đề buộc thôi học"
                 disabled={loading}
                 readOnly
               />
@@ -203,7 +202,7 @@ Hệ quả và yêu cầu:
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none"
-                placeholder="Nhập nội dung cảnh báo"
+                placeholder="Nhập nội dung buộc thôi học"
                 disabled={loading}
               />
             </div>
@@ -229,7 +228,7 @@ Hệ quả và yêu cầu:
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
               )}
-              {loading ? 'Đang gửi...' : 'Gửi cảnh báo'}
+              {loading ? 'Đang gửi...' : 'Gửi thông báo buộc thôi học'}
             </button>
           </div>
         </div>
