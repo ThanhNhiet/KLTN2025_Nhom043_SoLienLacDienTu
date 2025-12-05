@@ -3,16 +3,16 @@ const redisService = require('./redis.service');
 
 // Tạo transporter cho email
 const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true, // true for 465, false for other ports
+    service: 'gmail',
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
     },
-    // tls: {
-    //     rejectUnauthorized: false
-    // }
+    pool: true,         // Dùng pool connection để tái sử dụng kết nối
+    maxConnections: 1,  // Giới hạn kết nối để tránh bị Google chặn
+    rateDelta: 20000,   // Giới hạn tốc độ gửi
+    rateLimit: 5,       // Tối đa 5 mail mỗi giây
+    family: 4,          // QUAN TRỌNG: Ép buộc dùng IPv4 (Fix lỗi ETIMEDOUT trên Render)
 });
 
 // Tạo OTP ngẫu nhiên 6 số
