@@ -376,6 +376,14 @@ const createPrivateChat4Users = async (requestUserID, targetUserID) => {
             });
         }
 
+        if (requestUserID.startsWith('AD')) {
+            requestUser = await models.Staff.findOne({
+                where: { admin_id: requestUserID },
+                attributes: ['admin_id', 'name', 'avatar']
+            });
+            requestUser.name = "Quản trị viên - " + requestUser.name;
+        }
+
         // Lấy thông tin của target user
         let targetUser = null;
         if (targetUserID.startsWith('LE')) {
@@ -2129,19 +2137,26 @@ const searchUserByKeyword = async (keyword) => {
         }
 
         if (result === null) {
-            // Tìm kiếm giảng viên chính xác theo lecturer_id
-            result = await models.Lecturer.findOne({
+             // Tìm kiếm trong Parent
+            result = await models.Parent.findOne({
                 where: {
                     [Op.or]: [
-                        { lecturer_id: searchKeyword },
+                        { parent_id: searchKeyword },
                         { phone: searchKeyword },
                         { email: searchKeyword }
                     ]
                 },
-                attributes: ['lecturer_id', 'name', 'avatar'],
+                attributes: ['parent_id', 'name', 'avatar'],
                 raw: true
             });
-            if (result) result.type = 'Giảng viên';
+            if (result) result.type = 'Phụ huynh';
+        }
+
+        if (result === null) {
+            return {
+                success: false,
+                message: 'Không tìm thấy người dùng với từ khóa đã cho'
+            };
         }
 
         return {
@@ -2310,6 +2325,22 @@ const searchUserByKeyword4Lecturer = async (keyword) => {
                 raw: true
             });
             if (result) result.type = 'Sinh viên';
+        }
+
+        if (result === null) {
+           // Tìm kiếm trong Parent
+            result = await models.Parent.findOne({
+                where: {
+                    [Op.or]: [
+                        { parent_id: searchKeyword },
+                        { phone: searchKeyword },
+                        { email: searchKeyword }
+                    ]
+                },
+                attributes: ['parent_id', 'name', 'avatar'],
+                raw: true
+            });
+            if (result) result.type = 'Phụ huynh';
         }
 
         return {

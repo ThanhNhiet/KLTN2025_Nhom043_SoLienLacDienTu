@@ -24,7 +24,7 @@ const ChatListCpn = forwardRef<any, ChatListCpnProps>(({ onChatSelect, selectedC
 
     const handleSelectUser = async (result: any) => {
         try {
-            const targetId = result.student_id || result.lecturer_id;
+            const targetId = result.student_id || result.lecturer_id || result.admin_id || result.parent_id;
             if (!targetId) return;
             await createPrivateChat(targetId);
             await getChats4AllUser(1, 10);

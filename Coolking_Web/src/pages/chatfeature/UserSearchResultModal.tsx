@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 
 interface SearchResult {
+    admin_id?: string;
+    parent_id?: string;
     student_id?: string;
     lecturer_id?: string;
     name?: string;
