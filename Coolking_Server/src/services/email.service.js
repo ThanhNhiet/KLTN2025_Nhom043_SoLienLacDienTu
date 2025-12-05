@@ -3,14 +3,16 @@ const redisService = require('./redis.service');
 
 // Tạo transporter cho email
 const transporter = nodemailer.createTransport({
-    host: "email-smtp.ap-southeast-1.amazonaws.com",
+    host: 'smtp.gmail.com',
     port: 465,
-    secure: true,
+    secure: true, // true for 465, false for other ports
     auth: {
-        user: process.env.SES_SMTP_USER,
-        pass: process.env.SES_SMTP_PASS
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
     },
-    debug: true
+    // tls: {
+    //     rejectUnauthorized: false
+    // }
 });
 
 // Tạo OTP ngẫu nhiên 6 số
@@ -52,9 +54,6 @@ const sendOTP = async (email) => {
                 </div>
             `
         };
-
-        await transporter.verify(); 
-        console.log("Kết nối SES thành công!");
 
         // Gửi email
         const info = await transporter.sendMail(mailOptions);
