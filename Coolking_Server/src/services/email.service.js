@@ -1,19 +1,8 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const redisService = require('./redis.service');
 
-// Tạo transporter cho email
-const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false, // true for 465, false for other ports
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    },
-    tls: {
-        rejectUnauthorized: false
-    }
-});
+// Khởi tạo Resend
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Tạo OTP ngẫu nhiên 6 số
 const generateOTP = () => {
@@ -30,10 +19,10 @@ const sendOTP = async (email) => {
         const redisKey = `otp:${email}`;
         await redisService.setex(redisKey, 180, otp);
 
-        // Cấu hình email
-        const mailOptions = {
-            from: process.env.EMAIL_USER,
-            to: email,
+        // Gửi qua api Resend
+        const {data, error} = await resend.emails.send({
+            from: process.env.EMAIL_FROM,
+            to: [email],
             subject: 'Mã OTP xác thực - E-Contact Book',
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -53,30 +42,21 @@ const sendOTP = async (email) => {
                     </div>
                 </div>
             `
-        };
+        });
 
-        // Gửi email
-        const info = await transporter.sendMail(mailOptions);
+        if (error) {
+            console.error('Resend API Error:', error);
+            throw new Error('Lỗi từ dịch vụ gửi email: ' + error.message);
+        }
+
         return {
             success: true,
             message: 'OTP đã được gửi thành công',
-            messageId: info.messageId
+            messageId: data.id
         };
 
     } catch (error) {
         console.error('Error sending OTP:', error);
-
-        // Xử lý các loại lỗi khác nhau
-        let errorMessage = 'Không thể gửi OTP. Vui lòng thử lại sau.';
-
-        if (error.code === 'EDNS' || error.code === 'ENOTFOUND') {
-            errorMessage = 'Không thể kết nối đến server email. Vui lòng kiểm tra kết nối mạng.';
-        } else if (error.code === 'EAUTH') {
-            errorMessage = 'Lỗi xác thực email. Vui lòng kiểm tra cấu hình email.';
-        } else if (error.responseCode === 535) {
-            errorMessage = 'Thông tin đăng nhập email không chính xác.';
-        }
-
         throw new Error(errorMessage);
     }
 };
