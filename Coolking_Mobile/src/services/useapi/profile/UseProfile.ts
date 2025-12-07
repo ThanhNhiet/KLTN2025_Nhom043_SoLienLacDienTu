@@ -52,6 +52,7 @@ export const useProfile = () => {
                 return;
             }
            
+           
             let profileData = {};
             let navigationData = {};
             if (role === 'STUDENT') {
@@ -66,7 +67,10 @@ export const useProfile = () => {
                     dob: data.dob,
                     gender: data.gender,
                 };
-                setProfileParent(data.parents);
+                console.log("data.parent:",Array.isArray(data.parent) ? data.parent : []);
+                const parent = [];
+                parent.push(data.parent);
+                setProfileParent(parent);
                 navigationData = {
                     name: data.name,
                     avatar: data?.avatar ,
@@ -93,7 +97,7 @@ export const useProfile = () => {
                 navigationData = {
                     name: data.name,
                     avatar: data?.avatar,
-                    studentName: data.studentName,
+                    parent_id: data.parent_id,
                 };
                 setAvatarUrl(data?.avatar);
         }
@@ -156,6 +160,8 @@ export const useProfile = () => {
             throw error;
         }
     }
+   
+
 
 
     return{

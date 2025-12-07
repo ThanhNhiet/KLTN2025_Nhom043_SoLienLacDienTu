@@ -13,6 +13,7 @@ export default function TopNavigations_Profile({
   role
 }: Props) {
 
+
   return (
     <View style={styles.container}>
       {/* Avatar + Info */}
@@ -28,7 +29,7 @@ export default function TopNavigations_Profile({
             </Text>
           ) : (
             <Text style={styles.mssv} numberOfLines={1}>
-              Học sinh: {profileNavigation?.studentName || "Chưa có tên"}
+              Mã phụ huynh: {profileNavigation?.parent_id || "Chưa có mã"}
             </Text>
           )}
         </View>
