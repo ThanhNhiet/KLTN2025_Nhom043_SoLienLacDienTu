@@ -364,7 +364,15 @@ const getStudentInfoById4Lecturer = async (student_id) => {
             className: student.clazz ? student.clazz.name : null,
             facultyName: student.clazz && student.clazz.faculty ? student.clazz.faculty.name : null,
             majorName: student.major ? student.major.name : null,
-            parent: student.parent
+            parent: {
+                parent_id: student.parent ? student.parent.parent_id : null,
+                name: student.parent ? student.parent.name : null,
+                dob: student.parent && student.parent.dob ? datetimeFormatter.formatDateVN(student.parent.dob) : null,
+                gender: student.parent ? (student.parent.gender === true || student.parent.gender === '1' || student.parent.gender === 1 ? "Nam" : "Nữ") : null,
+                phone: student.parent ? student.parent.phone : null,
+                email: student.parent ? student.parent.email : null,
+                address: student.parent ? student.parent.address : null
+            }
         };
     } catch (error) {
         console.error("Error in getStudentInfoById4Lecturer:", error);
