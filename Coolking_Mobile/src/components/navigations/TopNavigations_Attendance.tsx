@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context"; // Đã thêm
 import { useProfile } from "@/src/services/useapi/profile/UseProfile";
 import SelectStudentModal from "../modals/SelectStudentModal"; // Giả sử đường dẫn này là đúng
 
@@ -29,21 +29,18 @@ export default function TopNavigations_Attendance({setStudentId,handleFetchAtten
     };
 
     return (
-        // Thêm style nền ở đây để phủ cả status bar
-        <SafeAreaView style={styles.safeArea}>
+        // Bọc trong SafeAreaView
+        <SafeAreaView edges={["top"]} style={styles.safeAreaContainer}>
             <View style={styles.container}>
+                
                 <Text style={styles.title}>Điểm danh</Text>
 
-                {/* * 1. Di chuyển vào trong <View>
-                  * 2. Dùng && cho gọn
-                  * 3. Thêm style mới để định vị
-                */}
                 {isParent && (
                     <TouchableOpacity
                         style={styles.iconButton}
                         onPress={handleOpenStudentModal}
                     >
-                        {/* 3. Đổi màu icon cho hợp với nền */}
+                        {/* Đảm bảo icon có màu dễ nhìn trên nền tím */}
                         <Ionicons name="people-circle-outline" size={28} color="#e5f0f0ff" />
                     </TouchableOpacity>
                 )}
@@ -55,37 +52,46 @@ export default function TopNavigations_Attendance({setStudentId,handleFetchAtten
                 onClose={() => setOpenStudentModal(false)}
                 students={students} // Truyền danh sách học sinh
                 onSelectStudent={handleSelectStudent} // Truyền hàm xử lý
-            />
-        </SafeAreaView>
+            /> 
+        </SafeAreaView> // Đóng SafeAreaView
     );
 }
 
 const styles = StyleSheet.create({
-    safeArea: {
-        backgroundColor: "#6e2febff", // Đưa màu nền ra đây
+    // 1. Thêm style cho SafeAreaView để quản lý màu nền Status Bar
+    safeAreaContainer: {
+        backgroundColor: "#6e2febff", // Màu nền của Navigation Bar
     },
+    // 2. Chỉnh sửa container để nó chỉ là phần nội dung (height đã được quản lý một phần bởi SafeAreaView)
     container: {
-        position: "relative", // Cần thiết để `iconButton` chạy theo
+        height: 56, // Chiều cao tiêu chuẩn cho Nav Bar nội dung
         flexDirection: "row",
         alignItems: "center",
-        justifyContent: "center", // Giữ nguyên để căn giữa title
-        padding: 12,
-        backgroundColor: "#6e2febff", // Vẫn giữ màu ở đây
-        borderBottomWidth: 1,
-        borderBottomColor: "#eee",
+        justifyContent: "center",
+        backgroundColor: "#6e2febff",
+        // Bỏ các thuộc tính shadow/borderBottom cũ để đơn giản hóa,
+        // nếu muốn, có thể thêm lại vào safeAreaContainer
+        // borderBottomWidth: StyleSheet.hairlineWidth,
+        // borderBottomColor: "#a088ff",
+        // shadowColor: "#000",
+        // shadowOffset: { width: 0, height: 2 },
+        // shadowOpacity: 0.15,
+        // shadowRadius: 3,
+        // elevation: 4, 
     },
     title: {
-        fontSize: 16,
-        fontWeight: "600",
+        fontSize: 18, // Tăng kích thước tiêu đề một chút
+        fontWeight: "700", // Đậm hơn
         textAlign: "center",
         color: "#e5f0f0ff",
+        // Đảm bảo title không bị icon bên cạnh đẩy ra khỏi trung tâm
+        flex: 1, 
     },
-    // STYLE MỚI CHO ICON
+    // STYLE CHO ICON
     iconButton: {
-        position: "absolute", // Định vị tuyệt đối
-        right: 12,            // Căn lề phải
-        padding: 4,           // Tăng vùng nhấn
-        justifyContent: "center",
-        alignItems: "center",
+        position: "absolute",
+        right: 12,
+        padding: 8, // Tăng vùng nhấn
+        zIndex: 10, // Đảm bảo nút nằm trên các thành phần khác nếu có
     },
 });

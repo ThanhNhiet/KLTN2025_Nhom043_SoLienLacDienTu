@@ -409,6 +409,7 @@ export default function MessageScreen() {
     const navigation = useNavigation<any>();
     const route = useRoute();
     const { chatId } = route.params as { chatId: string };
+    const textAction = 'Delete';
    
     // Sử dụng hook
     const { 
@@ -850,7 +851,11 @@ return (
                             <View style={styles.modalBackdrop} />
                         </TouchableWithoutFeedback>
                         <View style={styles.modalContent}>
-                            {modalActions.map((action, index) => (
+                            {modalActions.map((action, index) => {
+                                if (userId !== selectedMessage?.senderInfo.userID && action.text === textAction) {
+                                    return null; // Không hiển thị nút Delete nếu không phải người gửi
+                                }
+                                return (
                                 <TouchableOpacity
                                     key={index}
                                     style={styles.modalActionButton}
@@ -862,7 +867,8 @@ return (
                                         {action.text}
                                     </Text>
                                 </TouchableOpacity>
-                            ))}
+                            );
+                            })}
                         </View>
                     </Modal>
 

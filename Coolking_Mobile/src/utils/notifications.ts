@@ -42,9 +42,6 @@ let lastUploadedToken: string | null = null;
 
 /** Upload FCM token lên server (LOGIN / mở app) */
 async function uploadTokenToServer(userId: string, nativeToken: string) {
-  console.log('[notifications] uploading token to server...');
-  console.log('[notifications] userId:', userId);
-  console.log('[notifications] nativeToken:', nativeToken);
   const url = `${API_BASE}/api/public/upsert-token`;
   try {
     const res = await fetch(url, {
@@ -65,9 +62,6 @@ async function uploadTokenToServer(userId: string, nativeToken: string) {
 
 /** Gỡ token trên server (LOGOUT) */
 async function logoutTokenFromServer(userId: string, nativeToken: string) {
-  console.log('[notifications] logging out token from server...');
-  console.log('[notifications] userId:', userId);
-  console.log('[notifications] nativeToken:', nativeToken);
   const url = `${API_BASE}/api/public/logout-device`;
   try {
     const res = await fetch(url, {

@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
-import { Calendar } from "react-native-calendars";
+import { Calendar,WeekCalendar,CalendarProvider, } from "react-native-calendars";
 import dayjs from "dayjs";
 
 import BottomNavigation from "@/src/components/navigations/BottomNavigations";
@@ -28,17 +28,19 @@ const getDayText = (day: number) => {
 export default function CalendarScreen() {
   const navigation = useNavigation<any>();
   const [filter, setFilter] = useState<Filter>("all");
-  const [selectedDate, setSelectedDate] = useState(dayjs().format("YYYY-MM-DD"));
 
   const {
     loading,
     weekInfo,
+    selectedDate,
+    setSelectedDate,
     goPrevWeek,
     goNextWeek,
     getSchedulesByDate,
     getMarkedDates,
     fetchCalendar,
   } = useCalendar();
+
 
     const handleGoToday = () => {
       const todayISO = dayjs().format("YYYY-MM-DD");
@@ -120,7 +122,12 @@ export default function CalendarScreen() {
           {loading ? (
             <ActivityIndicator style={{ padding: 20 }} size="large" color="#007AFF" />
           ) : (
-            <Calendar
+            <View style={{ height: 80  }}>
+            <CalendarProvider
+                date={selectedDate}          // ngày hiện tại trong context
+                onDateChanged={setSelectedDate} // optional
+            >
+            <WeekCalendar
               current={selectedDate}
               onDayPress={(d) => setSelectedDate(d.dateString)}
               markedDates={marked}
@@ -137,6 +144,8 @@ export default function CalendarScreen() {
               }}
               style={styles.calendar}
             />
+            </CalendarProvider>
+            </View>
           )}
         </View>
 

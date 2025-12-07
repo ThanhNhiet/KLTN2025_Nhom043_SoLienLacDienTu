@@ -17,7 +17,8 @@ import TopNavigations_Detail from "@/src/components/navigations/TopNavigations";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { FontAwesome } from "@expo/vector-icons";
 import { useMessageDetail } from "@/src/services/useapi/chat/UseMessageDetail";
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
 import * as Mime from "react-native-mime-types";
 import * as IntentLauncher from "expo-intent-launcher";
 
@@ -61,7 +62,7 @@ export default function MessageDetailScreen() {
     const navigation = useNavigation<any>();
     const [activeTab, setActiveTab] = useState<MediaTab>(MediaTab.Photos);
     const [downloadingId, setDownloadingId] = useState<string | null>(null); // MỚI: State để theo dõi file đang tải
-
+    const [studentId, setStudentId] = useState<string>("");
     const router = useRoute();
     const { chatID } = router.params as { chatID: string };
 
@@ -89,7 +90,7 @@ export default function MessageDetailScreen() {
          return (
             <SafeAreaProvider>
                 <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                    <TopNavigations_Detail navigation={navigation} name="Thông tin hội thoại" />
+                    <TopNavigations_Detail navigation={navigation} name="Thông tin hội thoại"  setStudentId={setStudentId} />
                     <Text style={{color: 'red', marginTop: 20}}>Lỗi khi tải thông tin chi tiết.</Text>
                 </SafeAreaView>
             </SafeAreaProvider>
@@ -99,13 +100,39 @@ export default function MessageDetailScreen() {
     
     // CẬP NHẬT: Hàm xử lý tải file
     const handleDownload = async (item: FileItemType) => {
-        if (!item?.url) {
-            Alert.alert("Lỗi", "Không tìm thấy đường dẫn tải file.");
-            return;
-        }
+  if (!item?.url) {
+    Alert.alert("Lỗi", "Không tìm thấy đường dẫn tải file.");
+    return;
+  }
 
-    
-    };
+  try {
+    // Lấy tên file: ưu tiên item.name, fallback từ URL
+    const filenameFromUrl = item.url.split("/").pop() || "file";
+    const fileName = item.name || filenameFromUrl;
+    const fileUri = FileSystem.documentDirectory + fileName;
+
+    // 👇 Tải file về bộ nhớ app
+    const downloadRes = await FileSystem.downloadAsync(item.url, fileUri);
+
+    if (downloadRes.status !== 200) {
+      console.log("Download response:", downloadRes);
+      Alert.alert("Lỗi", "Tải file thất bại. Vui lòng thử lại.");
+      return;
+    }
+
+    // iOS / Android: mở menu share / lưu / mở bằng app khác
+    const isAvailable = await Sharing.isAvailableAsync();
+    if (isAvailable) {
+      await Sharing.shareAsync(downloadRes.uri);
+    } else {
+      // Fallback: chỉ thông báo đường dẫn file
+      Alert.alert("Hoàn tất", `File đã được lưu tại: ${downloadRes.uri}`);
+    }
+  } catch (error) {
+    console.error("Error downloading file:", error);
+    Alert.alert("Lỗi", "Có lỗi xảy ra khi tải file. Vui lòng thử lại.");
+  }
+};
 
     // MỚI: Hàm xử lý mở link
     const handleOpenLink = async (url: string) => {
@@ -268,7 +295,7 @@ export default function MessageDetailScreen() {
     return (
         <SafeAreaProvider>
             <SafeAreaView style={styles.container}>
-                <TopNavigations_Detail navigation={navigation} name="Thông tin hội thoại" />
+                <TopNavigations_Detail navigation={navigation} name="Thông tin hội thoại"  setStudentId={setStudentId} />
 
                 {/* Phần 1: Thông tin chung của Chat */}
                 {renderChatHeader()}

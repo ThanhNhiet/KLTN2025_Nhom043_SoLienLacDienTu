@@ -84,6 +84,7 @@ export default function AttendanceScreen() {
 
   const sessions = Object.keys(groupedCourses);
 
+
   if (loading) { // Chỉ hiển thị loading toàn màn hình cho lần tải đầu tiên
     return (
       <View style={styles.centered}>

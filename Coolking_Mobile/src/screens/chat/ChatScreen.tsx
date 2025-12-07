@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -9,7 +9,11 @@ import {
     ActivityIndicator,
     RefreshControl,
     Button,
-    Alert
+    Alert,
+    TouchableWithoutFeedback,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
+    ScrollView
 } from 'react-native';
 import { useNavigation } from "@react-navigation/native";
 import { useIsFocused } from '@react-navigation/native';
@@ -178,12 +182,14 @@ const ChatItem = ({ item, onPress, userID }: ChatItemProps) => {
 
 export default function ChatScreen() {
     const navigation = useNavigation<any>();
-    const { chats, loading, error, refetch, userID, markMessagesAsRead, createPrivateChatAI } = useChat();
+    const { chats, loading, loadingInitial, loadingMore, hasMore, loadMoreChats, error, refetch, userID, markMessagesAsRead, createPrivateChatAI } = useChat();
     const [refreshing, setRefreshing] = useState(false);
     const [localChats, setLocalChats] = useState<ChatItemType[]>([]);
      const [modalVisible, setModalVisible] = useState(false);
      const [chatAIId, setChatAIId] = useState<string | null>(null);
      const isFocused = useIsFocused();
+     const flatListRef = useRef<FlatList<ItemMessage>>(null);
+    const [isAtBottom, setIsAtBottom] = useState(true);
 
      useEffect(() => {
     if (isFocused) {
@@ -258,6 +264,70 @@ export default function ChatScreen() {
         };
     }, [socket, userID]);
 
+
+    const lastLoadTime = useRef(0);
+    const loadingTriggered = useRef(false);
+    const previousScrollY = useRef(0);
+    const isFirstLoad = useRef(true);
+    
+    // FIX: Đơn giản hóa logic load more
+    const handleLoadMore = useCallback(() => {
+        const now = Date.now();
+        
+        // Kiểm tra tất cả điều kiện
+        if (loadingMore || !hasMore || loadingTriggered.current) {
+            return;
+        }
+        
+        // Kiểm tra timing
+        if (now - lastLoadTime.current < 1500) {
+            return;
+        }
+        
+        loadingTriggered.current = true;
+        lastLoadTime.current = now;
+        
+        loadMoreChats();
+        
+        // Reset flag sau 2 giây
+        setTimeout(() => {
+            loadingTriggered.current = false;
+        }, 2000);
+    }, [loadingMore, hasMore, loadMoreChats]);
+    
+    // FIX: Cải thiện scroll detection
+    const handleOnScroll = useCallback(({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) => {
+        const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+        
+        // Kiểm tra đã đến đáy hay chưa
+        const isAtBottomNow = layoutMeasurement.height + contentOffset.y >= contentSize.height - 50;
+        setIsAtBottom(isAtBottomNow);
+        
+        // Chỉ load more khi scroll lên gần top
+        const currentScrollY = contentOffset.y;
+        const isScrollingUp = currentScrollY < previousScrollY.current;
+        previousScrollY.current = currentScrollY;
+        
+        // Load khi gần top
+        const isNearTop = currentScrollY < 50 && contentSize.height > layoutMeasurement.height;
+        
+        if (isScrollingUp && isNearTop && hasMore && !loadingMore && !loadingTriggered.current) {
+            
+            handleLoadMore();
+        }
+    }, [hasMore, loadingMore, handleLoadMore]);
+    
+    // Scroll to end khi load xong
+    useEffect(() => {
+        if (isFirstLoad.current && chats.length > 0 && !loading) {
+            const timer = setTimeout(() => {
+                flatListRef.current?.scrollToEnd({ animated: false });
+                isFirstLoad.current = false;
+            }, 50);
+            return () => clearTimeout(timer);
+        }
+    }, [chats.length, loading]);
+
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
         try {
@@ -321,15 +391,36 @@ export default function ChatScreen() {
                 renderItem={renderChatItem}
                 keyExtractor={(item) => item._id}
                 style={styles.list}
-                contentContainerStyle={{ paddingBottom: 20 }}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={onRefresh}
-                        colors={["#007AFF"]}
-                    />
-                }
+                onScroll={handleOnScroll}
+                scrollEventThrottle={1000}
+                scrollEnabled={true}
+                nestedScrollEnabled={true}
+                
+                contentContainerStyle={{
+                    paddingVertical: 10,
+                    paddingHorizontal: 10,
+                    flexGrow: 1,
+                    justifyContent: 'flex-end'
+                }}
+                ListHeaderComponent={() => {
+                    if (!loadingMore) return null;
+                    return (
+                        <View style={styles.loadingMoreContainer}>
+                            <ActivityIndicator size="small" color="#007AFF" />
+                        </View>
+                    );
+                }}
+                maintainVisibleContentPosition={{
+                    minIndexForVisible: 0,
+                    autoscrollToTopThreshold: 50
+                }}
+                onContentSizeChange={() => {
+                    if (!isFirstLoad.current && isAtBottom) {
+                        flatListRef.current?.scrollToEnd({ animated: true });
+                    }
+                }}
             />
+
         );
     }
 
@@ -473,6 +564,11 @@ const styles = StyleSheet.create({
         fontSize: 15,
         color: '#6B7280',
         textAlign: 'center',
+    },
+    loadingMoreContainer: {
+        padding: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     
     // --- Style cho Nút Tròn (Floating Action Button - FAB) ---

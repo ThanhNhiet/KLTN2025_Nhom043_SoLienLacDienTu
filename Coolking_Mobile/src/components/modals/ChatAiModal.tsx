@@ -252,7 +252,7 @@ const ChatAiModal = ({ visible, onClose, chatId }: ChatAiModalProps) => {
           </View>
 
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.keyboardView}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0} 
           >
@@ -361,23 +361,8 @@ const styles = StyleSheet.create({
   closeText: { color: '#007AFF', fontSize: 16, fontWeight: '600' },
   keyboardView: { flex: 1 },
   list: { flex: 1, paddingHorizontal: 10 },
-  inputContainer: {
-    flexDirection: 'row',
-    padding: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-  },
-  input: {
-    flex: 1,
-    height: 40,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    marginRight: 10,
-    color: '#000',
-  },
+  inputContainer: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#E5E5EA', backgroundColor: '#FFFFFF' },
+  input: { flex: 1, minHeight: 40, maxHeight: 120, backgroundColor: '#F2F2F7', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 16, marginRight: 8 },
   sendBtn: {
     backgroundColor: '#007AFF',
     paddingHorizontal: 15,

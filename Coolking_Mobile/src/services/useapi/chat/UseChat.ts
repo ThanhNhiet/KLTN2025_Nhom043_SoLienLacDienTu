@@ -1,4 +1,4 @@
-import { useEffect, useState,useCallback } from "react";
+import { useEffect, useState,useCallback,useRef } from "react";
 import { getChats , getSearchChatsByKeyword , getSearchUsersByKeyword, createNewChatPrivate, createNewChatPrivateAI} from "../../api/chat/ChatApi";
 import { refresh } from "@react-native-community/netinfo";
 import { updatelastReadMessage } from "../../api/chat/MessageApi";
@@ -31,6 +31,10 @@ export const useChat = () => {
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState<any[]>([]);
     const [userID, setUserID] = useState<string>('');
+    const [totals, setTotals] = useState<number>(0);  
+    const [hasMore, setHasMore] = useState<boolean>(true);
+    const [loadingMore, setLoadingMore] = useState<boolean>(false); 
+     const [loadingInitial, setLoadingInitial] = useState(false); 
 
     useEffect(() => {
         const fetchUserID = async () => {
@@ -49,29 +53,80 @@ export const useChat = () => {
         fetchUserID();
     }, []);
 
-    const getfetchChats = useCallback(async (page: number,pageSize: number) => {
+    const getfetchChats = useCallback(async (requestedPage: number,pSize: number) => {
         try {
-           // setLoading(true);
-            const res = await getChats(page, pageSize);
+             if (loadingMore || (requestedPage > 1 && !hasMore)) return;
+             if (requestedPage === 1) setLoadingInitial(true);
+                else setLoadingMore(true);
+                setError(null);
+
+           
+
+            const res = await getChats(requestedPage, pSize);
             if (!res && !res.chats){
                 console.warn("No chats data received");
                 setChats([]);
                 return;
             }
-            setChats(res.chats);
-            setTotalPages(res.pages);
-            setError(null);
+            setChats((prevChats) =>{
+                let updateChat ;
+                if (requestedPage === 1) {
+                    updateChat = res.chats;
+                } else{
+                    const chatIds = new Set(prevChats.map(chat => chat._id));
+                    const newChats = res.chats.filter((chat: ChatItemType) => !chatIds.has(chat._id));
+                    updateChat = [...prevChats, ...newChats];
+                }
+                return updateChat;
+            });
+           
+            const {total,page,pageSize} = res;
+            const calculatedHasMore = (page * pageSize )< total;
+            setHasMore(calculatedHasMore);
+
             
         } catch (error) {
             setError(error as Error);
             setChats([])
         } finally{
-            setLoading(false);
+            setLoadingMore(false);
+            setLoadingInitial(false);
+        }
+    },[]);
+
+    const loadMoreChats = useCallback(() => {
+        if (loadingMore || !hasMore) return;
+       
+        setPage(prevPage => prevPage + 1);
+    }, [loadingMore, hasMore]);
+
+    const prevPageRef = useRef<number>(1);
+    const fetchMoreRef = useRef(false);
+
+    useEffect(() => {
+        if (page) {
+            setChats([]);
+            setPage(1);
+            setHasMore(true);
+            setError(null);
+            prevPageRef.current = 1;
+            fetchMoreRef.current = false;
+            getfetchChats(1,10);
+            getfetchChats(page,10);
         }
     },[page]);
     useEffect(() => {
-        getfetchChats(page,10);
-    },[getfetchChats]);
+        if (page > 1  && page !== prevPageRef.current && !fetchMoreRef.current) {
+            fetchMoreRef.current = true;
+            getfetchChats(page,10);
+            prevPageRef.current = page;
+            setTimeout(() => {
+                fetchMoreRef.current = false;
+            }, 300);
+        }
+        },[page,getfetchChats]);
+
+
 
     const searchChats = useCallback(async (query: string) => {
         setLoading(true);
@@ -179,10 +234,14 @@ export const useChat = () => {
     return {
         chats,
         loading,
+        loadingInitial,
+        loadingMore,
+        hasMore,
         error,
         page,
         refetch: () => getfetchChats(page,10),
         setPage,
+        loadMoreChats,
         totalPages,
         searchChats,
         searchUsers,

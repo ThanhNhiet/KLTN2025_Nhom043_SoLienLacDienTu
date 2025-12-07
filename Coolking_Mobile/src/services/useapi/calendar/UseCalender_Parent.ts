@@ -52,6 +52,7 @@ export const useCalendar_Parent = (stID: string | null) => {
   const [prev, setPrev] = useState<string | null>(null);
   const [next, setNext] = useState<string | null>(null);
   const [weekInfo, setWeekInfo] = useState<NewApiResp["weekInfo"]>(null);
+  const [selectedDate, setSelectedDate] = useState(dayjs().format("YYYY-MM-DD"));
 
   // ====== Fetch theo ngày ======
   const fetchCalendar = useCallback(async (date?: string, studentID?: string | null) => {
@@ -121,6 +122,7 @@ export const useCalendar_Parent = (stID: string | null) => {
         setPrev(data.prev ?? null);
         setNext(data.next ?? null);
         setWeekInfo(data.weekInfo ?? null);
+        setSelectedDate(dayjs(dateParam, "DD-MM-YYYY").format("YYYY-MM-DD"));
       }
     } catch (e) {
       console.error("❌ goPrevWeek error:", e);
@@ -141,6 +143,7 @@ export const useCalendar_Parent = (stID: string | null) => {
         setPrev(data.prev ?? null);
         setNext(data.next ?? null);
         setWeekInfo(data.weekInfo ?? null);
+        setSelectedDate(dayjs(dateParam, "DD-MM-YYYY").format("YYYY-MM-DD"));
       }
     } catch (e) {
       console.error("❌ goNextWeek error:", e);
@@ -189,6 +192,8 @@ export const useCalendar_Parent = (stID: string | null) => {
     weekInfo,
     prev,
     next,
+    selectedDate,
+    setSelectedDate,
     fetchCalendar,
     goPrevWeek,
     goNextWeek,
