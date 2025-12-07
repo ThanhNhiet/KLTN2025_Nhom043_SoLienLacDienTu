@@ -391,8 +391,8 @@ const getCourseSectionsByStudent = async (studentId, page, pageSize = 10) => {
 
         const page_num = parseInt(page) || 1;
         const pageSize_num = parseInt(pageSize) || 10;
-        const offset = (page_num - 1) * pageSize_num;
 
+        // Fetch all data without pagination first (for sorting)
         const { count, rows } = await models.StudentCourseSection.findAndCountAll({
             where: {
                 student_id: studentId
@@ -439,15 +439,32 @@ const getCourseSectionsByStudent = async (studentId, page, pageSize = 10) => {
                     ]
                 }
             ],
-            order: [
-                [{ model: models.CourseSection, as: 'course_section' }, 'createdAt', 'DESC']
-            ],
-            offset: offset,
-            limit: pageSize_num,
-            distinct: true
+            distinct: true,
+            raw: false
         });
 
-        const courseSections = rows.map(item => ({
+        // Sort in JavaScript: by year (DESC) → semester name (DESC) → createdAt (DESC)
+        const sortedRows = rows.sort((a, b) => {
+            const yearA = parseInt(a.course_section.session?.years?.split('-')[0] || '0');
+            const yearB = parseInt(b.course_section.session?.years?.split('-')[0] || '0');
+            
+            // Primary: year DESC
+            if (yearB !== yearA) return yearB - yearA;
+            
+            // Secondary: semester name DESC (HK3 > HK2 > HK1)
+            const nameA = a.course_section.session?.name || '';
+            const nameB = b.course_section.session?.name || '';
+            if (nameA !== nameB) return nameB.localeCompare(nameA);
+            
+            // Tertiary: createdAt DESC
+            return new Date(b.course_section.createdAt) - new Date(a.course_section.createdAt);
+        });
+
+        // Apply pagination after sorting
+        const offset = (page_num - 1) * pageSize_num;
+        const paginatedRows = sortedRows.slice(offset, offset + pageSize_num);
+
+        const courseSections = paginatedRows.map(item => ({
             course_section_id: item.course_section.id,
             subject_id: item.course_section.subject?.subject_id || 'N/A',
             subjectName: item.course_section.subject?.name || 'N/A',
@@ -461,7 +478,7 @@ const getCourseSectionsByStudent = async (studentId, page, pageSize = 10) => {
 
         const linkPrev = page_num > 1 ?
             `/api/coursesections/student/${studentId}?page=${page_num - 1}&pagesize=${pageSize_num}` : null;
-        const linkNext = (page_num - 1) * pageSize_num + rows.length < count ?
+        const linkNext = page_num * pageSize_num < count ?
             `/api/coursesections/student/${studentId}?page=${page_num + 1}&pagesize=${pageSize_num}` : null;
 
         const totalPages = Math.ceil(count / pageSize_num);

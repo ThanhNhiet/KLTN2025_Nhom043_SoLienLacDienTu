@@ -195,6 +195,7 @@ exports.verifyOTP_Email = async (req, res) => {
 exports.checkAccountByEmail = async (req, res) => {
 	try {
 		const { email } = req.params;
+		console.log('Received email to check:', email);
 
 		// Kiểm tra email có được cung cấp không
 		if (!email) {
@@ -214,6 +215,7 @@ exports.checkAccountByEmail = async (req, res) => {
 		}
 
 		const result = await accountRepo.checkAccountByEmail(email);
+		console.log('checkAccountByEmail result:', result);
 
 		if (result === 0) {
 			return res.status(404).json({

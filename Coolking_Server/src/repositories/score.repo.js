@@ -112,7 +112,6 @@ const getScoreStudentBySession = async (studentId) => {
         COUNT(*) as total_subjects,
         SUM(total_credit) as total_credits,
         
-        -- Công thức tính GPA
         FORMAT(
           SUM(
               CASE WHEN score IS NOT NULL THEN grade_point * total_credit ELSE 0 END
@@ -122,9 +121,9 @@ const getScoreStudentBySession = async (studentId) => {
         ) as gpa
 
       FROM ScoreData
-      GROUP BY student_id, name, class_name, academic_year, semester
-      ORDER BY academic_year DESC, semester ASC`;
+      GROUP BY student_id, name, class_name, academic_year, semester`;
 
+    // Fetch all results without ordering in SQL
     const results = await sequelize.query(query, {
       replacements: { studentId },
       type: QueryTypes.SELECT
@@ -137,7 +136,19 @@ const getScoreStudentBySession = async (studentId) => {
       };
     }
 
-    const formattedResults = results.map(result => ({
+    // Sort in JavaScript: by year (DESC) → semester (DESC)
+    const sortedResults = results.sort((a, b) => {
+      const yearA = parseInt(a.academic_year?.split('-')[0] || '0');
+      const yearB = parseInt(b.academic_year?.split('-')[0] || '0');
+      
+      // Primary: year DESC (latest year first)
+      if (yearB !== yearA) return yearB - yearA;
+      
+      // Secondary: semester DESC (HK3 before HK2 before HK1)
+      return (b.semester || '').localeCompare(a.semester || '');
+    });
+
+    const formattedResults = sortedResults.map(result => ({
       ...result,
       subjects: safeParseJSON(result.subjects)
     }));
@@ -228,7 +239,6 @@ const getScoreParentStudentBySession = async (ParentId, studentID) => {
         ) AS gpa
       FROM ScoreData
       GROUP BY student_id, name, class_name, academic_year, semester
-      ORDER BY academic_year DESC, semester ASC
     `;
 
     const results = await sequelize.query(query, {
@@ -243,7 +253,19 @@ const getScoreParentStudentBySession = async (ParentId, studentID) => {
       };
     }
 
-    const formattedResults = results.map(result => ({
+    // Sort in JavaScript: by year (DESC) → semester (DESC)
+    const sortedResults = results.sort((a, b) => {
+      const yearA = parseInt(a.academic_year?.split('-')[0] || '0');
+      const yearB = parseInt(b.academic_year?.split('-')[0] || '0');
+      
+      // Primary: year DESC (latest year first)
+      if (yearB !== yearA) return yearB - yearA;
+      
+      // Secondary: semester DESC (HK3 before HK2 before HK1)
+      return (b.semester || '').localeCompare(a.semester || '');
+    });
+
+    const formattedResults = sortedResults.map(result => ({
       ...result,
       subjects: safeParseJSON(result.subjects)
     }));
