@@ -71,6 +71,16 @@ async function hasAnyLoggedInDevice(userID) {
   return count > 0;
 }
 
+async function getUserIdOnline() {
+  const docs = await UserMobileDevice.find(
+    { enabled: true },
+    { userID: 1, _id: 0 }
+  ).lean();
+  return docs.map(d => d.userID);
+}
+
+
+
 module.exports = {
   upsertToken,
   getTokensByUserId,
@@ -78,4 +88,5 @@ module.exports = {
   removeUserToken,
   hasAnyLoggedInDevice,
   logoutDevice,
+  getUserIdOnline,
 };

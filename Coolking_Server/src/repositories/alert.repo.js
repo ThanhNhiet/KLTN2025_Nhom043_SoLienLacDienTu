@@ -3,6 +3,7 @@ const { Alert, IsReadAlert } = require('../databases/mongodb/schemas');
 const { Op } = require('sequelize');
 const mongoose = require('mongoose');
 const datetimeFormatter = require("../utils/format/datetime-formatter");
+const UserMobileDeviceRepo = require('../repositories/UserMobileDevice.repo.js');
 const { sendAlertPush } = require('../services/pushService');
 
 /**
@@ -31,6 +32,12 @@ const sendAlertToAll = async (user_id, header, body) => {
             createdAt: new Date(),
             updatedAt: new Date()
         });
+
+        const userIdsOnline = await UserMobileDeviceRepo.getUserIdOnline();
+        // Gửi push notification cho tất cả người dùng online
+        for (const receiverID of userIdsOnline) {
+            await sendAlertPush(receiverID, {header: alert.header, body: alert.body});
+        }
 
         // Lưu vào database
         await alert.save();

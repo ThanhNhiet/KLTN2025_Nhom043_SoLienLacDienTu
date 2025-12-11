@@ -134,12 +134,14 @@ async function sendChatPush(
 }
 
 async function sendAlertPush(toUserId, { header, body }) {
-  // 1. Lấy danh sách token
   let tokens = await UserMobileDevice.getTokensByUserId(String(toUserId));
   tokens = [...new Set(tokens)];
-  if (!tokens.length) return; // User không có thiết bị nhận push
 
-  // 2. UI hiển thị
+  if (!tokens.length) {
+    console.log('[sendAlertPush] no tokens for user', toUserId);
+    return;
+  }
+
   const title = header?.trim() || 'Thông báo mới';
   const content = body?.trim() || '';
 
@@ -155,14 +157,13 @@ async function sendAlertPush(toUserId, { header, body }) {
     data: {
       type: 'alert',
       title,
-      body: content
+      body: content,
     },
   };
 
-  // 3. Gửi Push
   const resp = await admin.messaging().sendEachForMulticast(msg);
+  // Dọn token chết / invalid
 
-  // 4. Dọn token chết (Copy logic từ sendChatPush để tái sử dụng)
   await Promise.all(
     resp.responses.map((r, i) => {
       if (!r.success) {
