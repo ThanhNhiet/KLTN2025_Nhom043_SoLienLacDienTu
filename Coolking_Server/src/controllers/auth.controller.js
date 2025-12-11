@@ -5,15 +5,55 @@ const redisService = require('../services/redis.service');
 const emailService = require("../services/email.service");
 const smsService = require("../services/sms.service");
 
+// Cấu hình giới hạn
+const OTP_LIMIT_CONFIG = {
+    IP_MAX: 10,        // 1 IP chỉ được yêu cầu 10 lần/giờ (cho cả mail và phone)
+    TARGET_MAX: 3,     // 1 Email hoặc 1 SĐT chỉ nhận tối đa 3 OTP/giờ
+    WINDOW: 60 * 60    // 1 Tiếng (tính bằng giây)
+};
+
+/**
+ * Hàm kiểm tra Rate Limit chung
+ * @param {string} key - Key Redis
+ * @param {number} limit - Số lần cho phép
+ * @param {number} window - Thời gian (giây)
+ * @returns {Promise<number|null>} - Trả về TTL (giây còn lại) nếu bị chặn, hoặc null nếu được phép
+ */
+const checkLimit = async (key, limit, window) => {
+    const count = await redisService.incr(key);
+    if (count === 1) {
+        await redisService.expire(key, window);
+    }
+    if (count > limit) {
+        return await redisService.ttl(key);
+    }
+    return null;
+};
+
 // POST /public/login
 exports.login = async (req, res, next) => {
 	try {
 		const { username, password } = req.body;
 
+		// --- RATE LIMITER START ---
+        // Lấy IP người dùng để làm key định danh
+        const ipAddress = req.ip || req.connection.remoteAddress;
+        const limitKey = `login_limit:${ipAddress}`;
+        const MAX_ATTEMPTS = 5; // Cho phép thử 5 lần
+        const WINDOW_SECONDS = 60; // Trong vòng 60 giây
+		const ipttl = await checkLimit(limitKey, MAX_ATTEMPTS, WINDOW_SECONDS);
+		if (ipttl) {
+			return res.status(429).json({
+				message: `Quá nhiều lần thử đăng nhập. Vui lòng thử lại sau ${ipttl} giây.`
+			});
+		}
+		// --- RATE LIMITER END ---
+
 		// Xác thực người dùng từ repo
 		const account = await accountRepo.login(username, password);
 
-		// Nếu xác thực thành công, tạo token
+		// --- LOGIN SUCCESS ---
+        await redisService.del(limitKey);
 		const payload = {
 			id: account.id,
 			user_id: account.user_id,
@@ -27,7 +67,6 @@ exports.login = async (req, res, next) => {
 		await tokenRepo.deleteTokenByUserId(account.user_id);
 
 		// Lưu refresh token vào database
-		const ipAddress = req.ip || req.connection.remoteAddress;
 		await tokenRepo.saveToken(account.user_id, refreshToken, ipAddress);
 
 		// Trả về token cho client
@@ -136,7 +175,6 @@ exports.logout = async (req, res) => {
 exports.verifyOTP_Email = async (req, res) => {
 	try {
 		const { email, otp } = req.body;
-
 		// Kiểm tra các trường bắt buộc
 		if (!email || !otp) {
 			return res.status(400).json({
@@ -195,7 +233,7 @@ exports.verifyOTP_Email = async (req, res) => {
 exports.checkAccountByEmail = async (req, res) => {
 	try {
 		const { email } = req.params;
-		console.log('Received email to check:', email);
+		const ip = req.ip || req.connection.remoteAddress;
 
 		// Kiểm tra email có được cung cấp không
 		if (!email) {
@@ -214,8 +252,28 @@ exports.checkAccountByEmail = async (req, res) => {
 			});
 		}
 
+		// ========== RATE LIMITER START ==========
+        // Check 1: Giới hạn theo IP (Chống Bot spam hệ thống)
+        const ipKey = `otp_limit:ip:${ip}`;
+        const ipTTL = await checkLimit(ipKey, OTP_LIMIT_CONFIG.IP_MAX, OTP_LIMIT_CONFIG.WINDOW);
+        if (ipTTL) {
+            return res.status(429).json({
+                success: false,
+                message: `Bạn thao tác quá nhanh. Vui lòng thử lại sau ${Math.ceil(ipTTL / 60)} phút.`
+            });
+        }
+        // Check 2: Giới hạn theo Email (Chống spam vào hộp thư người dùng)
+        const emailKey = `otp_limit:email:${email}`;
+        const emailTTL = await checkLimit(emailKey, OTP_LIMIT_CONFIG.TARGET_MAX, OTP_LIMIT_CONFIG.WINDOW);
+        if (emailTTL) {
+            return res.status(429).json({
+                success: false,
+                message: `Đã gửi quá nhiều OTP đến email này. Vui lòng quay lại sau ${Math.ceil(emailTTL / 60)} phút.`
+            });
+        }
+        // ========== RATE LIMITER END ==========
+
 		const result = await accountRepo.checkAccountByEmail(email);
-		console.log('checkAccountByEmail result:', result);
 
 		if (result === 0) {
 			return res.status(404).json({
@@ -283,6 +341,7 @@ exports.changePasswordByEmail = async (req, res) => {
 exports.checkAccountByPhoneNumber = async (req, res) => {
 	try {
 		const { phoneNumber } = req.params;
+		const ip = req.ip || req.connection.remoteAddress;
 		// Kiểm tra số điện thoại có được cung cấp không
 		if (!phoneNumber) {
 			return res.status(400).json({
@@ -298,6 +357,28 @@ exports.checkAccountByPhoneNumber = async (req, res) => {
 				message: 'Số điện thoại không hợp lệ.'
 			});
 		}
+
+		// ========== RATE LIMITER START ==========
+        // Check 1: Giới hạn theo IP
+        const ipKey = `otp_limit:ip:${ip}`;
+        const ipTTL = await checkLimit(ipKey, OTP_LIMIT_CONFIG.IP_MAX, OTP_LIMIT_CONFIG.WINDOW);
+        if (ipTTL) {
+            return res.status(429).json({
+                success: false,
+                message: `Hệ thống bận. Vui lòng thử lại sau ${Math.ceil(ipTTL / 60)} phút.`
+            });
+        }
+        // Check 2: Giới hạn theo Số điện thoại
+        const phoneKey = `otp_limit:phone:${phoneNumber}`;
+        const phoneTTL = await checkLimit(phoneKey, OTP_LIMIT_CONFIG.TARGET_MAX, OTP_LIMIT_CONFIG.WINDOW);
+        if (phoneTTL) {
+            return res.status(429).json({
+                success: false,
+                message: `Đã gửi quá nhiều mã OTP. Vui lòng thử lại sau ${Math.ceil(phoneTTL / 60)} phút.`
+            });
+        }
+        // ========== RATE LIMITER END ==========
+
 		const result = await accountRepo.checkAccountByPhoneNumber(phoneNumber);
 		if (result === 0) {
 			return res.status(404).json({
