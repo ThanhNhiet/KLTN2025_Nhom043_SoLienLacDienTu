@@ -23,7 +23,7 @@ export default function TopNavigations_Chat({ navigation, name, onRefresh }: pro
       {/* Nút Back */}
       <TouchableOpacity
         style={styles.leftButton} 
-        onPress={() => navigation.goBack()}
+        onPress={() => navigation.navigate("HomeScreen")}
         activeOpacity={0.7}
       >
         <Ionicons name="arrow-back" size={24} color="#e5f0f0ff" />

@@ -9,7 +9,9 @@ import { initNotifications } from "./src/utils/notifications";
 import { useFonts } from "expo-font";
 
 export default function App() {
-  // ✅ ALL HOOKS AT THE TOP - BEFORE ANY CONDITIONALS
+  // =========================
+  // HOOKS
+  // =========================
   const [fontsLoaded] = useFonts({
     "BeVietnam-Regular": require("./src/assets/frond/BeVietnamPro-Regular.ttf"),
     "BeVietnam-Bold": require("./src/assets/frond/BeVietnamPro-Bold.ttf"),
@@ -23,22 +25,82 @@ export default function App() {
   const [userID, setUserID] = useState<string>("");
   const hasSetDefaultFont = useRef(false);
 
-  // ✅ Init notifications effect
-  useEffect(() => {
-    let cleanupFn: (() => void) | null = null;
+  // =========================
+  // HELPER FUNCTIONS
+  // =========================
+  const lockNavigation = (ms = 2000) => {
+    navLockRef.current = true;
+    setTimeout(() => {
+      navLockRef.current = false;
+    }, ms);
+  };
 
-    initNotifications(safeNavigateToChat, { userId: userID })
-      .then(({ cleanup }) => {
-        cleanupFn = cleanup;
-      })
-      .catch((err) => console.warn("initNotifications error", err));
+  const safeNavigateToChat = (chatId: string) => {
+    // khóa điều hướng để tránh bị reset về Login/Home ngay khi từ push mở vào
+    lockNavigation(2500);
 
-    return () => {
-      if (cleanupFn) cleanupFn();
-    };
-  }, [userID]);
+    if (!navigationRef.current || !navigationRef.current.isReady()) {
+      // navigator chưa sẵn sàng → lưu lại, khi onReady sẽ xử lý
+      pendingChatRef.current = chatId;
+      return;
+    }
 
-  // ✅ Check session + navigation effect
+    navigationRef.current.navigate("MessageScreen" as any, { chatId });
+  };
+
+  const handleNavigation = (ok: boolean) => {
+    if (navLockRef.current || pendingChatRef.current) return false;
+    if (!navigationRef.current || !isNavigationReady) return false;
+
+    try {
+      const targetScreen = ok ? "HomeScreen" : "LoginScreen";
+      navigationRef.current.reset({
+        index: 0,
+        routes: [{ name: targetScreen }],
+      });
+      return true;
+    } catch (error) {
+      console.error("❌ Navigation failed:", error);
+      return false;
+    }
+  };
+
+  // =========================
+  // INIT NOTIFICATIONS
+  // =========================
+  // ...
+useEffect(() => {
+  if (!userID) return;
+
+  let cleanupFn: (() => void) | null = null;
+
+  initNotifications(
+    // navigateToChat
+    (chatId) => {
+      if (!navigationRef.current?.isReady()) return;
+      navigationRef.current.navigate("MessageScreen" as any, { chatId });
+    },
+    // navigateToAlert
+    () => {
+      if (!navigationRef.current?.isReady()) return;
+      navigationRef.current.navigate("HomeScreen" as any);
+    },
+    // options
+    { userId: userID }
+  )
+    .then((res) => {
+      cleanupFn = res?.cleanup ?? null;
+    })
+    .catch((err) => console.warn("initNotifications error", err));
+
+  return () => {
+    if (cleanupFn) cleanupFn();
+  };
+}, [userID]);
+
+  // =========================
+  // CHECK SESSION + NAVIGATION
+  // =========================
   useEffect(() => {
     const init = async () => {
       try {
@@ -69,7 +131,9 @@ export default function App() {
     init();
   }, [isNavigationReady]);
 
-  // ✅ Set default font effect - runs AFTER all hooks declared
+  // =========================
+  // SET DEFAULT FONT
+  // =========================
   useEffect(() => {
     if (fontsLoaded && !hasSetDefaultFont.current) {
       hasSetDefaultFont.current = true;
@@ -92,7 +156,9 @@ export default function App() {
     }
   }, [fontsLoaded]);
 
-  // ✅ NOW conditionals/early returns are OK (after all hooks)
+  // =========================
+  // LOADING UI
+  // =========================
   if (!fontsLoaded || checking) {
     return (
       <View
@@ -108,38 +174,9 @@ export default function App() {
     );
   }
 
-  // Helper functions (these don't have hooks, so they can be here)
-  const lockNavigation = (ms = 2000) => {
-    navLockRef.current = true;
-    setTimeout(() => (navLockRef.current = false), ms);
-  };
-
-  const safeNavigateToChat = (chatId: string) => {
-    lockNavigation(2500);
-    if (!navigationRef.current || !navigationRef.current.isReady()) {
-      pendingChatRef.current = chatId;
-      return;
-    }
-    navigationRef.current.navigate("MessageScreen" as any, { chatId });
-  };
-
-  const handleNavigation = (ok: boolean) => {
-    if (navLockRef.current || pendingChatRef.current) return false;
-    if (!navigationRef.current || !isNavigationReady) return false;
-
-    try {
-      const targetScreen = ok ? "HomeScreen" : "LoginScreen";
-      navigationRef.current.reset({
-        index: 0,
-        routes: [{ name: targetScreen }],
-      });
-      return true;
-    } catch (error) {
-      console.error("❌ Navigation failed:", error);
-      return false;
-    }
-  };
-
+  // =========================
+  // RENDER APP
+  // =========================
   return (
     <NavigationContainer
       ref={navigationRef}
