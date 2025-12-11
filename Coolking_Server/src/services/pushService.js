@@ -133,4 +133,50 @@ async function sendChatPush(
   );
 }
 
-module.exports = { sendChatPush };
+async function sendAlertPush(toUserId, { header, body }) {
+  // 1. Lấy danh sách token
+  let tokens = await UserMobileDevice.getTokensByUserId(String(toUserId));
+  tokens = [...new Set(tokens)];
+  if (!tokens.length) return; // User không có thiết bị nhận push
+
+  // 2. UI hiển thị
+  const title = header?.trim() || 'Thông báo mới';
+  const content = body?.trim() || '';
+
+  const msg = {
+    tokens,
+    notification: { title, body: content },
+    android: {
+      priority: 'high',
+      notification: {
+        channelId: 'general-alerts',
+      },
+    },
+    data: {
+      type: 'alert',
+      title,
+      body: content
+    },
+  };
+
+  // 3. Gửi Push
+  const resp = await admin.messaging().sendEachForMulticast(msg);
+
+  // 4. Dọn token chết (Copy logic từ sendChatPush để tái sử dụng)
+  await Promise.all(
+    resp.responses.map((r, i) => {
+      if (!r.success) {
+        const code = r.error?.errorInfo?.code || r.error?.code;
+        if (
+          code === 'messaging/registration-token-not-registered' ||
+          code === 'messaging/invalid-argument'
+        ) {
+          return UserMobileDevice.invalidateToken(tokens[i]);
+        }
+      }
+      return null;
+    })
+  );
+}
+
+module.exports = { sendChatPush, sendAlertPush };

@@ -3,6 +3,7 @@ const { Alert, IsReadAlert } = require('../databases/mongodb/schemas');
 const { Op } = require('sequelize');
 const mongoose = require('mongoose');
 const datetimeFormatter = require("../utils/format/datetime-formatter");
+const { sendAlertPush } = require('../services/pushService');
 
 /**
  * Gửi thông báo đến tất cả người dùng
@@ -92,6 +93,11 @@ const sendAlertToPerson = async (senderID, receiversID, header, body) => {
         // Bulk insert tất cả alerts
         if (alertsToCreate.length > 0) {
             await Alert.insertMany(alertsToCreate);
+        }
+
+        // Gửi push notification cho từng người nhận
+        for (const alert of alertsToCreate) {
+            await sendAlertPush(alert.receiverID, {header: alert.header, body: alert.body});
         }
 
         return {

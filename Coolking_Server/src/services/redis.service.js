@@ -168,6 +168,34 @@ const ttl = async (key) => {
   }
 };
 
+/**
+ * Tăng giá trị của key lên 1
+ * @param {String} key - Key cần tăng
+ * @returns {Number} - Giá trị mới sau khi tăng
+ */
+const incr = async (key) => {
+  try {
+    return await redis.incr(key);
+  } catch (error) {
+    console.error('Redis error when incrementing key:', error);
+    throw error;
+  }
+};
+
+/**
+ * Đặt thời gian hết hạn cho key (nếu key chưa có TTL hoặc muốn ghi đè)
+ * @param {String} key - Key
+ * @param {Number} seconds - Thời gian hết hạn (giây)
+ */
+const expire = async (key, seconds) => {
+  try {
+    return await redis.expire(key, seconds);
+  } catch (error) {
+    console.error('Redis error when setting expire:', error);
+    throw error;
+  }
+};
+
 // Kiểm tra kết nối Redis khi khởi động
 redis.on('connect', () => {
   console.log('✅ Connected to Redis server');
@@ -187,5 +215,7 @@ module.exports = {
   get,
   del,
   exists,
-  ttl
+  ttl,
+  incr,
+  expire
 };

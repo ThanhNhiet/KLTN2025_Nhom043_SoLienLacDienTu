@@ -277,14 +277,9 @@ const resetPassword4Admin = async (user_id) => {
 const checkAccountByEmail = async (email) => {
   try {
     const account = await models.Account.findOne({ where: { email } });
-
-    console.log('Found account by email:', account);
     if (!account) return 0; // Tài khoản không tồn tại
-
     const result = await emailService.sendOTP(email);
-    console.log('Email service result:', result);
     if (!result.success) return -1; // Gửi OTP thất bại
-
     return 1; // Gửi OTP thành công
   } catch (error) {
     console.error('Error in checkAccountByEmail:', error);
