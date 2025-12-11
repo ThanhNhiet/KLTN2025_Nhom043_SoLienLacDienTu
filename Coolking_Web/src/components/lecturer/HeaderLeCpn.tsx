@@ -38,7 +38,11 @@ const HeaderLECpn: React.FC = () => {
         message: '',
         type: 'success'
     });
-    const alertBoxRef = useRef<HTMLDivElement>(null);
+
+    //Tách ref thành 2 cái riêng biệt cho mobile và desktop
+    const mobileAlertBoxRef = useRef<HTMLDivElement>(null);
+    const desktopAlertBoxRef = useRef<HTMLDivElement>(null);
+
     const mobileMenuRef = useRef<HTMLDivElement>(null);
 
     // Lấy thông tin lecturer từ localStorage
@@ -71,7 +75,12 @@ const HeaderLECpn: React.FC = () => {
     // Đóng alert box và mobile menu khi click bên ngoài
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (alertBoxRef.current && !alertBoxRef.current.contains(event.target as Node)) {
+            // Kiểm tra click outside cho Alert Box
+            // Logic: Nếu click không nằm trong Desktop Ref VÀ không nằm trong Mobile Ref thì mới đóng
+            const clickedInsideDesktop = desktopAlertBoxRef.current && desktopAlertBoxRef.current.contains(event.target as Node);
+            const clickedInsideMobile = mobileAlertBoxRef.current && mobileAlertBoxRef.current.contains(event.target as Node);
+
+            if (showAlertBox && !clickedInsideDesktop && !clickedInsideMobile) {
                 setShowAlertBox(false);
             }
             if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node)) {
@@ -205,7 +214,7 @@ const HeaderLECpn: React.FC = () => {
                         </button>
 
                         {/* Mobile Alert Bell */}
-                        <div className="md:hidden relative" ref={alertBoxRef}>
+                        <div className="md:hidden relative" ref={mobileAlertBoxRef}>
                             <button
                                 onClick={handleBellClick}
                                 className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 focus:outline-none relative"
@@ -348,8 +357,8 @@ const HeaderLECpn: React.FC = () => {
                                 Nhắn tin
                             </a>
                             
-                            {/* Alert bell icon - Moved here */}
-                            <div className="relative ml-4" ref={alertBoxRef}>
+                            {/* Alert bell icon - Desktop */}
+                            <div className="relative ml-4" ref={desktopAlertBoxRef}>
                                 <button
                                     onClick={handleBellClick}
                                     className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 focus:outline-none relative"
