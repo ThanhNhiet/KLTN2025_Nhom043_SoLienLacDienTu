@@ -77,9 +77,9 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: "center", padding: 20, backgroundColor: "#f5f5f5" },
-  title: { fontSize: 28, fontWeight: "bold", marginBottom: 40, textAlign: "center", color: "#333" },
+  title: { fontFamily: 'BeVietnam-Bold',fontSize: 28,  marginBottom: 40, textAlign: "center", color: "#333" },
   inputContainer: { marginBottom: 18 },
-  label: { fontSize: 16, fontWeight: "500", marginBottom: 6, color: "#444" },
+  label: { fontFamily: 'BeVietnam-Regular', fontSize: 16, fontWeight: "500", marginBottom: 6, color: "#444" },
   input: {
     height: 45,
     borderBottomWidth: 1,
@@ -87,6 +87,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     paddingHorizontal: 8,
     backgroundColor: "transparent",
+    fontFamily: 'BeVietnam-Regular',
+
   },
   passwordWrapper: {
     flexDirection: "row",
@@ -100,7 +102,7 @@ const styles = StyleSheet.create({
   justifyContent: "flex-end",
   marginTop: 8,
 },
-  linkText: { color: "#007AFF", fontSize: 14, fontWeight: "600" },
+  linkText: { fontFamily: 'BeVietnam-Regular', color: "#007AFF", fontSize: 14, fontWeight: "600" },
   loginButton: {
     backgroundColor: "#007AFF",
     paddingVertical: 12,
@@ -108,5 +110,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 20,
   },
-  loginButtonText: { color: "#fff", fontSize: 18, fontWeight: "bold" },
+  loginButtonText: { fontFamily: 'BeVietnam-Bold', color: "#fff", fontSize: 18 },
 });

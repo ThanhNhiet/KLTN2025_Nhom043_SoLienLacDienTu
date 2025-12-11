@@ -12,7 +12,7 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import React, { useState } from "react";
 import NetInfo from '@react-native-community/netinfo'; // Install if not already
-import { unregisterPushToken } from '@/src/utils/notifications';
+import { unregisterPushToken, registerPushToken } from '@/src/utils/notifications';
 
 export const useLogin_out = () => {
     const navigation = useNavigation<any>();
@@ -63,6 +63,10 @@ export const useLogin_out = () => {
                 console.log("Login successful, tokens received");
                 await AsyncStorage.setItem('token', token);
                 await AsyncStorage.setItem('refreshToken', refreshToken);
+                const userId = await AsyncStorage.getItem('userId');
+                if (userId) {
+                    await registerPushToken(userId);
+                }
                 
                 navigation.navigate("HomeScreen");
             }

@@ -185,27 +185,42 @@ export default function ChatScreen() {
     const { chats, loading, loadingInitial, loadingMore, hasMore, loadMoreChats, error, refetch, userID, markMessagesAsRead, createPrivateChatAI } = useChat();
     const [refreshing, setRefreshing] = useState(false);
     const [localChats, setLocalChats] = useState<ChatItemType[]>([]);
-     const [modalVisible, setModalVisible] = useState(false);
-     const [chatAIId, setChatAIId] = useState<string | null>(null);
-     const isFocused = useIsFocused();
-     const flatListRef = useRef<FlatList<ItemMessage>>(null);
+    const [modalVisible, setModalVisible] = useState(false);
+    const [chatAIId, setChatAIId] = useState<string | null>(null);
+    const isFocused = useIsFocused();
+    const flatListRef = useRef<FlatList<ChatItemType>>(null);
     const [isAtBottom, setIsAtBottom] = useState(true);
+    const shouldRefetchRef = useRef(true);
+    const lastLoadTime = useRef(0);
+    const loadingTriggered = useRef(false);
+    const previousScrollY = useRef(0);
+    const isFirstLoad = useRef(true);
 
-     useEffect(() => {
-    if (isFocused) {
-        refetch();
-      setLocalChats(chats);
-    }
-  }, [isFocused, chats]);
+    // Update localChats only when chats change
+    useEffect(() => {
+        setLocalChats(chats);
+    }, [chats]);
 
+    // Refetch only once when screen is focused
+    useEffect(() => {
+        if (isFocused && shouldRefetchRef.current) {
+            shouldRefetchRef.current = false;
+            refetch();
+        }
+        return () => {
+            if (!isFocused) {
+                shouldRefetchRef.current = true;
+            }
+        };
+    }, [isFocused, refetch]);
 
     const handleCreatePrivateChatAI = async () => {
         const newChat = await createPrivateChatAI();
         if (newChat) {
             setChatAIId(newChat._id);
             setModalVisible(true);
-        } else{
-            Alert.alert("Lỗi","Không thể tạo cuộc trò chuyện với AI vào lúc này. Vui lòng thử lại sau.");
+        } else {
+            Alert.alert("Lỗi", "Không thể tạo cuộc trò chuyện với AI vào lúc này. Vui lòng thử lại sau.");
         }
     };
 
@@ -244,7 +259,6 @@ export default function ChatScreen() {
                                 content: '[Tin nhắn đã bị thu hồi]'
                             },
                             unread: false
-
                         };
                     }
                     return chat;
@@ -252,34 +266,23 @@ export default function ChatScreen() {
             });
         };
 
-        // Register socket event listeners
         socket.emit('register', userID);
         socket.on('receive_message', handleNewMessage);
-        socket.on('del_message', handleDeleteMessage);
+        socket.on('render_message', handleDeleteMessage);
 
-        // Cleanup function
         return () => {
             socket.off('receive_message', handleNewMessage);
-            socket.off('del_message', handleDeleteMessage);
+            socket.off('render_message', handleDeleteMessage);
         };
-    }, [socket, userID]);
+    }, [userID]);
 
-
-    const lastLoadTime = useRef(0);
-    const loadingTriggered = useRef(false);
-    const previousScrollY = useRef(0);
-    const isFirstLoad = useRef(true);
-    
-    // FIX: Đơn giản hóa logic load more
     const handleLoadMore = useCallback(() => {
         const now = Date.now();
         
-        // Kiểm tra tất cả điều kiện
         if (loadingMore || !hasMore || loadingTriggered.current) {
             return;
         }
         
-        // Kiểm tra timing
         if (now - lastLoadTime.current < 1500) {
             return;
         }
@@ -289,41 +292,29 @@ export default function ChatScreen() {
         
         loadMoreChats();
         
-        // Reset flag sau 2 giây
         setTimeout(() => {
             loadingTriggered.current = false;
         }, 2000);
     }, [loadingMore, hasMore, loadMoreChats]);
     
-    // FIX: Cải thiện scroll detection
     const handleOnScroll = useCallback(({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) => {
         const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
         
-        // Kiểm tra đã đến đáy hay chưa
         const isAtBottomNow = layoutMeasurement.height + contentOffset.y >= contentSize.height - 50;
         setIsAtBottom(isAtBottomNow);
         
-        // Chỉ load more khi scroll lên gần top
-        const currentScrollY = contentOffset.y;
-        const isScrollingUp = currentScrollY < previousScrollY.current;
-        previousScrollY.current = currentScrollY;
-        
-        // Load khi gần top
-        const isNearTop = currentScrollY < 50 && contentSize.height > layoutMeasurement.height;
-        
-        if (isScrollingUp && isNearTop && hasMore && !loadingMore && !loadingTriggered.current) {
-            
+        // Check if scrolling to bottom to load more
+        if (isAtBottomNow && hasMore && !loadingMore && !loadingTriggered.current) {
             handleLoadMore();
         }
     }, [hasMore, loadingMore, handleLoadMore]);
     
-    // Scroll to end khi load xong
     useEffect(() => {
         if (isFirstLoad.current && chats.length > 0 && !loading) {
             const timer = setTimeout(() => {
                 flatListRef.current?.scrollToEnd({ animated: false });
                 isFirstLoad.current = false;
-            }, 50);
+            }, 100);
             return () => clearTimeout(timer);
         }
     }, [chats.length, loading]);
@@ -331,15 +322,17 @@ export default function ChatScreen() {
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
         try {
-            await refetch(); // Gọi hàm fetch lại dữ liệu
+            refetch();
+            await new Promise(resolve => setTimeout(resolve, 500));
         } catch (e) {
             console.error("Failed to refresh chats:", e);
+        } finally {
+            setRefreshing(false);
         }
-        setRefreshing(false);
     }, [refetch]);
 
     const handlePressChat = async (chat: ChatItemType) => {
-        if (chat.unread===true) {
+        if (chat.unread === true) {
             console.log("Marking messages as read for chat:", chat._id);
             await markMessagesAsRead(chat._id);
         }
@@ -387,40 +380,36 @@ export default function ChatScreen() {
 
         return (
             <FlatList
+                ref={flatListRef}
                 data={localChats}
                 renderItem={renderChatItem}
                 keyExtractor={(item) => item._id}
                 style={styles.list}
                 onScroll={handleOnScroll}
-                scrollEventThrottle={1000}
+                scrollEventThrottle={500}
                 scrollEnabled={true}
                 nestedScrollEnabled={true}
                 
                 contentContainerStyle={{
                     paddingVertical: 10,
                     paddingHorizontal: 10,
-                    flexGrow: 1,
-                    justifyContent: 'flex-end'
                 }}
-                ListHeaderComponent={() => {
+                ListFooterComponent={() => {
                     if (!loadingMore) return null;
                     return (
                         <View style={styles.loadingMoreContainer}>
                             <ActivityIndicator size="small" color="#007AFF" />
+                            <Text style={{ marginTop: 8, color: '#6B7280' }}>Đang tải...</Text>
                         </View>
                     );
                 }}
-                maintainVisibleContentPosition={{
-                    minIndexForVisible: 0,
-                    autoscrollToTopThreshold: 50
-                }}
-                onContentSizeChange={() => {
-                    if (!isFirstLoad.current && isAtBottom) {
-                        flatListRef.current?.scrollToEnd({ animated: true });
+                onEndReached={() => {
+                    if (hasMore && !loadingMore && !loadingTriggered.current) {
+                        handleLoadMore();
                     }
                 }}
+                onEndReachedThreshold={0.5}
             />
-
         );
     }
 
@@ -433,7 +422,7 @@ export default function ChatScreen() {
                 style={styles.fab} // 2. Áp dụng style cho nút tròn
                 onPress={handleCreatePrivateChatAI} // Mở Modal
             >
-               <Image source={require('../../assets/images/chatbot.avif')} style={styles.fabImage} />
+               <Image source={{ uri:'https://res.cloudinary.com/echoappchat/image/upload/v1765437074/chatbot_srkubn.avif' }} style={styles.fabImage} />
             </TouchableOpacity>
 
             

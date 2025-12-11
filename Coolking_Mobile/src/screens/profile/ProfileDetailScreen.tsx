@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import TopNavigations_ProfileDetail from "@/src/components/navigations/TopNavigations_Profile_Screen";
 import { useProfile } from "@/src/services/useapi/profile/UseProfile";
 import UpdateProfileModal, { ProfileForm } from "@/src/components/modals/UpdateProfileModal";
+import { set } from "date-fns";
 
 
 const getGenderText = (gender: String) => (gender === "Nam" ? true : false);
@@ -81,19 +82,28 @@ export default function ProfileDetailScreen() {
         {
           text: "Đồng ý",
           onPress: async () => {
-            const data = await getUpdateAvatar(file);
-            if (!data) {
+            try {
+              const data = await getUpdateAvatar(file);
+              setAvatarUrl(data?.avatar);
+              if (!data) {
+                Alert.alert(
+                  "Lỗi",
+                  "Cập nhật ảnh đại diện thất bại. Vui lòng thử lại."
+                );
+              } else {
+                // ✅ Fetch profile immediately to update avatar everywhere
+                await fetchProfile();
+                Alert.alert(
+                  "Thành công",
+                  data.message || "Cập nhật ảnh đại diện thành công."
+                );
+                setFileAvatar(null);
+              }
+            } catch (error) {
               Alert.alert(
                 "Lỗi",
                 "Cập nhật ảnh đại diện thất bại. Vui lòng thử lại."
               );
-            } else {
-              Alert.alert(
-                "Thành công",
-                data.message || "Cập nhật ảnh đại diện thành công."
-              );
-              await fetchProfile(); // làm mới dữ liệu
-              setFileAvatar(null);
             }
           },
         },
@@ -101,18 +111,16 @@ export default function ProfileDetailScreen() {
     );
   };
 
-  
-
   const handleSubmitProfile = async (values: ProfileForm) => {
     try {
-      // gọi API cập nhật
       const data = await getUpdateProfileData(values);
-      await fetchProfile(); // làm mới dữ liệu
+      // ✅ Fetch profile to update UI immediately
+      await fetchProfile();
       Alert.alert("Thành công", data?.message || "Cập nhật hồ sơ thành công!");
       setOpenModal(false);
     } catch (e: any) {
       Alert.alert("Lỗi", e?.message || "Không thể cập nhật hồ sơ");
-      throw e; // để modal có thể hiển thị lại nếu cần
+      throw e;
     }
   };
 

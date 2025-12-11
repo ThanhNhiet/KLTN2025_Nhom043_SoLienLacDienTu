@@ -127,7 +127,7 @@ const onChangePassword = async () => {
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: "#f5f5f5" },
   backButton: { marginBottom: 10, alignSelf: "flex-start" },
-  title: { fontSize: 22, fontWeight: "700", marginBottom: 24, textAlign: "center" },
+  title: {fontFamily: "BeVietnam-Bold", fontSize: 22, marginBottom: 24, textAlign: "center" },
   label: { fontSize: 15, fontWeight: "500", marginBottom: 6, color: "#444" },
   input: {
     height: 45,
@@ -152,5 +152,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 10,
   },
-  buttonText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  buttonText: { fontFamily: "BeVietnam-Regular", color: "#fff", fontSize: 16, fontWeight: "700" },
 });
