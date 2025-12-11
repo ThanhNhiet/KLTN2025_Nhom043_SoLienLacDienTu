@@ -1,7 +1,7 @@
 import { getProfile , updateAvatar , changePassword , getUpdateProfile } from "@/src/services/api/profile/ProfileApi";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { set } from "date-fns";
+import { isLoading } from "expo-font";
 
 export const useProfile = () => {
  
@@ -14,6 +14,9 @@ export const useProfile = () => {
     const [profileParent, setProfileParent] = useState<any[]>([]);
     const [profileStudent, setProfileStudent] = useState<any[]>([]);
     const [students, setStudents] = useState<any[]>([]);
+    
+    const hasInitializedRef = useRef(false);
+    const isFetchingRef = useRef(false);
 
     const labelMapStudent: Record<string, string> = {
         name: "Họ và tên",
@@ -37,24 +40,31 @@ export const useProfile = () => {
         gender : "Giới tính",
     };
 
-    const fetchProfile = async () => {
+    // ✅ Make fetchProfile a useCallback to ensure stability
+    const fetchProfile = useCallback(async () => {
+        // ✅ Prevent duplicate simultaneous requests
+        if (isFetchingRef.current) return;
+        
         try {
+            isFetchingRef.current = true;
             setLoading(true);
             setError(null);
+            
             const role = await AsyncStorage.getItem('role');
             if (!role) {
                 throw new Error("No role found");
             }
             setRole(role);
+            
             const data = await getProfile();
             if (!data){
                 throw new Error("Invalid profile response"); 
                 return;
             }
            
-           
             let profileData = {};
             let navigationData = {};
+            
             if (role === 'STUDENT') {
                 profileData = {
                     name: data.name,
@@ -67,7 +77,6 @@ export const useProfile = () => {
                     dob: data.dob,
                     gender: data.gender,
                 };
-                console.log("data.parent:",Array.isArray(data.parent) ? data.parent : []);
                 const parent = [];
                 parent.push(data.parent);
                 setProfileParent(parent);
@@ -77,7 +86,7 @@ export const useProfile = () => {
                     student_id: data.student_id,
                 };
                 setAvatarUrl(data?.avatar);
-        } else if (role === 'PARENT') {
+            } else if (role === 'PARENT') {
                 profileData = {
                     name: data.name,
                     address: data.address,
@@ -87,11 +96,9 @@ export const useProfile = () => {
                     dob: data.dob,
                 };
                 setProfileStudent(data.students);
-                //console.log("data.students:", data.students);
-                const  studentMap = data.students.map((student: any) => ({
+                const studentMap = data.students.map((student: any) => ({
                     name: student.name,
                     student_id: student.student_id,
-                   // avatar: student.avatar,
                 }));
                 setStudents(studentMap);
                 navigationData = {
@@ -100,7 +107,8 @@ export const useProfile = () => {
                     parent_id: data.parent_id,
                 };
                 setAvatarUrl(data?.avatar);
-        }
+            }
+            
             setProfileNavigation(navigationData);
             setProfile(profileData);
         } catch (error) {
@@ -108,12 +116,17 @@ export const useProfile = () => {
             console.error("Fetch profile error:", error);
         } finally {
             setLoading(false);
+            isFetchingRef.current = false;
         }
-    }
-    useEffect(() => {
-        fetchProfile();
     }, []);
 
+    // ✅ Initial fetch on mount
+    useEffect(() => {
+        if (!hasInitializedRef.current) {
+            hasInitializedRef.current = true;
+            fetchProfile();
+        }
+    }, [fetchProfile]);
 
     const getUpdateAvatar = async (file: any) => {
         try {
@@ -132,6 +145,7 @@ export const useProfile = () => {
             throw error;
         }
     }
+
     const getchangePassword = async (currentPassword: string, newPassword: string) => {
         try {
             const data = await changePassword(currentPassword, newPassword);
@@ -160,9 +174,6 @@ export const useProfile = () => {
             throw error;
         }
     }
-   
-
-
 
     return{
         profile,
@@ -170,6 +181,7 @@ export const useProfile = () => {
         labelMap: role === "STUDENT" ? labelMapStudent : labelMapParent,
         role,
         loading,
+        isLoading: loading,
         error,
         getUpdateAvatar,
         avatarUrl,

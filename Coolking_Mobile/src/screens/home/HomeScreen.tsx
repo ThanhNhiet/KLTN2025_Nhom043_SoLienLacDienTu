@@ -10,7 +10,7 @@ import {
   FlatList,
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation,useFocusEffect } from "@react-navigation/native";
 import BottomNavigation from "@/src/components/navigations/BottomNavigations";
 import TopNavigations_Home from "@/src/components/navigations/TopNavigations_Home";
 import { useProfile } from "@/src/services/useapi/profile/UseProfile";
@@ -43,9 +43,24 @@ const features = [
 
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
-  const { profileNavigation, role } = useProfile();
+  const { profileNavigation, role, avatarUrl, fetchProfile,isLoading } = useProfile();
   const { loading, getSchedulesByDate } = useCalendar();
   const isParent = role === "PARENT";
+
+   // ✅ Refresh profile when screen is focused (returning from ProfileDetailScreen)
+    useFocusEffect(
+      React.useCallback(() => {
+        fetchProfile();
+      }, [fetchProfile])
+    );
+
+  // ✅ Memoize profile data - include avatarUrl
+    const memoizedProfileNav = useMemo(() => ({
+      ...profileNavigation,
+      avatar: avatarUrl
+    }), [profileNavigation?.name, avatarUrl]);
+    
+    const memoizedRole = useMemo(() => role, [role]);
 
   const todayStr = dayjs().format("YYYY-MM-DD");
 
@@ -151,6 +166,25 @@ export default function HomeScreen() {
     );
   };
 
+  // ✅ Update header with new avatar
+    if (isLoading) {
+      return (
+        <SafeAreaProvider>
+          <SafeAreaView style={styles.container}>
+            <StatusBar
+              barStyle={Platform.OS === "ios" ? "dark-content" : "dark-content"}
+              backgroundColor={Platform.OS === "android" ? "#f8f9fa" : "transparent"}
+              translucent={false}
+              animated
+            />
+            <View style={styles.loadingContainer}>
+              <Text>Đang tải...</Text>
+            </View>
+          </SafeAreaView>
+        </SafeAreaProvider>
+      );
+    }
+
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.container}>
@@ -162,7 +196,7 @@ export default function HomeScreen() {
         />
 
         {/* Top Navigation */}
-        <TopNavigations_Home navigation={navigation} profileNavigation={profileNavigation} />
+        <TopNavigations_Home navigation={navigation} profileNavigation={memoizedProfileNav} />
 
         {/* Nội dung chính - Sử dụng FlatList làm main container */}
         <FlatList
@@ -382,5 +416,10 @@ const styles = StyleSheet.create({
     right: 0,
     width: "100%",
     backgroundColor: "#FFFFFF",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
