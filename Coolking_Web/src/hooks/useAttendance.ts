@@ -1,69 +1,6 @@
 import { useState, useCallback } from 'react';
 import { attendanceService } from '../services/attendanceServices';
 
-
-// Define types for attendance data (aka getStudentsWithAttendance response)
-// {
-//     "subjectName": "Điện toán đám mây",
-//     "className": "DHCNTT17B",
-//     "course_section_id": "405e3df6-93a7-11f0-a902-088fc3521198",
-//     "facultyName": "Khoa Công nghệ thông tin",
-//     "sessionName": "HK1 2023-2024",
-//     "lecturerName": "Tran Thi J",
-//     "attendances": [
-//         {
-//             "date_attendance": "20-09-2025",
-//             "attendance_id": "505e3df6-93a7-11f0-a902-088fc3521198",
-//             "start_lesson": 4,
-//             "end_lesson": 6,
-//             "students": [
-//                 {
-//                     "student_id": "SV2100101",
-//                     "name": "Sinh Vien 101",
-//                     "dob": "12-04-2003",
-//                     "gender": true,
-//                     "status": "PRESENT",
-//                     "description": "Ghi chú cho SV2100101 buổi 1"
-//                 },
-//                 {
-//                     "student_id": "SV2100102",
-//                     "name": "Sinh Vien 102",
-//                     "dob": "13-04-2003",
-//                     "gender": false,
-//                     "status": "PRESENT",
-//                     "description": "Ghi chú cho SV2100102 buổi 1"
-//                 },
-//                 ...
-//             ]
-//         },
-//         {
-//             "date_attendance": "27-09-2025",
-//             "attendance_id": "605e3df6-93a7-11f0-a902-088fc3521198",
-//             "start_lesson": 4,
-//             "end_lesson": 6,
-//             "students": [
-//                 {
-//                     "student_id": "SV2100101",
-//                     "name": "Sinh Vien 101",
-//                     "dob": "12-04-2003",
-//                     "gender": true,
-//                     "status": "PRESENT",
-//                     "description": "Ghi chú cho SV2100101 buổi 2"
-//                 },
-//                 {
-//                     "student_id": "SV2100102",
-//                     "name": "Sinh Vien 102",
-//                     "dob": "13-04-2003",
-//                     "gender": false,
-//                     "status": "PRESENT",
-//                     "description": "Ghi chú cho SV2100102 buổi 2"
-//                 },
-//                 ...
-//             ]
-//         },
-//         ...
-//     ]
-// }
 export interface AttendanceData {
     subjectName: string;
     className: string;
@@ -88,6 +25,7 @@ export interface Student {
     name: string;
     dob: string;
     gender: boolean;
+    practice_gr?: string | null;
     status: string;
     description: string;
 }
@@ -97,6 +35,7 @@ export interface StudentRaw {
     name: string;
     dob: string;
     gender: boolean;
+    practice_gr?: string | null;
 }
 
 export const useAttendance = () => {

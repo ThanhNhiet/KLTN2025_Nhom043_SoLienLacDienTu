@@ -22,11 +22,13 @@ const StudentsAttendancePage: React.FC = () => {
   const [showActionMenu, setShowActionMenu] = useState<string | null>(null);
   const [showTooltip, setShowTooltip] = useState<{ studentId: string, attendanceId: string } | null>(null);
   
-  // For creating new attendance
+  // Update state để lưu thêm lessonType và practiceGroup
   const [newAttendanceData, setNewAttendanceData] = useState<{
     date: string;
     startLesson: number;
     endLesson: number;
+    lessonType?: 'LT' | 'TH';
+    practiceGroup?: number;
   } | null>(null);
   
   const [newStudentsAttendance, setNewStudentsAttendance] = useState<StudentAttendanceRecord[]>([]);
@@ -86,7 +88,6 @@ const StudentsAttendancePage: React.FC = () => {
   }, []);
 
   const formatDate = (dateString: string) => {
-    // Convert dd-MM-yyyy to dd/M/yyyy
     return dateString.replace(/-/g, '/').replace(/^0(\d)\//, '$1/').replace(/\/0(\d)\//, '/$1/');
   };
 
@@ -97,25 +98,58 @@ const StudentsAttendancePage: React.FC = () => {
     }, 3000);
   };
 
-  const handleCreateAttendance = (startLesson: number, endLesson: number) => {
+  // --- LOGIC XỬ LÝ KHI TẠO ĐIỂM DANH MỚI ---
+  const handleCreateAttendance = (
+    startLesson: number, 
+    endLesson: number, 
+    lessonType: 'LT' | 'TH', 
+    practiceGroup: number
+  ) => {
+
+    // 1. Lấy danh sách sinh viên hiện tại để kiểm tra
+    const studentList = attendanceData?.attendances[0]?.students || attendanceData?.students || [];
+
+    // 2. [MỚI] Kiểm tra logic: Nếu là TH, nhóm chọn phải có sinh viên
+    if (lessonType === 'TH' && studentList.length > 0) {
+        // Kiểm tra xem có ít nhất 1 sinh viên thuộc nhóm này không
+        const groupExists = studentList.some(s => s.practice_gr && parseInt(s.practice_gr) === practiceGroup);
+        
+        if (!groupExists) {
+            showToast(`Không tìm thấy sinh viên nào thuộc Nhóm ${practiceGroup} trong lớp học này!`, 'error');
+            return; // Dừng lại, không mở modal hay lưu state
+        }
+    }
+
     const today = new Date();
     const formattedDate = `${today.getDate()}/${today.getMonth() + 1}/${today.getFullYear()}`;
     
+    // Lưu thông tin buổi học vào state
     setNewAttendanceData({
       date: formattedDate,
       startLesson,
-      endLesson
+      endLesson,
+      lessonType,
+      practiceGroup
     });
     
-    // Initialize students attendance with empty status
-    // Use fallback to attendanceData.students if attendances array is empty
-    const studentList = attendanceData?.attendances[0]?.students || attendanceData?.students || [];
     if (studentList.length > 0) {
-      const initialData = studentList.map(student => ({
-        student_id: student.student_id,
-        status: '',
-        description: ''
-      }));
+      const initialData = studentList.map(student => {
+        let status = '';
+        // LOGIC QUAN TRỌNG: Kiểm tra nhóm
+        // Nếu là Thực hành (TH) và nhóm của sinh viên khác với nhóm đã chọn -> set status = DIFGR
+        if (lessonType === 'TH') {
+            const studentGroup = student.practice_gr ? parseInt(student.practice_gr) : 0;
+            if (studentGroup !== practiceGroup) {
+                status = 'DIFGR';
+            }
+        }
+
+        return {
+          student_id: student.student_id,
+          status: status, 
+          description: ''
+        };
+      });
       setNewStudentsAttendance(initialData);
     }
     
@@ -172,7 +206,7 @@ const StudentsAttendancePage: React.FC = () => {
   const handleSaveWithDefaults = async () => {
     if (!course_section_id || !newAttendanceData) return;
     
-    // Set empty statuses to ABSENT
+    // Set những status rỗng thành ABSENT (những status DIFGR giữ nguyên)
     const finalData = newStudentsAttendance.map(student => ({
       ...student,
       status: student.status || 'ABSENT'
@@ -186,7 +220,6 @@ const StudentsAttendancePage: React.FC = () => {
         finalData
       );
       
-      // Refresh data and reset form
       getStudentsWithAttendance(course_section_id);
       handleCancelCreate();
       showToast('Lưu kết quả điểm danh thành công!', 'success');
@@ -198,6 +231,7 @@ const StudentsAttendancePage: React.FC = () => {
   const handleSaveAttendance = async () => {
     if (!course_section_id || !newAttendanceData) return;
 
+    // Tìm những sinh viên chưa có status (không tính DIFGR là chưa có)
     const emptyStatuses = newStudentsAttendance.filter(student => !student.status);
     
     if (emptyStatuses.length > 0) {
@@ -212,9 +246,6 @@ const StudentsAttendancePage: React.FC = () => {
       return;
     }
     
-    // If all students have status, save directly
-    if (!course_section_id || !newAttendanceData) return;
-    
     try {
       await recordAttendance(
         course_section_id,
@@ -223,7 +254,6 @@ const StudentsAttendancePage: React.FC = () => {
         newStudentsAttendance
       );
       
-      // Refresh data and reset form
       getStudentsWithAttendance(course_section_id);
       handleCancelCreate();
       showToast('Lưu kết quả điểm danh thành công!', 'success');
@@ -233,11 +263,10 @@ const StudentsAttendancePage: React.FC = () => {
   };
 
   const handleUpdateAttendance = async (attendance: Attendance) => {
-    // Load existing data for update
     const existingData = attendance.students.map(student => ({
       student_id: student.student_id,
       status: student.status,
-      description: student.description || '' // Ensure description is never undefined
+      description: student.description || ''
     }));
     
     setNewUpdateStudentsAttendance(existingData);
@@ -253,7 +282,6 @@ const StudentsAttendancePage: React.FC = () => {
         newUpdateStudentsAttendance
       );
       
-      // Refresh data and reset form
       getStudentsWithAttendance(course_section_id!);
       setSelectedAttendanceForUpdate(null);
       setNewUpdateStudentsAttendance([]);
@@ -290,6 +318,7 @@ const StudentsAttendancePage: React.FC = () => {
   ];
 
   const getStatusLabel = (status: string) => {
+    if (status === 'DIFGR') return 'Khác nhóm';
     const option = getStatusOptions().find(opt => opt.value === status);
     return option ? option.label : status;
   };
@@ -305,6 +334,8 @@ const StudentsAttendancePage: React.FC = () => {
         return `${baseClasses} bg-yellow-100 text-yellow-800`;
       case 'LATE':
         return `${baseClasses} bg-orange-100 text-orange-800`;
+      case 'DIFGR':
+        return `${baseClasses} bg-gray-200 text-gray-500`; // Màu xám cho Khác nhóm
       default:
         return `${baseClasses} bg-gray-100 text-gray-800`;
     }
@@ -357,7 +388,6 @@ const StudentsAttendancePage: React.FC = () => {
     );
   }
 
-  // Get unique students list from first attendance or create from available data
   const allStudents = attendanceData.attendances[0]?.students || attendanceData.students || [];
 
   return (
@@ -375,7 +405,6 @@ const StudentsAttendancePage: React.FC = () => {
               
               <div className="flex gap-3">
                 {selectedAttendanceForUpdate ? (
-                  // Khi đang cập nhật điểm danh
                   <>
                     <button
                       onClick={() => {
@@ -397,7 +426,6 @@ const StudentsAttendancePage: React.FC = () => {
                     </button>
                   </>
                 ) : !isCreatingAttendance ? (
-                  // Khi không tạo mới và không cập nhật
                   <button
                     onClick={() => setShowCreateModal(true)}
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors duration-200"
@@ -405,7 +433,6 @@ const StudentsAttendancePage: React.FC = () => {
                     Tạo buổi điểm danh
                   </button>
                 ) : (
-                  // Khi đang tạo buổi điểm danh mới
                   <>
                     <button
                       onClick={handleSaveAttendance}
@@ -462,61 +489,74 @@ const StudentsAttendancePage: React.FC = () => {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-28 bg-gray-50 z-10">Họ tên</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ngày sinh</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Giới tính</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Nhóm TH</th>
                   
                   {/* Existing attendance columns */}
-                  {attendanceData.attendances.map((attendance) => (
-                    <th key={attendance.attendance_id} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider relative">
-                      <div className="flex items-center justify-between">
-                        <span>
-                          {formatDate(attendance.date_attendance)} Tiết {attendance.start_lesson} - {attendance.end_lesson}
-                        </span>
-                        {!isCreatingAttendance && (
-                          <div className="relative action-dropdown">
-                            <button
-                              onClick={() => setShowActionMenu(showActionMenu === attendance.attendance_id ? null : attendance.attendance_id)}
-                              className="p-1 hover:bg-gray-200 rounded text-gray-400 hover:text-gray-600"
-                            >
-                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                              </svg>
-                            </button>
-                            
-                            {showActionMenu === attendance.attendance_id && (
-                              <div className="absolute right-0 top-8 mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                                <div className="py-1">
-                                  <button
-                                    onClick={() => {
-                                      handleUpdateAttendance(attendance);
-                                      setShowActionMenu(null);
-                                    }}
-                                    className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm text-gray-700 border-b border-gray-100"
-                                  >
-                                    Cập nhật
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      handleDeleteAttendance(attendance.attendance_id);
-                                      setShowActionMenu(null);
-                                    }}
-                                    className="w-full text-left px-3 py-2 hover:bg-red-50 text-sm text-gray-700"
-                                  >
-                                    Xóa
-                                  </button>
+                  {attendanceData.attendances.map((attendance) => {
+                    // LOGIC HIỂN THỊ HEADER:
+                    // Nếu buổi điểm danh có ít nhất 1 sinh viên là "DIFGR" -> Đây là buổi TH, ngược lại là LT
+                    const isPracticeSession = attendance.students.some(s => s.status === 'DIFGR');
+                    const sessionTypeLabel = isPracticeSession ? '(TH)' : '(LT)';
+
+                    return (
+                        <th key={attendance.attendance_id} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider relative">
+                        <div className="flex items-center justify-between">
+                            <span>
+                            {formatDate(attendance.date_attendance)} Tiết {attendance.start_lesson} - {attendance.end_lesson} <br/>
+                            <span className={`text-xs ${isPracticeSession ? 'text-purple-600' : 'text-blue-600'}`}>
+                                {sessionTypeLabel}
+                            </span>
+                            </span>
+                            {!isCreatingAttendance && (
+                            <div className="relative action-dropdown">
+                                <button
+                                onClick={() => setShowActionMenu(showActionMenu === attendance.attendance_id ? null : attendance.attendance_id)}
+                                className="p-1 hover:bg-gray-200 rounded text-gray-400 hover:text-gray-600"
+                                >
+                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                                </svg>
+                                </button>
+                                
+                                {showActionMenu === attendance.attendance_id && (
+                                <div className="absolute right-0 top-8 mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                                    <div className="py-1">
+                                    <button
+                                        onClick={() => {
+                                        handleUpdateAttendance(attendance);
+                                        setShowActionMenu(null);
+                                        }}
+                                        className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm text-gray-700 border-b border-gray-100"
+                                    >
+                                        Cập nhật
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                        handleDeleteAttendance(attendance.attendance_id);
+                                        setShowActionMenu(null);
+                                        }}
+                                        className="w-full text-left px-3 py-2 hover:bg-red-50 text-sm text-gray-700"
+                                    >
+                                        Xóa
+                                    </button>
+                                    </div>
                                 </div>
-                              </div>
+                                )}
+                            </div>
                             )}
-                          </div>
-                        )}
-                      </div>
-                    </th>
-                  ))}
+                        </div>
+                        </th>
+                    );
+                  })}
                   
                   {/* New attendance column when creating */}
                   {isCreatingAttendance && newAttendanceData && (
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider relative">
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider relative min-w-[200px]">
                       <div className="flex items-center justify-between">
                         <span>
-                          {newAttendanceData.date} Tiết {newAttendanceData.startLesson} - {newAttendanceData.endLesson}
+                          {newAttendanceData.date} Tiết {newAttendanceData.startLesson} - {newAttendanceData.endLesson} <br/>
+                          <span className="text-blue-600 font-bold">({newAttendanceData.lessonType})</span>
+                          {newAttendanceData.lessonType === 'TH' && <span className="ml-1 text-gray-500">- N{newAttendanceData.practiceGroup}</span>}
                         </span>
                         <button
                           onClick={handleCancelCreate}
@@ -534,7 +574,7 @@ const StudentsAttendancePage: React.FC = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {allStudents.length === 0 ? (
                   <tr>
-                    <td colSpan={4 + attendanceData.attendances.length + (isCreatingAttendance ? 1 : 0)} className="px-6 py-4 text-center text-gray-500">
+                    <td colSpan={5 + attendanceData.attendances.length + (isCreatingAttendance ? 1 : 0)} className="px-6 py-4 text-center text-gray-500">
                       Không có sinh viên nào trong lớp học phần này
                     </td>
                   </tr>
@@ -553,6 +593,9 @@ const StudentsAttendancePage: React.FC = () => {
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                         {student.gender ? 'Nam' : 'Nữ'}
                       </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
+                        {student.practice_gr || '-'}
+                      </td>
                       
                       {/* Existing attendance columns */}
                       {attendanceData.attendances.map((attendance) => {
@@ -560,21 +603,30 @@ const StudentsAttendancePage: React.FC = () => {
                         const isUpdating = selectedAttendanceForUpdate === attendance.attendance_id;
                         const updateRecord = newUpdateStudentsAttendance.find(s => s.student_id === student.student_id);
                         
+                        // LOGIC KHÓA UPDATE: Nếu student đang có status là DIFGR thì không cho sửa
+                        const isLocked = isUpdating && updateRecord?.status === 'DIFGR';
+
                         return (
                           <td key={attendance.attendance_id} className="px-4 py-4 whitespace-nowrap text-center">
                             {isUpdating ? (
-                              <select
-                                value={updateRecord?.status || studentAttendance?.status || ''}
-                                onChange={(e) => handleStatusChange(student.student_id, e.target.value, true)}
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                              >
-                                <option value="">Chọn trạng thái</option>
-                                {getStatusOptions().map(option => (
-                                  <option key={option.value} value={option.value}>
-                                    {option.label}
-                                  </option>
-                                ))}
-                              </select>
+                                isLocked ? (
+                                    <div className="w-full px-2 py-1 bg-gray-100 border border-gray-200 rounded text-sm text-gray-500 italic text-center cursor-not-allowed">
+                                        Khác nhóm
+                                    </div>
+                                ) : (
+                                    <select
+                                        value={updateRecord?.status || studentAttendance?.status || ''}
+                                        onChange={(e) => handleStatusChange(student.student_id, e.target.value, true)}
+                                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <option value="">Chọn trạng thái</option>
+                                        {getStatusOptions().map(option => (
+                                        <option key={option.value} value={option.value}>
+                                            {option.label}
+                                        </option>
+                                        ))}
+                                    </select>
+                                )
                             ) : (
                               <div className="tooltip-container relative">
                                 <span
@@ -595,7 +647,7 @@ const StudentsAttendancePage: React.FC = () => {
                               </div>
                             )}
                             
-                            {isUpdating && (
+                            {isUpdating && !isLocked && (
                               <input
                                 type="text"
                                 placeholder="Ghi chú..."
@@ -610,26 +662,44 @@ const StudentsAttendancePage: React.FC = () => {
                       
                       {/* New attendance column when creating */}
                       {isCreatingAttendance && newAttendanceData && (
-                        <td className="px-4 py-4 whitespace-nowrap text-center">
-                          <select
-                            value={newStudentsAttendance.find(s => s.student_id === student.student_id)?.status || ''}
-                            onChange={(e) => handleStatusChange(student.student_id, e.target.value)}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                          >
-                            <option value="">Chọn trạng thái</option>
-                            {getStatusOptions().map(option => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-                          <input
-                            type="text"
-                            placeholder="Ghi chú..."
-                            value={newStudentsAttendance.find(s => s.student_id === student.student_id)?.description || ''}
-                            onChange={(e) => handleDescriptionChange(student.student_id, e.target.value)}
-                            className="w-full mt-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                          />
+                        <td className="px-4 py-4 whitespace-nowrap text-center bg-blue-50/30">
+                          {(() => {
+                             // LOGIC KHÓA CREATE: Kiểm tra status trong state newStudentsAttendance
+                             const currentRecord = newStudentsAttendance.find(s => s.student_id === student.student_id);
+                             const isLocked = currentRecord?.status === 'DIFGR';
+
+                             if (isLocked) {
+                                return (
+                                    <div className="w-full px-2 py-1 bg-gray-100 border border-gray-200 rounded text-sm text-gray-500 italic text-center cursor-not-allowed">
+                                        Khác nhóm
+                                    </div>
+                                );
+                             }
+
+                             return (
+                                <>
+                                  <select
+                                    value={currentRecord?.status || ''}
+                                    onChange={(e) => handleStatusChange(student.student_id, e.target.value)}
+                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm mb-1 focus:ring-2 focus:ring-blue-500"
+                                  >
+                                    <option value="">Chọn trạng thái</option>
+                                    {getStatusOptions().map(option => (
+                                      <option key={option.value} value={option.value}>
+                                        {option.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <input
+                                    type="text"
+                                    placeholder="Ghi chú..."
+                                    value={currentRecord?.description || ''}
+                                    onChange={(e) => handleDescriptionChange(student.student_id, e.target.value)}
+                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                  />
+                                </>
+                             );
+                          })()}
                         </td>
                       )}
                     </tr>
