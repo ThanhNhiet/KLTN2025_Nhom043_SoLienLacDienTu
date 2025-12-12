@@ -13,7 +13,8 @@ module.exports = {
     PRESENT: "PRESENT",
     ABSENT: "ABSENT",
     EXCUSED: "EXCUSED",
-    LATE: "LATE"
+    LATE: "LATE",
+    DIFGR: "DIFGR"
   },
   SessionName: {
     HK1: "HK1",

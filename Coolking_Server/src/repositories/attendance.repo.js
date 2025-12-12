@@ -27,14 +27,15 @@ const getStudentsByCourseSectionID = async (course_section_id) => {
                     attributes: ['student_id', 'name', 'dob', 'gender']
                 }
             ],
-            attributes: []
+            attributes: ['practice_gr']
         });
 
         return students.map(item => ({
             student_id: item.student.student_id,
             name: item.student.name,
             dob: item.student.dob,
-            gender: item.student.gender ? 'Nam' : 'Nữ'
+            gender: item.student.gender ? 'Nam' : 'Nữ',
+            practice_gr: item?.practice_gr || null
         }));
 
     } catch (error) {
@@ -229,6 +230,7 @@ const getAttendanceDetailsByCourseSectionID = async (course_section_id) => {
                     name: student.name,
                     dob: datetimeFormatter.formatDateVN(student.dob),
                     gender: student.gender,
+                    practice_gr: student.practice_gr,
                     status: attendanceData ? attendanceData.status : "ABSENT",
                     description: attendanceData ? attendanceData.description : ""
                 };
@@ -693,6 +695,11 @@ const getAttendanceByStudentBySubject = async (student_id, subject_id, course_se
                     attributes: ['status', 'description']
                 });
 
+                // Skip records with DIFGR status
+                if (studentAttendance?.status === 'DIFGR') {
+                    continue;
+                }
+
                 allAttendanceDetails.push({
                     course_section_id: cs.course_section.id,
                     session: `${cs.course_section.session.name} ${cs.course_section.session.years}`,
@@ -705,7 +712,7 @@ const getAttendanceByStudentBySubject = async (student_id, subject_id, course_se
             }
         }
 
-        // Tính thống kê tổng hợp
+        // Tính thống kê tổng hợp (DIFGR records already filtered out)
         const stats = allAttendanceDetails.reduce((acc, curr) => {
             acc.total++;
             if (curr.status === 'PRESENT') acc.present++;
@@ -832,6 +839,11 @@ const getAttendanceByStudentBySubjectByParent = async (parent_id, studentId, pag
                     },
                     attributes: ['status', 'description']
                 });
+
+                // Skip records with DIFGR status
+                if (studentAttendance?.status === 'DIFGR') {
+                    continue;
+                }
 
                 stats.total++;
                 if (studentAttendance?.status === 'PRESENT') stats.present++;

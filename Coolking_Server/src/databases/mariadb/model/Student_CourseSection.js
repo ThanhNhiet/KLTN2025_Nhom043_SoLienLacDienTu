@@ -22,6 +22,10 @@ module.exports = function(sequelize, DataTypes) {
         model: 'course_sections',
         key: 'id'
       }
+    },
+    practice_gr: {
+      type: DataTypes.INTEGER,
+      allowNull: true
     }
   }, {
     sequelize,
