@@ -1,4 +1,4 @@
-// utils/notifications.ts (hoặc nơi bạn đang để)
+// utils/notifications.ts
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
@@ -19,11 +19,14 @@ Notifications.setNotificationHandler({
   }),
 });
 
+/** =========================
+ *  Android notification channels
+ *  ========================= */
 async function ensureAndroidChannels() {
   if (Platform.OS !== 'android') return;
 
   await Notifications.setNotificationChannelAsync('default', {
-    name: 'Chat Messages',
+    name: 'Default',
     importance: Notifications.AndroidImportance.MAX,
     vibrationPattern: [0, 250, 250, 250],
     lightColor: '#FFFFFF',
@@ -35,9 +38,18 @@ async function ensureAndroidChannels() {
     vibrationPattern: [0, 250, 250, 250],
     lightColor: '#FFFFFF',
   });
+
+  await Notifications.setNotificationChannelAsync('general-alerts', {
+    name: 'General Alerts',
+    importance: Notifications.AndroidImportance.MAX,
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: '#FFFFFF',
+  });
 }
 
-/** Tránh upsert token lặp */
+/** =========================
+ *  Tránh upsert token lặp
+ *  ========================= */
 let lastUploadedToken: string | null = null;
 
 /** Upload FCM token lên server (LOGIN / mở app) */
@@ -125,29 +137,61 @@ export async function unregisterPushToken(userId: string) {
 }
 
 /** =========================
- *  DEDUP: nếu FCM đã đến cho message_id này, đừng show local nữa
+ *  DEDUP + handle ALERT (KHÔNG spam)
  *  ========================= */
 const seenMessageIds = new Set<string>();
 
 Notifications.addNotificationReceivedListener((n) => {
-  const id = String((n.request.content.data as any)?.message_id ?? '');
+  const data = n.request.content.data as any;
+
+  // Dùng cho chat: lưu message_id để tránh bắn local trùng
+  const id = String(data?.message_id ?? '');
   if (id) seenMessageIds.add(id);
+
+  // ALERT: chỉ log (không schedule local, tránh vòng lặp)
+  if (data?.type === 'alert') {
+    console.log('[notifications] received general-alerts:', {
+      title: n.request.content.title,
+      body: n.request.content.body,
+      data,
+    });
+  }
 });
 
-/** Click noti -> điều hướng vào chat */
-export function attachNotificationNavigation(navigateToChat: (chatId: string) => void) {
+/** =========================
+ *  Click noti -> điều hướng vào chat / ALERT SCREEN
+ *  ========================= */
+export function attachNotificationNavigation(
+  navigateToChat?: (chatId: string) => void,
+  navigateToAlert?: () => void
+) {
   const tapSub = Notifications.addNotificationResponseReceivedListener((resp) => {
     const data = resp.notification.request.content.data as any;
-    if (data?.chat_id) navigateToChat(String(data.chat_id));
+
+    if (data?.chat_id && typeof navigateToChat === 'function') {
+      // Case: noti chat → điều hướng vào màn chat
+      navigateToChat(String(data.chat_id));
+    } else if (data?.type === 'alert') {
+      // Case: general-alerts → chuyển sang màn Alert nếu có callback
+      if (typeof navigateToAlert === 'function') {
+        navigateToAlert();
+      } else {
+        console.log('[notifications] user tapped general-alerts (no navigateToAlert provided):', {
+          title: resp.notification.request.content.title,
+          body: resp.notification.request.content.body,
+          data,
+        });
+      }
+    }
   });
+
   return () => {
     tapSub.remove();
   };
 }
 
 /** =========================
- *  Local notification dự phòng (foreground)
- *  Title = chatName (dòng 1), Body = sender: text (dòng 2)
+ *  Local notification dự phòng (foreground) cho CHAT
  *  ========================= */
 export async function maybeLocalNotifyMessage(params: {
   chatId: string;
@@ -163,11 +207,9 @@ export async function maybeLocalNotifyMessage(params: {
   const chatName = (data as any)?.chat_name;
   const sender = (data as any)?.sender;
 
-  // Dòng 1: tên đoạn chat (hoặc fallback)
   const finalTitle =
     title || chatName || (sender ?? 'Tin nhắn mới');
 
-  // Dòng 2: "Sender: nội dung" hoặc fallback
   const previewBody =
     body ??
     (sender ? `${sender}: Bạn có tin nhắn mới` : 'Bạn có tin nhắn mới');
@@ -194,7 +236,8 @@ export async function maybeLocalNotifyMessage(params: {
  *  Khởi tạo notifications (gọi ở root)
  *  ========================= */
 export async function initNotifications(
-  navigateToChat: (chatId: string) => void,
+  navigateToChat?: (chatId: string) => void,
+  navigateToAlert?: () => void,
   options?: { userId?: string }
 ) {
   await ensureAndroidChannels();
@@ -206,12 +249,25 @@ export async function initNotifications(
     const last = await Notifications.getLastNotificationResponseAsync();
     if (last) {
       const data = last.notification.request.content.data as any;
-      if (data?.chat_id) navigateToChat(String(data.chat_id));
+
+      if (data?.chat_id && typeof navigateToChat === 'function') {
+        navigateToChat(String(data.chat_id));
+      } else if (data?.type === 'alert') {
+        if (typeof navigateToAlert === 'function') {
+          navigateToAlert();
+        } else {
+          console.log('[notifications] last general-alerts tapped from killed state:', {
+            title: last.notification.request.content.title,
+            body: last.notification.request.content.body,
+            data,
+          });
+        }
+      }
     }
   } catch (e) {
     console.warn('[notifications] getLastNotificationResponseAsync failed:', e);
   }
 
-  const cleanup = attachNotificationNavigation(navigateToChat);
+  const cleanup = attachNotificationNavigation(navigateToChat, navigateToAlert);
   return { token, cleanup, lastUploadedToken };
 }

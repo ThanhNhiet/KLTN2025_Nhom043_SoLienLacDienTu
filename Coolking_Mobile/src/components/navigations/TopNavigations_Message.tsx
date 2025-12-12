@@ -15,7 +15,7 @@ export default function TopNavigations_Message({ navigation, chatPartner, onShow
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+      <TouchableOpacity onPress={() => navigation.navigate("ChatScreen")} style={styles.backButton}>
         <Ionicons name="arrow-back" size={24} color={ICON_COLOR} />
       </TouchableOpacity>
       <Image source={{ uri: chatPartner.avatar }} style={styles.headerAvatar} />
