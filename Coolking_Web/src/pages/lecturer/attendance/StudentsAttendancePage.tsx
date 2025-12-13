@@ -14,7 +14,7 @@ interface StudentAttendanceRecord {
 
 const StudentsAttendancePage: React.FC = () => {
   const { course_section_id } = useParams<{ course_section_id: string }>();
-  const { loading, error, attendanceData, getStudentsWithAttendance, recordAttendance, updateAttendance, deleteAttendance } = useAttendance();
+  const { loading, attendanceData, getStudentsWithAttendance, recordAttendance, updateAttendance, deleteAttendance } = useAttendance();
   
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isCreatingAttendance, setIsCreatingAttendance] = useState(false);
@@ -213,16 +213,20 @@ const StudentsAttendancePage: React.FC = () => {
     }));
     
     try {
-      await recordAttendance(
+      const response = await recordAttendance(
         course_section_id,
         newAttendanceData.startLesson,
         newAttendanceData.endLesson,
         finalData
       );
       
-      getStudentsWithAttendance(course_section_id);
-      handleCancelCreate();
-      showToast('Lưu kết quả điểm danh thành công!', 'success');
+      if (response && response.success) {
+          getStudentsWithAttendance(course_section_id);
+          handleCancelCreate();
+          showToast('Lưu kết quả điểm danh thành công!', 'success');
+      } else {
+          showToast(response?.message || 'Có lỗi xảy ra khi lưu điểm danh!', 'error');
+      }
     } catch (error) {
       showToast('Có lỗi xảy ra khi lưu điểm danh!', 'error');
     }
@@ -247,16 +251,20 @@ const StudentsAttendancePage: React.FC = () => {
     }
     
     try {
-      await recordAttendance(
+      const response = await recordAttendance(
         course_section_id,
         newAttendanceData.startLesson,
         newAttendanceData.endLesson,
         newStudentsAttendance
       );
       
-      getStudentsWithAttendance(course_section_id);
-      handleCancelCreate();
-      showToast('Lưu kết quả điểm danh thành công!', 'success');
+      if (response && response.success) {
+          getStudentsWithAttendance(course_section_id);
+          handleCancelCreate();
+          showToast('Lưu kết quả điểm danh thành công!', 'success');
+      } else {
+          showToast(response?.message || 'Có lỗi xảy ra khi lưu điểm danh!', 'error');
+      }
     } catch (error) {
       showToast('Có lỗi xảy ra khi lưu điểm danh!', 'error');
     }
@@ -359,20 +367,20 @@ const StudentsAttendancePage: React.FC = () => {
     );
   }
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col">
-        <HeaderLeCpn />
-        <main className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="text-red-600 text-lg font-medium mb-2">Lỗi</div>
-            <div className="text-gray-600">{error}</div>
-          </div>
-        </main>
-        <FooterLeCpn />
-      </div>
-    );
-  }
+  // if (error) {
+  //   return (
+  //     <div className="min-h-screen bg-gray-50 flex flex-col">
+  //       <HeaderLeCpn />
+  //       <main className="flex-1 flex items-center justify-center">
+  //         <div className="text-center">
+  //           <div className="text-red-600 text-lg font-medium mb-2">Lỗi</div>
+  //           <div className="text-gray-600">{error}</div>
+  //         </div>
+  //       </main>
+  //       <FooterLeCpn />
+  //     </div>
+  //   );
+  // }
 
   if (!attendanceData) {
     return (
@@ -476,6 +484,10 @@ const StudentsAttendancePage: React.FC = () => {
               <div>
                 <span className="text-sm font-medium text-gray-600">Giảng viên phụ trách:</span>
                 <div className="text-base font-semibold text-gray-800">{attendanceData.lecturerName}</div>
+              </div>
+              <div>
+                <span className="text-sm font-medium text-gray-600">Lớp thực hành phụ trách:</span>
+                <div className="text-base font-semibold text-gray-800">{attendanceData.practice_gr ? attendanceData.practice_gr : 'Không có'}</div>
               </div>
             </div>
           </div>
@@ -719,6 +731,7 @@ const StudentsAttendancePage: React.FC = () => {
           isOpen={showCreateModal}
           onClose={() => setShowCreateModal(false)}
           onConfirm={handleCreateAttendance}
+          allowedPracticeGroupsStr={attendanceData?.practice_gr || null}
         />
       )}
 

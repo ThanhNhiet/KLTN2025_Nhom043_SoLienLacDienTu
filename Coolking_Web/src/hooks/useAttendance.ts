@@ -8,6 +8,7 @@ export interface AttendanceData {
     facultyName: string;
     sessionName: string;
     lecturerName: string;
+    practice_gr: string | null;
     attendances: Attendance[];
     students?: StudentRaw[];
 }

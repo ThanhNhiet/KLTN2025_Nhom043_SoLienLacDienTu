@@ -1,23 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
 interface CreateAttendanceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  // Cập nhật interface để truyền thêm lessonType và practiceGroup ra ngoài
   onConfirm: (startLesson: number, endLesson: number, lessonType: 'LT' | 'TH', practiceGroup: number) => void;
+  allowedPracticeGroupsStr: string | null;
 }
 
 const CreateAttendanceModal: React.FC<CreateAttendanceModalProps> = ({
   isOpen,
   onClose,
-  onConfirm
+  onConfirm,
+  allowedPracticeGroupsStr
 }) => {
   const [startLesson, setStartLesson] = useState<number>(1);
   const [endLesson, setEndLesson] = useState<number>(1);
-  // State mới cho loại tiết và nhóm
   const [lessonType, setLessonType] = useState<'LT' | 'TH'>('LT');
   const [practiceGroup, setPracticeGroup] = useState<number>(1);
   const [error, setError] = useState<string>('');
+
+  //Chuyển đổi chuỗi "1,2" thành mảng số [1, 2]. Nếu null trả về mảng rỗng.
+  const allowedGroups = useMemo(() => {
+    if (!allowedPracticeGroupsStr) return [];
+    return allowedPracticeGroupsStr
+      .split(',')
+      .map(s => parseInt(s.trim()))
+      .filter(n => !isNaN(n));
+  }, [allowedPracticeGroupsStr]);
+
+  //Kiểm tra xem có được phép dạy thực hành không
+  const canTeachPractice = allowedGroups.length > 0;
+
+  //Khi chọn sang TH, đảm bảo nhóm được chọn mặc định là nhóm hợp lệ đầu tiên
+  useEffect(() => {
+    if (lessonType === 'TH' && canTeachPractice) {
+        // Nếu nhóm hiện tại không nằm trong danh sách cho phép, set về nhóm đầu tiên
+        if (!allowedGroups.includes(practiceGroup)) {
+            setPracticeGroup(allowedGroups[0]);
+        }
+    }
+  }, [lessonType, allowedGroups, canTeachPractice, practiceGroup]);
 
   const handleConfirm = () => {
     // Validation
@@ -35,9 +57,19 @@ const CreateAttendanceModal: React.FC<CreateAttendanceModalProps> = ({
       setError('Tiết học không được vượt quá 15');
       return;
     }
+
+    if (lessonType === 'TH') {
+        if (!canTeachPractice) {
+            setError('Giảng viên không phụ trách lớp thực hành nào.');
+            return;
+        }
+        if (!allowedGroups.includes(practiceGroup)) {
+            setError(`Bạn không được phân công dạy nhóm ${practiceGroup}.`);
+            return;
+        }
+    }
     
     setError('');
-    // Truyền đủ 4 tham số khi xác nhận
     onConfirm(startLesson, endLesson, lessonType, practiceGroup);
   };
 
@@ -45,7 +77,7 @@ const CreateAttendanceModal: React.FC<CreateAttendanceModalProps> = ({
     setError('');
     setStartLesson(1);
     setEndLesson(1);
-    setLessonType('LT'); // Reset về mặc định
+    setLessonType('LT');
     setPracticeGroup(1);
     onClose();
   };
@@ -78,21 +110,27 @@ const CreateAttendanceModal: React.FC<CreateAttendanceModalProps> = ({
                 />
                 <span className="ml-2 text-sm text-gray-700">Lý thuyết (LT)</span>
               </label>
-              <label className="flex items-center cursor-pointer">
+              
+              {/*Radio button TH sẽ bị disabled nếu practice_gr là null */}
+              <label className={`flex items-center ${!canTeachPractice ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
                 <input
                   type="radio"
                   value="TH"
                   checked={lessonType === 'TH'}
                   onChange={(e) => setLessonType(e.target.value as 'LT' | 'TH')}
+                  disabled={!canTeachPractice}
                   className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
                 />
-                <span className="ml-2 text-sm text-gray-700">Thực hành (TH)</span>
+                <span className="ml-2 text-sm text-gray-700">
+                    Thực hành (TH)
+                    {!canTeachPractice && <span className="text-xs ml-1 text-red-500">(Không phụ trách)</span>}
+                </span>
               </label>
             </div>
           </div>
 
           {/* Phần chọn Nhóm thực hành (Chỉ hiện khi chọn TH) */}
-          {lessonType === 'TH' && (
+          {lessonType === 'TH' && canTeachPractice && (
             <div className="mb-4 animate-fadeIn">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Nhóm thực hành <span className="text-red-500">*</span>
@@ -102,14 +140,13 @@ const CreateAttendanceModal: React.FC<CreateAttendanceModalProps> = ({
                 onChange={(e) => setPracticeGroup(parseInt(e.target.value))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
               >
-                <option value={1}>Nhóm 1</option>
-                <option value={2}>Nhóm 2</option>
-                <option value={3}>Nhóm 3</option>
-                <option value={4}>Nhóm 4</option>
-                <option value={5}>Nhóm 5</option>
+                {/*Chỉ render các nhóm nằm trong allowedGroups */}
+                {allowedGroups.map(group => (
+                    <option key={group} value={group}>Nhóm {group}</option>
+                ))}
               </select>
               <p className="mt-1 text-xs text-gray-500 italic">
-                * Sinh viên khác nhóm sẽ tự động bị khóa trạng thái "Khác nhóm".
+                * Bạn chỉ có thể chọn nhóm được phân công: {allowedPracticeGroupsStr}.
               </p>
             </div>
           )}
