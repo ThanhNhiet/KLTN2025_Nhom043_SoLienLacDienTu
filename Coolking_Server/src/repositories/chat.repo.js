@@ -1340,6 +1340,7 @@ const getNonChatCourseSections = async (faculty_id = "CNTT", page = 1, pageSize 
             {
                 model: models.LecturerCourseSection,
                 as: 'lecturers_course_sections',
+                where: {isMain: true},
                 include: [
                     {
                         model: models.Lecturer,

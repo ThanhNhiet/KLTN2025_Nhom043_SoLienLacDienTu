@@ -3,6 +3,7 @@ const { Op } = require("sequelize");
 const initModels = require("../databases/mariadb/model/init-models");
 const models = initModels(sequelize);
 const datetimeFormatter = require("../utils/format/datetime-formatter");
+const { where } = require("../databases/mongodb/schemas/Alert");
 
 /**
  * Lấy danh sách sinh viên bằng course_section_id
@@ -82,12 +83,23 @@ const getAttendanceListByCourseID = async (course_section_id) => {
  * @param {string} course_section_id 
  * @returns {Object} Thông tin chi tiết lớp học phần
  */
-const getCourseSectionDetailByID = async (course_section_id) => {
+const getCourseSectionDetailByID = async (course_section_id, user_id) => {
     try {
         // Validate input
         if (!course_section_id) {
             throw new Error('course_section_id is required');
         }
+
+        console.log('User ID in getCourseSectionDetailByID:', user_id);
+
+        // Truy vấn nhóm thực hành của giảng viên request
+        const practice_gr = await models.LecturerCourseSection.findOne({
+            where: {
+                course_section_id: course_section_id,
+                lecturer_id: user_id
+            },
+            attributes: ['practice_gr']
+        });
 
         const courseSectionDetail = await models.CourseSection.findOne({
             where: {
@@ -119,6 +131,7 @@ const getCourseSectionDetailByID = async (course_section_id) => {
                 {
                     model: models.LecturerCourseSection,
                     as: 'lecturers_course_sections',
+                    where: { isMain: true },
                     include: [
                         {
                             model: models.Lecturer,
@@ -144,7 +157,8 @@ const getCourseSectionDetailByID = async (course_section_id) => {
             className: courseSectionDetail.clazz?.name || 'N/A',
             facultyName: courseSectionDetail.subject?.faculty?.name || 'N/A',
             sessionName: courseSectionDetail.session ? `${courseSectionDetail.session.name} ${courseSectionDetail.session.years}` : 'N/A',
-            lecturerName: lecturerName
+            lecturerName: lecturerName,
+            practice_gr: practice_gr?.practice_gr || null
         };
 
     } catch (error) {
@@ -189,7 +203,7 @@ const getAttendanceStudentListByAttendanceID = async (attendance_id) => {
  * @param {string} course_section_id 
  * @returns {Object} Dữ liệu điểm danh hoàn chỉnh
  */
-const getAttendanceDetailsByCourseSectionID = async (course_section_id) => {
+const getAttendanceDetailsByCourseSectionID = async (course_section_id, user_id) => {
     try {
         // Validate input parameters
         if (!course_section_id) {
@@ -197,7 +211,7 @@ const getAttendanceDetailsByCourseSectionID = async (course_section_id) => {
         }
 
         // Lấy thông tin chi tiết lớp học phần
-        const courseSectionDetail = await getCourseSectionDetailByID(course_section_id);
+        const courseSectionDetail = await getCourseSectionDetailByID(course_section_id, user_id);
 
         // Lấy danh sách sinh viên trong lớp
         const allStudents = await getStudentsByCourseSectionID(course_section_id);
@@ -252,6 +266,7 @@ const getAttendanceDetailsByCourseSectionID = async (course_section_id) => {
             facultyName: courseSectionDetail.facultyName,
             sessionName: courseSectionDetail.sessionName,
             lecturerName: courseSectionDetail.lecturerName,
+            practice_gr: courseSectionDetail.practice_gr,
             attendances: attendances,
             students: attendances?.[0]?.students || allStudents
         };

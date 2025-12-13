@@ -3,6 +3,7 @@ const sequelize = require("../config/mariadb.conf");
 const { initModels } = require("../databases/mariadb/model/init-models");
 const models = initModels(sequelize);
 const datetimeFormatter = require("../utils/format/datetime-formatter");
+const { where } = require("../databases/mongodb/schemas/Alert");
 
 /**
  * Chuyển đổi từ JavaScript day (0-6) sang database day_of_week (1-7)
@@ -295,6 +296,7 @@ const getSchedulesByUserId = async (user_id, currentDate) => {
                                 {
                                     model: models.LecturerCourseSection,
                                     as: 'lecturers_course_sections',
+                                    where: { isMain: true },
                                     include: [{ model: models.Lecturer, as: 'lecturer', attributes: ['name'] }]
                                 }
                             ]

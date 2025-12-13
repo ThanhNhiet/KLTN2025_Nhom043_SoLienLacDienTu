@@ -19,7 +19,7 @@ exports.getAttendanceDetailsByCourseSectionAndAttendanceID = async (req, res) =>
             });
         }
 
-        const attendanceDetails = await attendanceRepo.getAttendanceDetailsByCourseSectionID(course_section_id);
+        const attendanceDetails = await attendanceRepo.getAttendanceDetailsByCourseSectionID(course_section_id, decoded.user_id);
         return res.status(200).json(attendanceDetails);
 
     } catch (error) {
