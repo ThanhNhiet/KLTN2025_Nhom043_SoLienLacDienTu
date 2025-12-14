@@ -92,7 +92,7 @@ const StudentInfoModal: React.FC<StudentInfoModalProps> = ({
                 <h3 className="text-lg font-semibold text-green-800 mb-3">Thông tin học tập</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <span className="text-sm font-medium text-gray-600">Lớp:</span>
+                    <span className="text-sm font-medium text-gray-600">Lớp danh nghĩa:</span>
                     <div className="text-base font-semibold text-gray-800">{studentInfo.className}</div>
                   </div>
                   <div>
@@ -100,8 +100,20 @@ const StudentInfoModal: React.FC<StudentInfoModalProps> = ({
                     <div className="text-base font-semibold text-gray-800">{studentInfo.facultyName}</div>
                   </div>
                   <div>
-                    <span className="text-sm font-medium text-gray-600">Ngành:</span>
+                    <span className="text-sm font-medium text-gray-600">Chuyên ngành:</span>
                     <div className="text-base font-semibold text-gray-800">{studentInfo.majorName}</div>
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium text-gray-600">Giảng viên chủ nhiệm:</span>
+                    <div className="text-base font-semibold text-gray-800">{studentInfo.homeroomTeacherName}</div>
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium text-gray-600">Email giảng viên chủ nhiệm:</span>
+                    <div className="text-base font-semibold text-gray-800">{studentInfo.homeroomTeacherEmail}</div>
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium text-gray-600">Số điện thoại giảng viên chủ nhiệm:</span>
+                    <div className="text-base font-semibold text-gray-800">{studentInfo.homeroomTeacherPhone}</div>
                   </div>
                 </div>
               </div>

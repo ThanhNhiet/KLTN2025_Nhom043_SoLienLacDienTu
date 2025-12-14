@@ -91,6 +91,18 @@ export const useStatistics = () => {
         setLoading(false);
     }, []);
 
+    // Trả về thống kê của lớp học phần theo học kỳ
+    const getCourseSectionStatistics = useCallback(async (courseSectionId: string, sessionId: string) => {
+        setLoading(true);
+        setError('');
+        try {
+           return await statisticsServices.getCourseSectionOverview(courseSectionId, sessionId);
+        } catch (err) {
+            setError('Failed to fetch course section statistics');
+        }
+        setLoading(false);
+    }, []);
+
     return {
         loading,
         error,
@@ -102,7 +114,8 @@ export const useStatistics = () => {
         getFacultyStatistics,
         getLecturersStatistics,
         getLecturerStatistics,
-        getCoursesSectionsStatistics
+        getCoursesSectionsStatistics,
+        getCourseSectionStatistics
     };
 };
 

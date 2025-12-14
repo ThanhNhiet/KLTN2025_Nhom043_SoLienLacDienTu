@@ -5,9 +5,12 @@ export interface courseSectionWithStudents {
     course_section_id: string;
     subjectName: string;
     className: string;
+    sessionId: string;
     sessionName: string;
     facultyName: string;
     lecturerName: string;
+    lecturerEmail: string;
+    lecturerPhone: string;
     students: StudentWithScore[];
 }
 
