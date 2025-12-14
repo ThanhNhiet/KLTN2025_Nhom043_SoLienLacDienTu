@@ -328,7 +328,7 @@ const HeaderLECpn: React.FC = () => {
                         </div>
 
                         {/* Desktop Navigation */}
-                        <nav className="hidden md:flex space-x-4 items-center">
+                        <nav className="hidden md:flex space-x-3 items-center">
                             <a
                                 href="/lecturer/schedule"
                                 className="text-gray-700 hover:text-blue-600 font-medium transition-colors duration-200 px-3 py-2 rounded-md hover:bg-gray-50"
@@ -339,13 +339,19 @@ const HeaderLECpn: React.FC = () => {
                                 href="/lecturer/clazz"
                                 className="text-gray-700 hover:text-blue-600 font-medium transition-colors duration-200 px-3 py-2 rounded-md hover:bg-gray-50"
                             >
-                                Lớp học phần
+                                Lớp học
+                            </a>
+                            <a
+                                href="/lecturer/clazz"
+                                className="text-gray-700 hover:text-blue-600 font-medium transition-colors duration-200 px-3 py-2 rounded-md hover:bg-gray-50"
+                            >
+                                Lớp chủ nhiệm
                             </a>
                             <a
                                 href="/lecturer/alerts"
                                 className="text-gray-700 hover:text-blue-600 font-medium transition-colors duration-200 px-3 py-2 rounded-md hover:bg-gray-50"
                             >
-                                Gửi thông báo
+                                Thông báo đã gửi
                             </a>
                             <a
                                 href="/lecturer/chat"
@@ -493,7 +499,7 @@ const HeaderLECpn: React.FC = () => {
                                 />
                             )}
                             <span className="text-gray-700 text-sm font-medium group-hover:text-blue-600 transition-colors duration-200">
-                                {lecturerName || 'Giảng viên'}
+                               GV {lecturerName || 'Giảng viên'}
                             </span>
                         </a>
 
@@ -531,7 +537,7 @@ const HeaderLECpn: React.FC = () => {
                                     />
                                 )}
                                 <span className="text-gray-700 text-sm font-medium hover:text-blue-600">
-                                    {lecturerName || 'Giảng viên'}
+                                    GV {lecturerName || 'Giảng viên'}
                                 </span>
                             </button>
 
@@ -546,13 +552,19 @@ const HeaderLECpn: React.FC = () => {
                                 onClick={() => handleNavigation("/lecturer/clazz")}
                                 className="block w-full text-left px-3 py-2 text-gray-700 hover:text-blue-600 hover:bg-gray-50 rounded-md font-medium"
                             >
-                                Lớp học phần
+                                Lớp học
+                            </button>
+                            <button
+                                onClick={() => handleNavigation("/lecturer/clazz")}
+                                className="block w-full text-left px-3 py-2 text-gray-700 hover:text-blue-600 hover:bg-gray-50 rounded-md font-medium"
+                            >
+                                Lớp chủ nhiệm
                             </button>
                             <button
                                 onClick={() => handleNavigation("/lecturer/alerts")}
                                 className="block w-full text-left px-3 py-2 text-gray-700 hover:text-blue-600 hover:bg-gray-50 rounded-md font-medium"
                             >
-                                Gửi thông báo
+                                Thông báo
                             </button>
                             <button
                                 onClick={() => handleNavigation('/lecturer/chat')}

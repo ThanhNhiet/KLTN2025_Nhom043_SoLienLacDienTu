@@ -83,7 +83,7 @@ const HeaderAdCpn: React.FC = () => {
                 />
               )}
               <span className="text-gray-700 text-sm font-medium group-hover:text-blue-600 transition-colors duration-200">
-                {admin_name || 'Quản trị viên'}
+                QTV {admin_name || 'Quản trị viên'}
               </span>
             </a>
 
