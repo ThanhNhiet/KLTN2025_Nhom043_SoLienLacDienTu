@@ -8,7 +8,11 @@ export interface AttendanceData {
     facultyName: string;
     sessionName: string;
     lecturerName: string;
+    lecturerEmail: string;
+    lecturerPhone: string;
     practice_gr: string | null;
+    start_lesson: number | null;
+    end_lesson: number | null;
     attendances: Attendance[];
     students?: StudentRaw[];
 }
@@ -37,6 +41,12 @@ export interface StudentRaw {
     dob: string;
     gender: boolean;
     practice_gr?: string | null;
+    absentTheo: number;
+    absentPra: number;
+    banFromTakingExam: boolean;
+    need2Remind: boolean;
+    remindAtCredit: string;
+    isRemindYet: boolean;
 }
 
 export const useAttendance = () => {

@@ -4,6 +4,8 @@ interface CreateAttendanceModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (startLesson: number, endLesson: number, lessonType: 'LT' | 'TH', practiceGroup: number) => void;
+  start_lesson?: number | null;
+  end_lesson?: number | null;
   allowedPracticeGroupsStr: string | null;
 }
 
@@ -11,10 +13,12 @@ const CreateAttendanceModal: React.FC<CreateAttendanceModalProps> = ({
   isOpen,
   onClose,
   onConfirm,
+  start_lesson,
+  end_lesson,
   allowedPracticeGroupsStr
 }) => {
-  const [startLesson, setStartLesson] = useState<number>(1);
-  const [endLesson, setEndLesson] = useState<number>(1);
+  const [startLesson, setStartLesson] = useState<number>(start_lesson ?? 1);
+  const [endLesson, setEndLesson] = useState<number>(end_lesson ?? 1);
   const [lessonType, setLessonType] = useState<'LT' | 'TH'>('LT');
   const [practiceGroup, setPracticeGroup] = useState<number>(1);
   const [error, setError] = useState<string>('');

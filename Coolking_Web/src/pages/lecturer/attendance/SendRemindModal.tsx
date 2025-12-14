@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import type { StudentWithScore, courseSectionWithStudents } from '../../../hooks/useStudent';
+import type { AttendanceData, StudentRaw } from '../../../hooks/useAttendance';
 import { useAlert } from '../../../hooks/useAlert';
 
 interface SendWarningModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  student: StudentWithScore;
-  courseSectionData: courseSectionWithStudents;
+  studentRaw: StudentRaw;
+  attendanceData: AttendanceData;
   studentInfo: any; // Thông tin chi tiết sinh viên bao gồm phụ huynh
 }
 
@@ -15,25 +15,30 @@ const SendWarningModal: React.FC<SendWarningModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
-  student,
-  courseSectionData,
+  studentRaw,
+  attendanceData,
   studentInfo
 }) => {
-  const defaultTitle = `Nhắc nhở học tập - Sinh viên ${student.student_id} - LHP: ${courseSectionData.course_section_id} - Môn: ${courseSectionData.subjectName}`;
-  const defaultContent = `Thông báo đến sinh viên ${student.name} (MSSV: ${student.student_id}) và Quý Phụ huynh.
 
-Trong môn học ${courseSectionData.subjectName} (mã lớp học phần: ${courseSectionData.course_section_id}), thuộc lớp ${courseSectionData.className}, học kỳ ${courseSectionData.sessionName}, tôi nhận thấy rằng:
+  const remindAtCredit = () => {
+    if(studentRaw.remindAtCredit === 'theo') return 'Lý thuyết';
+    if(studentRaw.remindAtCredit === 'pra') return 'Thực hành';
+  };
 
-Điểm giữa kỳ của là ${student.score.mid} theo thang điểm 10. Đây là kết quả rất đáng lo ngại và có ảnh hưởng lớn đến điểm tổng kết của môn học. Kết quả này cho thấy em đang bị hổng kiến thức nghiêm trọng và có nguy cơ rất cao sẽ không đạt môn học này.
+  const defaultTitle = `Nhắc nhở chuyên cần - Sinh viên ${studentRaw.student_id} - LHP: ${attendanceData.course_section_id} - Môn: ${attendanceData.subjectName}`;
+  const defaultContent = `Thông báo đến sinh viên ${studentRaw.name} (MSSV: ${studentRaw.student_id}) và Quý Phụ huynh.
 
-Đề nghị sinh viên nghiêm túc xem lại và củng cố lại toàn bộ kiến thức đã học và bài kiểm tra vừa rồi. Lên kế hoạch học tập chi tiết cho phần còn lại của học kỳ.
+Trong môn học ${attendanceData.subjectName} (mã lớp học phần: ${attendanceData.course_section_id}), thuộc lớp ${attendanceData.className}, học kỳ ${attendanceData.sessionName}, tôi nhận thấy rằng:
 
-Nhà trường và giảng viên luôn tạo điều kiện hỗ trợ, nhưng sự nỗ lực từ chính bản thân em mới là yếu tố quyết định.
+Thống kê đến thời điểm hiện tại, sinh viên đã vắng không phép ${studentRaw.absentTheo} buổi lý thuyết và vắng ${studentRaw.absentPra} buổi thực hành. Điều này có nghĩa là nếu sinh viên vắng 20% số tiết thuộc tín chỉ ${remindAtCredit()}, nếu vắng vượt quá 20% sẽ có nguy cơ bị cấm thi.
+Đề nghị sinh viên nghiêm túc đi học đầy đủ . Nếu có lý do chính đáng cho việc vắng mặt, xin vui lòng liên hệ với giảng viên bộ môn để được hỗ trợ.
+
+Quý Phụ huynh vui lòng phối hợp cùng nhà trường để nhắc nhở và hỗ trợ sinh viên trong việc học tập, nhằm đảm bảo kết quả học tập tốt nhất.
 
 Trân trọng.
-Giảng viên phụ trách môn học: ${courseSectionData.lecturerName}
-Email: ${courseSectionData.lecturerEmail}
-Số điện thoại: ${courseSectionData.lecturerPhone}`;
+Giảng viên phụ trách môn học: ${attendanceData.lecturerName}
+Email: ${attendanceData.lecturerEmail}
+Số điện thoại: ${attendanceData.lecturerPhone}`;
 
   const [title, setTitle] = useState(defaultTitle);
   const [content, setContent] = useState(defaultContent);
@@ -68,8 +73,8 @@ Số điện thoại: ${courseSectionData.lecturerPhone}`;
       const receiverIDs: string[] = [];
 
       // Thêm sinh viên
-      if (student.student_id) {
-        receiverIDs.push(student.student_id);
+      if (studentRaw.student_id) {
+        receiverIDs.push(studentRaw.student_id);
       }
 
       // Thêm phụ huynh từ studentInfo (single parent object)
@@ -127,7 +132,7 @@ Số điện thoại: ${courseSectionData.lecturerPhone}`;
         <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
           {/* Header */}
           <div className="flex justify-between items-center p-6 border-b">
-            <h2 className="text-xl font-semibold text-gray-900">Gửi nhắc nhở học tập</h2>
+            <h2 className="text-xl font-semibold text-gray-900">Gửi nhắc nhở chuyên cần</h2>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -145,10 +150,9 @@ Số điện thoại: ${courseSectionData.lecturerPhone}`;
             <div className="mb-6 p-4 bg-blue-50 rounded-lg">
               <h3 className="font-semibold text-blue-800 mb-2">Thông tin sinh viên</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                <div><span className="font-medium">Họ tên:</span> {student.name}</div>
-                <div><span className="font-medium">MSSV:</span> {student.student_id}</div>
-                <div><span className="font-medium">Ngày sinh:</span> {student.dob}</div>
-                <div><span className="font-medium">Đánh giá:</span> {student.initial_evaluate === 'ok' ? "Bình thường" : "Cần nhắc nhở"}</div>
+                <div><span className="font-medium">Họ tên:</span> {studentRaw.name}</div>
+                <div><span className="font-medium">MSSV:</span> {studentRaw.student_id}</div>
+                <div><span className="font-medium">Ngày sinh:</span> {studentRaw.dob}</div>
               </div>
             </div>
 
@@ -160,7 +164,7 @@ Số điện thoại: ${courseSectionData.lecturerPhone}`;
               <div className="bg-gray-50 rounded-lg p-4">
                 <div className="space-y-2">
                   <div className="text-sm">
-                    <span className="font-medium text-gray-700">Sinh viên:</span> {student.name} ({student.student_id})
+                    <span className="font-medium text-gray-700">Sinh viên:</span> {studentRaw.name} ({studentRaw.student_id})
                   </div>
                   {studentInfo?.parent && (
                     <div className="text-sm">

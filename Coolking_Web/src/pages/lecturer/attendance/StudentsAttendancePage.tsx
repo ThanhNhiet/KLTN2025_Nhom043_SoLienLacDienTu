@@ -6,6 +6,9 @@ import FooterLeCpn from '../../../components/lecturer/FooterLeCpn';
 import CreateAttendanceModal from './CreateAttendanceModal';
 import ConfirmationModal from './ConfirmationModal';
 import SendFormModal from '../alert/SendFormModal';
+import SendRemindModal from './SendRemindModal';
+import StudentInfoModal from './StudentInfoModal';
+import { useStudent } from '../../../hooks/useStudent';
 
 interface StudentAttendanceRecord {
   student_id: string;
@@ -16,6 +19,7 @@ interface StudentAttendanceRecord {
 const StudentsAttendancePage: React.FC = () => {
   const { course_section_id } = useParams<{ course_section_id: string }>();
   const { loading, attendanceData, getStudentsWithAttendance, recordAttendance, updateAttendance, deleteAttendance } = useAttendance();
+  const { fetchStudentInfo, studentInfo } = useStudent();
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isCreatingAttendance, setIsCreatingAttendance] = useState(false);
@@ -23,6 +27,10 @@ const StudentsAttendancePage: React.FC = () => {
   const [showActionMenu, setShowActionMenu] = useState<string | null>(null);
   const [showTooltip, setShowTooltip] = useState<{ studentId: string, attendanceId: string } | null>(null);
   const [showSendFormModal, setShowSendFormModal] = useState(false);
+  const [showRemindModal, setShowRemindModal] = useState(false);
+  const [selectedStudentForRemind, setSelectedStudentForRemind] = useState<any>(null);
+  const [showStudentInfoModal, setShowStudentInfoModal] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<any>(null);
 
   // Update state để lưu thêm lessonType và practiceGroup
   const [newAttendanceData, setNewAttendanceData] = useState<{
@@ -335,6 +343,26 @@ const StudentsAttendancePage: React.FC = () => {
     });
   };
 
+  const handleSendRemind = async (student: any) => {
+    setSelectedStudentForRemind(student);
+    await fetchStudentInfo(student.student_id);
+    setShowRemindModal(true);
+  };
+
+  const handleRemindSuccess = () => {
+    setShowRemindModal(false);
+    setSelectedStudentForRemind(null);
+    if (course_section_id) {
+      getStudentsWithAttendance(course_section_id);
+    }
+  };
+
+  const handleStudentClick = async (student: any) => {
+    setSelectedStudent(student);
+    await fetchStudentInfo(student.student_id);
+    setShowStudentInfoModal(true);
+  };
+
   const getStatusOptions = () => [
     { value: 'PRESENT', label: 'Có mặt' },
     { value: 'ABSENT', label: 'Vắng' },
@@ -413,7 +441,7 @@ const StudentsAttendancePage: React.FC = () => {
     );
   }
 
-  const allStudents = attendanceData.attendances[0]?.students || attendanceData.students || [];
+  const allStudents = attendanceData.students || [];
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -527,6 +555,9 @@ const StudentsAttendancePage: React.FC = () => {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ngày sinh</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Giới tính</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Nhóm TH</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Vắng LT</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Vắng TH</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Đánh giá</th>
 
                   {/* New attendance column when creating */}
                   {isCreatingAttendance && newAttendanceData && (
@@ -567,7 +598,7 @@ const StudentsAttendancePage: React.FC = () => {
 
                     return (
                       <th key={attendance.attendance_id} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider relative">
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-center">
                           <span>
                             {formatDate(attendance.date_attendance)} Tiết {attendance.start_lesson} - {attendance.end_lesson} <br />
                             <span className={`text-xs ${isPracticeSession ? 'text-purple-600' : 'text-blue-600'}`}>
@@ -626,7 +657,19 @@ const StudentsAttendancePage: React.FC = () => {
                   </tr>
                 ) : (
                   allStudents.map((student) => (
-                    <tr key={student.student_id} className="hover:bg-gray-50 transition-colors duration-150">
+                    <tr
+                      key={student.student_id}
+                      onClick={(e) => {
+                        // Prevent click when clicking on buttons or interactive elements
+                        if (e.target instanceof HTMLElement) {
+                          const isInteractive = e.target.closest('button, select, input, .action-dropdown');
+                          if (!isInteractive) {
+                            handleStudentClick(student);
+                          }
+                        }
+                      }}
+                      className="hover:bg-gray-50 cursor-pointer transition-colors duration-150"
+                    >
                       <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-blue-600 sticky left-0 bg-white z-10">
                         {student.student_id}
                       </td>
@@ -641,6 +684,53 @@ const StudentsAttendancePage: React.FC = () => {
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
                         {student.practice_gr || '-'}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
+                        {student.absentTheo || 0}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
+                        {student.absentPra || 0}
+                      </td>
+
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
+                        {student.banFromTakingExam ? (
+                          // 1. Ưu tiên cao nhất: Bị cấm thi
+                          <span className="inline-block px-3 py-1 rounded-md text-xs font-bold bg-red-600 text-white shadow-sm">
+                            Cấm thi
+                          </span>
+                        ) : (
+                          // 2. Nếu chưa bị cấm, xét tiếp logic nhắc nhở
+                          student.need2Remind ? (
+                            student.isRemindYet ? (
+                              // Đã gửi nhắc nhở -> Disable
+                              <button
+                                disabled
+                                className="px-3 py-1 rounded-md text-xs font-medium bg-gray-300 text-gray-600 cursor-not-allowed border border-gray-300"
+                              >
+                                Đã gửi nhắc nhở
+                              </button>
+                            ) : (
+                              // Cần nhắc nhở -> Nút cam Active
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation(); // Ngăn chặn sự kiện click vào dòng
+                                  handleSendRemind(student);
+                                }}
+                                className="px-3 py-1 rounded-md text-xs font-medium bg-orange-600 text-white hover:bg-orange-700 transition-colors shadow-sm"
+                              >
+                                Cần nhắc nhở
+                              </button>
+                            )
+                          ) : (
+                            // Bình thường -> Nút xanh nhạt Disable
+                            <button
+                              disabled
+                              className="px-3 py-1 rounded-md text-xs font-medium bg-green-100 text-green-800 cursor-default border border-green-200"
+                            >
+                              Bình thường
+                            </button>
+                          )
+                        )}
                       </td>
 
                       {/* New attendance column when creating */}
@@ -769,6 +859,8 @@ const StudentsAttendancePage: React.FC = () => {
           isOpen={showCreateModal}
           onClose={() => setShowCreateModal(false)}
           onConfirm={handleCreateAttendance}
+          start_lesson={attendanceData.start_lesson}
+          end_lesson={attendanceData.end_lesson}
           allowedPracticeGroupsStr={attendanceData?.practice_gr || null}
         />
       )}
@@ -798,11 +890,33 @@ const StudentsAttendancePage: React.FC = () => {
         type={confirmModal.type}
       />
 
+      {/* Send Remind Modal */}
+      {showRemindModal && selectedStudentForRemind && attendanceData && (
+        <SendRemindModal
+          isOpen={showRemindModal}
+          onClose={() => setShowRemindModal(false)}
+          onSuccess={handleRemindSuccess}
+          studentRaw={selectedStudentForRemind}
+          attendanceData={attendanceData}
+          studentInfo={studentInfo}
+        />
+      )}
+
+      {/* Student Info Modal */}
+      {showStudentInfoModal && selectedStudent && (
+        <StudentInfoModal
+          isOpen={showStudentInfoModal}
+          onClose={() => setShowStudentInfoModal(false)}
+          studentInfo={studentInfo}
+          loading={loading}
+        />
+      )}
+
       {/* Toast Notification */}
       {toast.show && (
         <div className={`fixed top-4 right-4 z-[9999] p-4 rounded-lg shadow-lg transform transition-all duration-300 ${toast.type === 'success'
-            ? 'bg-green-500 text-white'
-            : 'bg-red-500 text-white'
+          ? 'bg-green-500 text-white'
+          : 'bg-red-500 text-white'
           }`}>
           <div className="flex items-center">
             {toast.type === 'success' ? (
