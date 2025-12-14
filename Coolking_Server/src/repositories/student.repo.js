@@ -48,16 +48,17 @@ const getStudentsScoreByCourseSectionId4Lecturer = async (course_section_id) => 
                 {
                     model: models.Session,
                     as: 'session',
-                    attributes: ['name', 'years']
+                    attributes: ['id', 'name', 'years']
                 },
                 {
                     model: models.LecturerCourseSection,
                     as: 'lecturers_course_sections',
+                    where: { isMain: true },
                     include: [
                         {
                             model: models.Lecturer,
                             as: 'lecturer',
-                            attributes: ['name']
+                            attributes: ['name', 'email', 'phone']
                         }
                     ]
                 }
@@ -71,8 +72,8 @@ const getStudentsScoreByCourseSectionId4Lecturer = async (course_section_id) => 
         // Lấy danh sách student_id từ Student_CourseSection
         const studentCourseSections = await models.StudentCourseSection.findAll({
             where: { course_section_id: course_section_id },
-            attributes: ['student_id'],
-            order: [['createdAt', 'ASC']] // Sắp xếp theo thời gian đăng ký
+            attributes: ['student_id']
+            // order: [['createdAt', 'ASC']] // Sắp xếp theo thời gian đăng ký
         });
 
         if (studentCourseSections.length === 0) {
@@ -81,9 +82,12 @@ const getStudentsScoreByCourseSectionId4Lecturer = async (course_section_id) => 
                 course_section_id: courseSectionDetail.id,
                 subjectName: courseSectionDetail.subject?.name || 'N/A',
                 className: courseSectionDetail.clazz?.name || 'N/A',
+                sessionId: courseSectionDetail?.session ? courseSectionDetail.session.id : 'N/A',
                 sessionName: courseSectionDetail?.session ? courseSectionDetail.session.name + ' ' + courseSectionDetail.session.years : 'N/A',
                 facultyName: courseSectionDetail.subject?.faculty?.name || 'N/A',
                 lecturerName: courseSectionDetail.lecturers_course_sections?.[0]?.lecturer?.name || 'N/A',
+                leturerEmail: courseSectionDetail.lecturers_course_sections?.[0]?.lecturer?.email || 'N/A',
+                leturerPhone: courseSectionDetail.lecturers_course_sections?.[0]?.lecturer?.phone || 'N/A',
                 students: []
             };
         }
@@ -222,9 +226,12 @@ const getStudentsScoreByCourseSectionId4Lecturer = async (course_section_id) => 
             course_section_id: courseSectionDetail.id,
             subjectName: courseSectionDetail.subject?.name || 'N/A',
             className: courseSectionDetail.clazz?.name || 'N/A',
+            sessionId: courseSectionDetail?.session ? courseSectionDetail.session.id : 'N/A',
             sessionName: courseSectionDetail?.session ? courseSectionDetail.session.name + ' ' + courseSectionDetail.session.years : 'N/A',
             facultyName: courseSectionDetail.subject?.faculty?.name || 'N/A',
             lecturerName: courseSectionDetail.lecturers_course_sections?.[0]?.lecturer?.name || 'N/A',
+            lecturerEmail: courseSectionDetail.lecturers_course_sections?.[0]?.lecturer?.email || 'N/A',
+            lecturerPhone: courseSectionDetail.lecturers_course_sections?.[0]?.lecturer?.phone || 'N/A',
             students: processedStudents
         };
 
@@ -297,7 +304,7 @@ const updateStudentAvatar = async (student_id, file) => {
 const getStudentInfoById4Lecturer = async (student_id) => {
     try {
         const student = await models.Student.findOne({
-            attributes: { exclude: ['id', 'isDeleted', 'clazz_id', 'major_id', 'createdAt', 'updatedAt'] },
+            attributes: { exclude: ['id', 'isDeleted', 'major_id', 'createdAt', 'updatedAt'] },
             where: { student_id, isDeleted: false },
             include: [
                 // use the actual association alias defined in your models (singular 'parent' per error)
@@ -329,6 +336,13 @@ const getStudentInfoById4Lecturer = async (student_id) => {
                     required: false
                 }
             ]
+        });
+        console.log("clazz_id:", student.clazz_id);
+
+        //Tìm kiếm giảng viên chủ nhiệm theo clazz_id
+        const homeroomTeacher = await models.Lecturer.findOne({
+            where: { homeroom_class_id: student.clazz_id, isDeleted: false },
+            attributes: ['name', 'email', 'phone']
         });
 
         if (!student) throw new Error("Student not found");
@@ -363,6 +377,9 @@ const getStudentInfoById4Lecturer = async (student_id) => {
             address: student.address,
             className: student.clazz ? student.clazz.name : null,
             facultyName: student.clazz && student.clazz.faculty ? student.clazz.faculty.name : null,
+            homeroomTeacherName: homeroomTeacher ? homeroomTeacher.name : null,
+            homeroomTeacherEmail: homeroomTeacher ? homeroomTeacher.email : null,
+            homeroomTeacherPhone: homeroomTeacher ? homeroomTeacher.phone : null,
             majorName: student.major ? student.major.name : null,
             parent: {
                 parent_id: student.parent ? student.parent.parent_id : null,
