@@ -4,6 +4,7 @@ const initModels = require("../databases/mariadb/model/init-models");
 const models = initModels(sequelize);
 const datetimeFormatter = require("../utils/format/datetime-formatter");
 const { where } = require("../databases/mongodb/schemas/Alert");
+const { Alert } = require('../databases/mongodb/schemas');
 
 /**
  * Lấy danh sách sinh viên bằng course_section_id
@@ -109,7 +110,7 @@ const getCourseSectionDetailByID = async (course_section_id, user_id) => {
                 {
                     model: models.Subject,
                     as: 'subject',
-                    attributes: ['name'],
+                    attributes: ['name', 'theo_credit', 'pra_credit'],
                     include: [
                         {
                             model: models.Faculty,
@@ -136,7 +137,7 @@ const getCourseSectionDetailByID = async (course_section_id, user_id) => {
                         {
                             model: models.Lecturer,
                             as: 'lecturer',
-                            attributes: ['name']
+                            attributes: ['lecturer_id', 'name', 'email', 'phone']
                         }
                     ]
                 }
@@ -154,10 +155,15 @@ const getCourseSectionDetailByID = async (course_section_id, user_id) => {
         return {
             course_section_id: courseSectionDetail.id,
             subjectName: courseSectionDetail.subject?.name || 'N/A',
+            theo_credit: courseSectionDetail.subject?.theo_credit || 0,
+            pra_credit: courseSectionDetail.subject?.pra_credit || 0,
             className: courseSectionDetail.clazz?.name || 'N/A',
             facultyName: courseSectionDetail.subject?.faculty?.name || 'N/A',
             sessionName: courseSectionDetail.session ? `${courseSectionDetail.session.name} ${courseSectionDetail.session.years}` : 'N/A',
+            lecturer_id: courseSectionDetail.lecturers_course_sections?.[0]?.lecturer?.lecturer_id || null,
             lecturerName: lecturerName,
+            lecturerEmail: courseSectionDetail.lecturers_course_sections?.[0]?.lecturer?.email || 'N/A',
+            lecturerPhone: courseSectionDetail.lecturers_course_sections?.[0]?.lecturer?.phone || 'N/A',
             practice_gr: practice_gr?.practice_gr || null
         };
 
@@ -213,20 +219,68 @@ const getAttendanceDetailsByCourseSectionID = async (course_section_id, user_id)
         // Lấy thông tin chi tiết lớp học phần
         const courseSectionDetail = await getCourseSectionDetailByID(course_section_id, user_id);
 
-        // Lấy danh sách sinh viên trong lớp
-        const allStudents = await getStudentsByCourseSectionID(course_section_id);
+        // --- 1. TÍNH TOÁN GIỚI HẠN CẤM THI (Quy đổi ra TIẾT) ---
+        // 1 tín chỉ LT = 15 tiết, 1 tín chỉ TH = 30 tiết
+        const totalTheoPeriods = (courseSectionDetail.theo_credit || 0) * 15;
+        const totalPraPeriods = (courseSectionDetail.pra_credit || 0) * 30;
 
-        // Lấy danh sách các buổi điểm danh
+        // Giới hạn 20% số tiết
+        const maxAllowedTheoAbsent = totalTheoPeriods * 0.2;
+        const maxAllowedPraAbsent = totalPraPeriods * 0.2;
+
+        // Lấy danh sách sinh viên và danh sách điểm danh
+        const allStudents = await getStudentsByCourseSectionID(course_section_id);
         const attendanceList = await getAttendanceListByCourseID(course_section_id);
 
-        // Tạo danh sách attendances với thông tin điểm danh đầy đủ
+        // =========================================================================
+        // === SẮP XẾP DANH SÁCH ĐIỂM DANH (Date -> Start -> End) ===
+        // =========================================================================
+        attendanceList.sort((a, b) => {
+            // 1. So sánh ngày (tăng dần)
+            // Chuyển về getTime() để so sánh số nguyên timestamp cho chính xác
+            const timeA = new Date(a.date_attendance).getTime();
+            const timeB = new Date(b.date_attendance).getTime();
+            if (timeA !== timeB) {
+                return timeB - timeA;
+            }
+
+            // 2. Nếu ngày bằng nhau, so sánh tiết bắt đầu (tăng dần)
+            if (a.start_lesson !== b.start_lesson) {
+                return b.start_lesson - a.start_lesson;
+            }
+
+            // 3. Nếu tiết bắt đầu bằng nhau, so sánh tiết kết thúc (tăng dần)
+            return a.end_lesson - b.end_lesson;
+        });
+        // =========================================================================
+
+        //Lấy tiết học của lớp học phần của giảng viên chính
+        const schedules = await models.Schedule.findOne({
+            where: {
+                course_section_id: course_section_id,
+                user_id: courseSectionDetail.lecturer_id,
+                date: { [Op.is]: null },
+                room: {
+                    [Op.notLike]: 'TH_%'
+                }
+            },
+            attributes: ['start_lesson', 'end_lesson']
+        });
+
+        // --- 2. KHỞI TẠO BỘ ĐẾM SỐ BUỔI VẮNG ---
+        // Map lưu: { student_id: { theo: 0, pra: 0 } } -> Đơn vị là BUỔI (Session)
+        const studentAbsenceCounterMap = new Map();
+        allStudents.forEach(s => studentAbsenceCounterMap.set(s.student_id, { theo: 0, pra: 0 }));
+
         const attendances = [];
 
+        // Duyệt qua từng buổi điểm danh (Lúc này attendanceList ĐÃ ĐƯỢC SẮP XẾP)
         for (const attendance of attendanceList) {
-            // Lấy danh sách sinh viên điểm danh cho buổi này
             const attendanceStudents = await getAttendanceStudentListByAttendanceID(attendance.attendance_id);
 
-            // Tạo map để lookup nhanh thông tin điểm danh của từng sinh viên
+            // Xác định loại buổi học
+            const isPracticeSession = attendanceStudents.some(s => s.status === 'DIFGR');
+
             const attendanceStudentMap = new Map();
             attendanceStudents.forEach(item => {
                 attendanceStudentMap.set(item.student_id, {
@@ -235,9 +289,21 @@ const getAttendanceDetailsByCourseSectionID = async (course_section_id, user_id)
                 });
             });
 
-            // Tạo danh sách đầy đủ tất cả sinh viên với thông tin điểm danh
-            const students = allStudents.map(student => {
+            const studentsForSession = allStudents.map(student => {
                 const attendanceData = attendanceStudentMap.get(student.student_id);
+                const status = attendanceData ? attendanceData.status : "ABSENT";
+
+                if (status !== 'DIFGR' && status === 'ABSENT') {
+                    const currentCounter = studentAbsenceCounterMap.get(student.student_id);
+                    if (currentCounter) {
+                        if (isPracticeSession) {
+                            currentCounter.pra += 1; // +1 buổi thực hành
+                        } else {
+                            currentCounter.theo += 1; // +1 buổi lý thuyết
+                        }
+                        studentAbsenceCounterMap.set(student.student_id, currentCounter);
+                    }
+                }
 
                 return {
                     student_id: student.student_id,
@@ -245,7 +311,7 @@ const getAttendanceDetailsByCourseSectionID = async (course_section_id, user_id)
                     dob: datetimeFormatter.formatDateVN(student.dob),
                     gender: student.gender,
                     practice_gr: student.practice_gr,
-                    status: attendanceData ? attendanceData.status : "ABSENT",
+                    status: status,
                     description: attendanceData ? attendanceData.description : ""
                 };
             });
@@ -255,7 +321,90 @@ const getAttendanceDetailsByCourseSectionID = async (course_section_id, user_id)
                 attendance_id: attendance.attendance_id,
                 start_lesson: attendance.start_lesson,
                 end_lesson: attendance.end_lesson,
-                students: students
+                type: isPracticeSession ? 'TH' : 'LT',
+                students: studentsForSession
+            });
+        }
+
+        // --- 3. XỬ LÝ DANH SÁCH TỔNG HỢP & LOGIC CẢNH BÁO ---
+        let summaryStudents = allStudents.map(student => {
+            // Lấy số BUỔI vắng
+            const counters = studentAbsenceCounterMap.get(student.student_id) || { theo: 0, pra: 0 };
+
+            let need2Remind = false;
+            let remindAtCredit = null;
+            let banFromTakingExam = false; // Mặc định là không cấm
+
+            // --- QUY ĐỔI RA TIẾT ĐỂ SO SÁNH ---
+            const currentTheoPeriods = counters.theo * 3; // Số tiết LT đã vắng
+            const currentPraPeriods = counters.pra * 3;   // Số tiết TH đã vắng
+
+            // 1. Logic Cấm thi (Vượt quá 20%)
+            if (currentTheoPeriods > maxAllowedTheoAbsent || currentPraPeriods > maxAllowedPraAbsent) {
+                banFromTakingExam = true;
+            }
+
+            // 2. Logic Cần nhắc nhở (Sắp bị cấm)
+            // Check Lý thuyết
+            const isNearBanTheo = (currentTheoPeriods <= maxAllowedTheoAbsent) &&
+                ((currentTheoPeriods + 3) > maxAllowedTheoAbsent);
+
+            // Check Thực hành
+            const isNearBanPra = (currentPraPeriods <= maxAllowedPraAbsent) &&
+                ((currentPraPeriods + 3) > maxAllowedPraAbsent);
+
+            if (isNearBanTheo) {
+                need2Remind = true;
+                remindAtCredit = 'theo';
+            } else if (isNearBanPra) {
+                need2Remind = true;
+                remindAtCredit = 'pra';
+            }
+
+            // Nếu đã bị cấm thi rồi thì không cần nhắc nhở "sắp bị cấm" nữa
+            if (banFromTakingExam) {
+                need2Remind = false;
+            }
+
+            return {
+                student_id: student.student_id,
+                name: student.name,
+                dob: datetimeFormatter.formatDateVN(student.dob),
+                gender: student.gender,
+                practice_gr: student.practice_gr,
+                absentTheo: counters.theo,
+                absentPra: counters.pra,
+                banFromTakingExam: banFromTakingExam,
+                need2Remind: need2Remind,
+                remindAtCredit: remindAtCredit,
+                isRemindYet: false
+            };
+        });
+
+        // 4. Lọc danh sách cần check Alert
+        const studentsNeedCheckAlert = summaryStudents
+            .filter(s => s.need2Remind)
+            .map(s => s.student_id);
+
+        // 5. Query MongoDB
+        if (studentsNeedCheckAlert.length > 0) {
+            const studentIdsRegex = studentsNeedCheckAlert.join('|');
+
+            const existingAlerts = await Alert.find({
+                $and: [
+                    { header: { $regex: '^Nhắc nhở chuyên cần', $options: 'i' } },
+                    { header: { $regex: course_section_id, $options: 'i' } },
+                    { header: { $regex: studentIdsRegex, $options: 'i' } }
+                ]
+            });
+
+            summaryStudents.forEach(student => {
+                if (student.need2Remind) {
+                    const hasAlert = existingAlerts.some(alert =>
+                        new RegExp(student.student_id, 'i').test(alert.header)
+                    );
+                    student.isRemindYet = hasAlert;
+                }
             });
         }
 
@@ -266,9 +415,19 @@ const getAttendanceDetailsByCourseSectionID = async (course_section_id, user_id)
             facultyName: courseSectionDetail.facultyName,
             sessionName: courseSectionDetail.sessionName,
             lecturerName: courseSectionDetail.lecturerName,
+            lecturerEmail: courseSectionDetail.lecturerEmail,
+            lecturerPhone: courseSectionDetail.lecturerPhone,
             practice_gr: courseSectionDetail.practice_gr,
+            start_lesson: schedules ? schedules.start_lesson : null, 
+            end_lesson: schedules ? schedules.end_lesson : null,
+            meta: {
+                totalTheoPeriods,
+                totalPraPeriods,
+                maxAllowedTheoAbsent,
+                maxAllowedPraAbsent
+            },
             attendances: attendances,
-            students: attendances?.[0]?.students || allStudents
+            students: summaryStudents
         };
 
     } catch (error) {
@@ -307,11 +466,11 @@ const createAttendanceRecord = async (lecturer_id, course_section_id, attendance
         if (!lecturer_id) {
             throw new Error('lecturer_id is required');
         }
-        
+
         if (!course_section_id) {
             throw new Error('course_section_id is required');
         }
-        
+
         if (!attendanceData) {
             throw new Error('attendanceData is required');
         }
@@ -401,7 +560,7 @@ const createAttendanceRecord = async (lecturer_id, course_section_id, attendance
         // Bulk insert các attendance student records
         const createdRecords = await models.AttendanceStudent.bulkCreate(
             attendanceStudentRecords,
-            { 
+            {
                 transaction,
                 validate: true,
                 returning: true
@@ -464,7 +623,7 @@ const updateAttendanceRecord = async (attendance_id, attendanceData) => {
         if (!attendance_id) {
             throw new Error('attendance_id is required');
         }
-        
+
         if (!attendanceData) {
             throw new Error('attendanceData is required');
         }
@@ -491,13 +650,8 @@ const updateAttendanceRecord = async (attendance_id, attendanceData) => {
             throw new Error(`Attendance record not found with id: ${attendance_id}`);
         }
 
-        // Tự động cập nhật date_attendance theo ngày hiện tại (yyyy-MM-dd)
-        const currentDate = new Date();
-        const date_attendance = currentDate.toISOString().split('T')[0]; // yyyy-MM-dd format
-
         // Cập nhật bản ghi Attendance
         await models.Attendance.update({
-            date_attendance: date_attendance,
             start_lesson: start_lesson,
             end_lesson: end_lesson
         }, {
@@ -558,7 +712,7 @@ const updateAttendanceRecord = async (attendance_id, attendanceData) => {
         // Bulk insert các attendance student records mới
         const updatedRecords = await models.AttendanceStudent.bulkCreate(
             attendanceStudentRecords,
-            { 
+            {
                 transaction,
                 validate: true,
                 returning: true
@@ -747,7 +901,7 @@ const getAttendanceByStudentBySubject = async (student_id, subject_id, course_se
                 present: stats.present,
                 absent: stats.absent,
                 late: stats.late,
-                attendance_rate: stats.total ? 
+                attendance_rate: stats.total ?
                     ((stats.present + stats.late) / stats.total * 100).toFixed(1) + '%' : '0%'
             },
             attendance_details: allAttendanceDetails
@@ -783,10 +937,10 @@ const getAttendanceByStudentBySubjectByParent = async (parent_id, studentId, pag
 
         // Lấy thông tin sinh viên cụ thể
         const student = await models.Student.findOne({
-            where: { 
+            where: {
                 student_id: studentId,
                 parent_id: parent_id,
-                isDeleted: false 
+                isDeleted: false
             }
         });
 
@@ -886,7 +1040,7 @@ const getAttendanceByStudentBySubjectByParent = async (parent_id, studentId, pag
                     present: stats.present,
                     absent: stats.absent,
                     late: stats.late,
-                    attendance_rate: stats.total ? 
+                    attendance_rate: stats.total ?
                         ((stats.present + stats.late) / stats.total * 100).toFixed(1) + '%' : '0%'
                 },
                 attendance_details: attendanceDetails
