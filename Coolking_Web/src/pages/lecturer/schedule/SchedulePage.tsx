@@ -4,6 +4,7 @@ import 'react-datepicker/dist/react-datepicker.css';
 import HeaderLeCpn from '../../../components/lecturer/HeaderLeCpn';
 import FooterLeCpn from '../../../components/lecturer/FooterLeCpn';
 import { useSchedule, type Schedule } from '../../../hooks/useSchedule';
+import { useStatistics } from '../../../hooks/useStatistics';
 
 // Custom styles for react-datepicker
 const datePickerStyles = `
@@ -36,7 +37,71 @@ const datePickerStyles = `
 
 const SchedulePage: React.FC = () => {
     const { loading, error, schedules, linkPrev, linkNext, weekStart, getSchedulesByUser } = useSchedule();
+    const { sessions, fetchAllSessions } = useStatistics();
     const [selectedDate, setSelectedDate] = useState<string>('');
+    const [selectedSession, setSelectedSession] = useState<string>('');
+    const [sessionSearch, setSessionSearch] = useState<string>('');
+    const [showSessionDropdown, setShowSessionDropdown] = useState<boolean>(false);
+
+    // Fetch sessions on mount and set latest session as default
+    useEffect(() => {
+        const loadSessions = async () => {
+            await fetchAllSessions();
+        };
+        loadSessions();
+    }, [fetchAllSessions]);
+
+    // Get current session based on current date
+    const getCurrentSessionId = (): string => {
+        if (sessions.length === 0) return '';
+        
+        const today = new Date();
+        const currentMonth = today.getMonth() + 1; // getMonth() returns 0-11
+        const currentYear = today.getFullYear();
+        
+        let targetSessionName = '';
+        
+        // Determine which semester based on current date
+        if (currentMonth >= 8 && currentMonth <= 12) {
+            // August to December: HK1 of current academic year
+            targetSessionName = `HK1 ${currentYear}-${currentYear + 1}`;
+        } else if (currentMonth >= 1 && currentMonth <= 5) {
+            // January to May: HK2 of previous academic year
+            targetSessionName = `HK2 ${currentYear - 1}-${currentYear}`;
+        } else if (currentMonth === 6 || currentMonth === 7) {
+            // June to July: HK3 of previous academic year
+            targetSessionName = `HK3 ${currentYear - 1}-${currentYear}`;
+        }
+        
+        // Find session that matches the target session name
+        const currentSession = sessions.find(session => 
+            session.nameSession === targetSessionName
+        );
+        
+        return currentSession ? currentSession.id : (sessions[0]?.id || '');
+    };
+
+    // Set current session as default when sessions are loaded
+    useEffect(() => {
+        if (sessions.length > 0 && !selectedSession) {
+            const currentSessionId = getCurrentSessionId();
+            setSelectedSession(currentSessionId);
+        }
+    }, [sessions, selectedSession]);
+
+    // Handle click outside to close dropdown
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as HTMLElement;
+            if (!target.closest('.session-dropdown')) {
+                setShowSessionDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
 
     // Khởi tạo với ngày hiện tại
     useEffect(() => {
@@ -73,6 +138,54 @@ const SchedulePage: React.FC = () => {
         const year = date.getFullYear();
         return `${day}/${month}/${year}`;
     };
+
+    // Get session name by ID
+    const getSessionName = (sessionId: string): string => {
+        const session = sessions.find(s => s.id === sessionId);
+        return session ? session.nameSession : '';
+    };
+
+    // Get default date for session based on session name
+    const getSessionDefaultDate = (sessionName: string): string => {
+        if (!sessionName) return '';
+        
+        // Extract academic year from session name (e.g., "HK1 2025-2026")
+        const yearMatch = sessionName.match(/(\d{4})-(\d{4})/);
+        if (!yearMatch) return '';
+        
+        const startYear = parseInt(yearMatch[1]);
+        
+        if (sessionName.includes('HK1')) {
+            return `01/08/${startYear}`; // August 1st of start year
+        } else if (sessionName.includes('HK2')) {
+            return `01/01/${startYear + 1}`; // January 1st of next year
+        } else if (sessionName.includes('HK3')) {
+            return `01/06/${startYear + 1}`; // June 1st of next year
+        }
+        
+        return '';
+    };
+
+    // Handle session selection
+    const handleSessionSelect = (sessionId: string) => {
+        setSelectedSession(sessionId);
+        setSessionSearch('');
+        setShowSessionDropdown(false);
+        
+        const sessionName = getSessionName(sessionId);
+        if (sessionName) {
+            const defaultDate = getSessionDefaultDate(sessionName);
+            if (defaultDate) {
+                setSelectedDate(defaultDate);
+                getSchedulesByUser(defaultDate);
+            }
+        }
+    };
+
+    // Filter sessions for dropdown
+    const filteredSessions = sessions.filter(session =>
+        session.nameSession.toLowerCase().includes(sessionSearch.toLowerCase())
+    );
 
 
 
@@ -213,6 +326,45 @@ const SchedulePage: React.FC = () => {
 
                             {/* Controls */}
                             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                                {/* Session Dropdown */}
+                                <div className="relative session-dropdown min-w-[200px]">
+                                    
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            placeholder="Tìm và chọn học kỳ..."
+                                            value={selectedSession ? getSessionName(selectedSession) : sessionSearch}
+                                            onChange={(e) => {
+                                                setSessionSearch(e.target.value);
+                                                if (selectedSession && e.target.value !== getSessionName(selectedSession)) {
+                                                    setSelectedSession('');
+                                                }
+                                            }}
+                                            onFocus={() => setShowSessionDropdown(true)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+                                        />
+                                        {showSessionDropdown && (
+                                            <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                                {filteredSessions.length > 0 ? (
+                                                    filteredSessions.map((session) => (
+                                                        <div
+                                                            key={session.id}
+                                                            onClick={() => handleSessionSelect(session.id)}
+                                                            className="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                                                        >
+                                                            <div className="font-medium text-gray-900">{session.nameSession}</div>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <div className="px-3 py-2 text-gray-500 text-center">
+                                                        Không tìm thấy học kỳ nào
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                
                                 {/* Date picker */}
                                 <div className="flex items-center gap-2">
                                     <DatePicker
