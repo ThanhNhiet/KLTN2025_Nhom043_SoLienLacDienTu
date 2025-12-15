@@ -4,6 +4,7 @@ const models = initModels(sequelize);
 const datetimeFormatter = require("../utils/format/datetime-formatter");
 const cloudinaryService = require("../services/cloudinary.service");
 const cloudinaryUtils = require("../utils/cloudinary.utils");
+const { Alert } = require('../databases/mongodb/schemas');
 
 const getLecturerByLecturer_id = async (lecturer_id) => {
   try {
@@ -229,12 +230,209 @@ const getLecturerById4Admin = async (lecturer_id) => {
   }
 };
 
+const getHomeroomClassByLecturerId = async (lecturer_id) => {
+  try {
+    const lecturer = await models.Lecturer.findOne({
+      attributes: ['id', 'name', 'email', 'phone', 'faculty_id', 'homeroom_class_id'],
+      where: { lecturer_id },
+      include: [
+        {
+          model: models.Faculty,
+          as: 'faculty',
+          attributes: ['name'],
+          required: false
+        },
+        {
+          model: models.Clazz,
+          as: 'clazz',
+          attributes: ['name'],
+          required: false
+        }
+      ]
+    });
+    if (!lecturer) throw new Error("Lecturer not found");
+    return {
+      lecturer_id: lecturer.lecturer_id,
+      name: lecturer.name,
+      email: lecturer.email,
+      phone: lecturer.phone,
+      facultyName: lecturer.faculty ? lecturer.faculty.name : null,
+      homeroom_class_id: lecturer.homeroom_class_id,
+      homeroomClassName: lecturer.clazz ? lecturer.clazz.name : null,
+    }
+  } catch (error) {
+    throw error;
+  }
+};
+
+const getStudentsInHomeroomClass = async (homeroom_class_id) => {
+  try {
+    const students = await models.Student.findAll({
+      attributes: ['student_id', 'name', 'dob', 'gender', 'email', 'phone', 'address', 'parent_id'],
+      where: { clazz_id: homeroom_class_id, isDeleted: false },
+      include: [
+        {
+          model: models.Major,
+          as: 'major',
+          attributes: ['name'],
+          required: false
+        },
+        {
+          model: models.Parent,
+          as: 'parent',
+          attributes: ['name', 'dob', 'gender', 'phone', 'email', 'address'],
+          required: false
+        }
+      ]
+    });
+    return students.map(student => ({
+      student_id: student.student_id,
+      name: student.name,
+      dob: datetimeFormatter.formatDateVN(student.dob),
+      gender: student.gender ? "Nam" : "Nữ",
+      email: student.email,
+      phone: student.phone,
+      address: student.address,
+      parent_id: student.parent_id,
+      parentName: student.parent ? student.parent.name : null,
+      parentDob: student.parent ? datetimeFormatter.formatDateVN(student.parent.dob) : null,
+      parentGender: student.parent ? (student.parent.gender ? "Nam" : "Nữ") : null,
+      parentPhone: student.parent ? student.parent.phone : null,
+      parentEmail: student.parent ? student.parent.email : null,
+      parentAddress: student.parent ? student.parent.address : null
+    }));
+  } catch (error) {
+    throw error;
+  }
+};
+
+const getStudentsInfoInHomeroomClassByLecturerId = async (lecturer_id) => {
+    try {
+        // 1. Lấy thông tin lớp chủ nhiệm
+        const homeroomInfo = await getHomeroomClassByLecturerId(lecturer_id);
+        
+        // Nếu giảng viên không có lớp chủ nhiệm, trả về rỗng
+        if (!homeroomInfo.homeroom_class_id) {
+            return {
+                homeroomInfo,
+                students: []
+            };
+        }
+
+        // 2. Lấy danh sách sinh viên cơ bản từ MariaDB
+        const students = await getStudentsInHomeroomClass(homeroomInfo.homeroom_class_id);
+
+        if (students.length === 0) {
+            return {
+                homeroomInfo,
+                students: []
+            };
+        }
+
+        // 3. TỐI ƯU HÓA: Batch Query MongoDB để lấy Alert cho toàn bộ sinh viên
+
+        const studentIds = students.map(s => s.student_id);
+        const studentIdsRegexString = studentIds.join('|'); // Pattern: "SV01|SV02|SV03"
+
+        // Query 1: Lấy tất cả "Cảnh báo học vụ" liên quan đến danh sách sinh viên này
+        const allWarnings = await Alert.find({
+            $and: [
+                { header: { $regex: '^Cảnh báo học vụ', $options: 'i' } },
+                {
+                    $or: [
+                        { header: { $regex: studentIdsRegexString, $options: 'i' } }, // Tìm ID trong header
+                        { receiverID: { $in: studentIds } } // Tìm theo receiverID
+                    ]
+                }
+            ]
+        });
+
+        // Query 2: Lấy tất cả "Thông báo buộc thôi học" liên quan
+        const allExpulsions = await Alert.find({
+            $and: [
+                { header: { $regex: '^Thông báo buộc thôi học', $options: 'i' } },
+                {
+                    $or: [
+                        { header: { $regex: studentIdsRegexString, $options: 'i' } },
+                        { receiverID: { $in: studentIds } }
+                    ]
+                }
+            ]
+        });
+
+        // 4. Xử lý dữ liệu Alert vào Map để mapping nhanh
+        const alertMap = {};
+        
+        // Khởi tạo map mặc định
+        studentIds.forEach(id => {
+            alertMap[id] = { totalWarnings: 0, gotExpelAlertYet: false };
+        });
+
+        // --- Xử lý đếm Warning (Logic tránh trùng lặp Header) ---
+        // Nhóm các Alert theo header để tránh đếm trùng khi gửi cho cả sinh viên và phụ huynh
+        const uniqueWarningAlerts = {};
+        allWarnings.forEach(alert => {
+            const header = alert.header || "";
+            // Chỉ giữ lại 1 bản ghi đại diện cho mỗi header unique
+            if (!uniqueWarningAlerts[header]) {
+                uniqueWarningAlerts[header] = alert;
+            }
+        });
+
+        // Duyệt qua các Warning Header duy nhất để đếm
+        Object.values(uniqueWarningAlerts).forEach(alert => {
+            const header = alert.header || "";
+            const receiverID = alert.receiverID;
+
+            studentIds.forEach(studentId => {
+                // Kiểm tra xem alert này có thuộc về studentId này không
+                // Logic check: Header chứa ID hoặc receiverID trùng khớp
+                const isMatch = new RegExp(studentId, 'i').test(header) || receiverID === studentId;
+                
+                if (isMatch) {
+                    alertMap[studentId].totalWarnings += 1;
+                }
+            });
+        });
+
+        // --- Xử lý Expulsion (Chỉ cần check tồn tại) ---
+        allExpulsions.forEach(alert => {
+            const header = alert.header || "";
+            const receiverID = alert.receiverID;
+
+            studentIds.forEach(studentId => {
+                const isMatch = new RegExp(studentId, 'i').test(header) || receiverID === studentId;
+                if (isMatch) {
+                    alertMap[studentId].gotExpelAlertYet = true;
+                }
+            });
+        });
+
+        // 5. Merge dữ liệu cảnh báo vào danh sách sinh viên
+        const students_final = students.map(student => ({
+            ...student,
+            totalWarnings: alertMap[student.student_id].totalWarnings,
+            gotExpelAlertYet: alertMap[student.student_id].gotExpelAlertYet
+        }));
+
+        return {
+            homeroomInfo,
+            students: students_final
+        };
+
+    } catch (error) {
+        console.error("Error in getStudentsInfoInHomeroomClassByLecturerId:", error);
+        throw error;
+    }
+};
+
 module.exports = {
   getLecturerByLecturer_id,
   createLecturer,
   updateLecturer,
   deleteLecturer,
   uploadAvatar,
-  getLecturerById4Admin
+  getLecturerById4Admin,
+  getStudentsInfoInHomeroomClassByLecturerId
 };
 

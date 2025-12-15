@@ -59,3 +59,21 @@ exports.getLecturerById = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+//GET /lecturer/students-in-homeroom
+exports.getStudentsInfoInHomeroomClass = async (req, res) => {
+    try {
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
+        const decoded = jwtUtils.verifyAccessToken(token);
+        console.log(decoded);
+        if (!decoded || decoded.role !== 'LECTURER') {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
+        const lecturer_id = decoded.user_id;
+        const students = await lecturerRepo.getStudentsInfoInHomeroomClassByLecturerId(lecturer_id);
+        res.status(200).json(students);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
