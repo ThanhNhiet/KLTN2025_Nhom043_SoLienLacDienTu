@@ -5,15 +5,17 @@ const models = initModels(sequelize);
 
 const convertToGrade4 = (score10) => {
   if (score10 === null || score10 === undefined) return 0;
-  if (score10 >= 9.0) return 4.0;
-  if (score10 >= 8.5) return 3.7;
-  if (score10 >= 8.0) return 3.5;
-  if (score10 >= 7.0) return 3.0;
-  if (score10 >= 6.0) return 2.5;
-  if (score10 >= 5.5) return 2.0;
-  if (score10 >= 5.0) return 1.5;
-  if (score10 >= 4.0) return 1.0;
-  return 0;
+  const s = parseFloat(score10);
+  if (isNaN(s)) return 0;
+  if (s >= 9.0) return 4.0;
+  if (s >= 8.5) return 3.8;
+  if (s >= 8.0) return 3.5;
+  if (s >= 7.0) return 3.0;
+  if (s >= 6.0) return 2.5;
+  if (s >= 5.5) return 2.0;
+  if (s >= 5.0) return 1.5;
+  if (s >= 4.0) return 1.0;
+  return 0.0;
 };
 
 const calculateGPA = (scoresList, type = '4') => {
@@ -68,10 +70,10 @@ const getScoreStudentBySession = async (studentId) => {
           g.avr AS score,
           CASE 
             WHEN g.avr >= 9.0 THEN 4.0
-            WHEN g.avr >= 8.5 THEN 3.7
+            WHEN g.avr >= 8.5 THEN 3.8
             WHEN g.avr >= 8.0 THEN 3.5
             WHEN g.avr >= 7.0 THEN 3.0
-            WHEN g.avr >= 6.5 THEN 2.5
+            WHEN g.avr >= 6.0 THEN 2.5
             WHEN g.avr >= 5.5 THEN 2.0
             WHEN g.avr >= 5.0 THEN 1.5
             WHEN g.avr >= 4.0 THEN 1.0
@@ -184,10 +186,10 @@ const getScoreParentStudentBySession = async (ParentId, studentID) => {
           g.avr AS score,
           CASE 
             WHEN g.avr >= 9.0 THEN 4.0
-            WHEN g.avr >= 8.5 THEN 3.7
+            WHEN g.avr >= 8.5 THEN 3.8
             WHEN g.avr >= 8.0 THEN 3.5
             WHEN g.avr >= 7.0 THEN 3.0
-            WHEN g.avr >= 6.5 THEN 2.5
+            WHEN g.avr >= 6.0 THEN 2.5
             WHEN g.avr >= 5.5 THEN 2.0
             WHEN g.avr >= 5.0 THEN 1.5
             WHEN g.avr >= 4.0 THEN 1.0

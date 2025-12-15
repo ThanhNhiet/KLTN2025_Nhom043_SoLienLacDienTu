@@ -25,6 +25,12 @@ router.get('/warn-list', studentController.getWarnedStudents);
 // GET /students/warn-list/search?sessionId=&facultyId=&studentId=
 router.get('/warn-list/search', studentController.searchWarnedStudents);
 
+// GET /students/remindsstudy-4-homeroomle?student_id=&page=&pageSize=
+router.get('/remindsstudy-4-homeroomle', studentController.countStudyStudentsForHomeroomLecturer);
+
+// GET /students/remindsattendance-4-homeroomle?student_id=&page=&pageSize=
+router.get('/remindsattendance-4-homeroomle', studentController.countAttendanceStudentsForHomeroomLecturer);
+
 // ===== ROUTES CHO STUDENT =====
 // PUT /students/update-info - Cập nhật thông tin
 router.put('/update-info', studentController.updateStudentInfo);

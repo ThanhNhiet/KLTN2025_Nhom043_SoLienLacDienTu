@@ -295,3 +295,41 @@ exports.searchWarnedStudents = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+// GET /students/remindsstudy-4-homeroomle?student_id=&page=&pageSize=
+exports.countStudyStudentsForHomeroomLecturer = async (req, res) => {
+    try {
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
+        const decoded = jwtUtils.verifyAccessToken(token);
+        if (!decoded || (decoded.role !== 'LECTURER')) {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
+        const studentId = req.query.student_id;
+        const page = parseInt(req.query.page) || 1;
+        const pageSize = parseInt(req.query.pageSize) || 10;
+        const count = await studentRepo.getStudentRemindsOfStudy4HomeroomTeacher(studentId, page, pageSize);
+         res.status(200).json(count);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// GET /students/remindsattendance-4-homeroomle?student_id=&page=&pageSize=
+exports.countAttendanceStudentsForHomeroomLecturer = async (req, res) => {
+    try {
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
+        const decoded = jwtUtils.verifyAccessToken(token);
+        if (!decoded || (decoded.role !== 'LECTURER')) {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
+        const studentId = req.query.student_id;
+        const page = parseInt(req.query.page) || 1;
+        const pageSize = parseInt(req.query.pageSize) || 10;
+        const count = await studentRepo.getStudentRemindsOfAttendance4HomeroomTeacher(studentId, page, pageSize);
+        res.status(200).json(count);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};

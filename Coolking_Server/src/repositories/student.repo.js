@@ -1103,7 +1103,7 @@ const getFailedStudentsBySessionAndFaculty = async (session_id, session_name, fa
             distinctStudentIds.forEach(studentId => {
                 // Kiểm tra header chứa studentId (Case insensitive)
                 const matchedByHeader = new RegExp(studentId, 'i').test(header);
-                
+
                 if (matchedByHeader) {
                     // Tăng biến đếm tổng (chỉ đếm 1 lần cho mỗi header duy nhất)
                     alertMap[studentId].count += 1;
@@ -1119,12 +1119,12 @@ const getFailedStudentsBySessionAndFaculty = async (session_id, session_name, fa
         // Xử lý Expulsion Alerts - chỉ cần kiểm tra có hay không, không cần so session
         allExpulsionAlerts.forEach(alert => {
             const receiverID = alert.receiverID;
-            
+
             // Kiểm tra receiverID có trong danh sách không
             if (receiverID && alertMap[receiverID]) {
                 alertMap[receiverID].gotExpelAlertYet = true;
             }
-            
+
             // Cũng kiểm tra trong header (backup)
             const header = alert.header || "";
             distinctStudentIds.forEach(studentId => {
@@ -1225,7 +1225,7 @@ const getFailedStudentsBySessionAndFaculty = async (session_id, session_name, fa
                 Object.keys(academicYearSessions).forEach(year => {
                     const semesters = academicYearSessions[year];
                     const currentYear = Math.floor(currentSessionOrder / 10);
-                    
+
                     if (parseInt(year) < currentYear) {
                         // Năm học trước đây - tính là đã hoàn thành
                         completedAcademicYears++;
@@ -1240,7 +1240,7 @@ const getFailedStudentsBySessionAndFaculty = async (session_id, session_name, fa
                 // Chỉ áp dụng ĐTBCTL nếu sinh viên không phải mới chỉ học HK1 duy nhất
                 if (completedAcademicYears > 0 || currentYearStatus === 'in_progress') {
                     const academicYear = completedAcademicYears + (currentYearStatus === 'in_progress' ? 1 : 0);
-                    
+
                     if (academicYear === 1 && gpa4_cumulative < 1.20) {
                         failByCumulativeGPA = true;
                     } else if (academicYear === 2 && gpa4_cumulative < 1.40) {
@@ -1499,7 +1499,7 @@ const searchFailedStudentBySessionAndFacultyWithStudentId = async (session_id, s
             Object.keys(academicYearSessions).forEach(year => {
                 const semesters = academicYearSessions[year];
                 const currentYear = Math.floor(currentSessionOrder / 10);
-                
+
                 if (parseInt(year) < currentYear) {
                     // Năm học trước đây - tính là đã hoàn thành
                     completedAcademicYears++;
@@ -1514,7 +1514,7 @@ const searchFailedStudentBySessionAndFacultyWithStudentId = async (session_id, s
             // Chỉ áp dụng ĐTBCTL nếu sinh viên không phải mới chỉ học HK1 duy nhất
             if (completedAcademicYears > 0 || currentYearStatus === 'in_progress') {
                 const academicYear = completedAcademicYears + (currentYearStatus === 'in_progress' ? 1 : 0);
-                
+
                 if (academicYear === 1 && gpa4_cumulative < 1.20) {
                     failByCumulativeGPA = true;
                 } else if (academicYear === 2 && gpa4_cumulative < 1.40) {
@@ -1545,7 +1545,7 @@ const searchFailedStudentBySessionAndFacultyWithStudentId = async (session_id, s
                 }
             ]
         });
-        
+
         // Đếm số header duy nhất
         const uniqueCurrentHeaders = new Set(currentSessionAlerts.map(alert => alert.header));
         const countCurrentSession = uniqueCurrentHeaders.size;
@@ -1562,7 +1562,7 @@ const searchFailedStudentBySessionAndFacultyWithStudentId = async (session_id, s
                 }
             ]
         });
-        
+
         // Đếm số header duy nhất
         const uniqueTotalHeaders = new Set(totalAlerts.map(alert => alert.header));
         const countTotal = uniqueTotalHeaders.size;
@@ -1581,7 +1581,7 @@ const searchFailedStudentBySessionAndFacultyWithStudentId = async (session_id, s
                 }
             ]
         });
-        
+
         const gotExpelAlertYet = expulsionAlerts.length > 0;
 
         // BƯỚC 5: Trả về kết quả
@@ -1613,6 +1613,170 @@ const searchFailedStudentBySessionAndFacultyWithStudentId = async (session_id, s
     }
 };
 
+/**
+ * Lấy ra số lần và nội dung thông báo bị Nhắc nhở học tập của sinh viên
+ * Logic: Tìm các alert có header chứa từ khóa học tập/cảnh báo học vụ VÀ thuộc về student_id
+ */
+const getStudentRemindsOfStudy4HomeroomTeacher = async (student_id, page = 1, pageSize = 10) => {
+    try {
+        if (!student_id) {
+            throw new Error('student_id is required');
+        }
+
+        const page_num = parseInt(page) || 1;
+        const pageSize_num = parseInt(pageSize) || 10;
+        const skip = (page_num - 1) * pageSize_num;
+
+        // 1. Lấy TẤT CẢ các cảnh báo học tập liên quan đến sinh viên này
+        const allStudyAlerts = await Alert.find({
+            $and: [
+                // 1. Header chứa từ khóa
+                {
+                    header: {
+                        $regex: 'Nhắc nhở học tập',
+                        $options: 'i'
+                    }
+                },
+                // 2. Header PHẢI chứa mã sinh viên
+                {
+                    header: {
+                        $regex: student_id,
+                        $options: 'i'
+                    }
+                },
+                // 3. Người nhận phải là sinh viên
+                { receiverID: student_id }
+            ]
+        }).sort({ createdAt: -1 });
+
+        // 2. Format dữ liệu
+        const formattedAlerts = allStudyAlerts.map(alert => ({
+            _id: alert._id,
+            header: alert.header,
+            body: alert.body,
+            createdAt: alert.createdAt ? datetimeFormatter.formatDateTimeVN(alert.createdAt) : null,
+            isRead: alert.isRead // Có thể hiển thị trạng thái xem SV đã đọc chưa
+        }));
+
+        // 3. Phân trang (In-memory pagination theo yêu cầu logic mẫu)
+        const total = formattedAlerts.length;
+        const paginatedAlerts = formattedAlerts.slice(skip, skip + pageSize_num);
+
+        // 4. Tạo pagination links và pages array
+        const totalPages = Math.ceil(total / pageSize_num);
+
+        const linkPrev = page_num > 1
+            ? `/api/students/remind-study?student_id=${student_id}&page=${page_num - 1}&pageSize=${pageSize_num}`
+            : null;
+
+        const linkNext = (page_num - 1) * pageSize_num + paginatedAlerts.length < total
+            ? `/api/students/remind-study?student_id=${student_id}&page=${page_num + 1}&pageSize=${pageSize_num}`
+            : null;
+
+        const pages = [];
+        for (let i = 1; i <= totalPages; i++) {
+            if (i >= page_num && i < page_num + 3) {
+                pages.push(i);
+            }
+        }
+
+        return {
+            total,
+            page: page_num,
+            pageSize: pageSize_num,
+            alerts: paginatedAlerts,
+            linkPrev,
+            linkNext,
+            pages
+        };
+    } catch (error) {
+        console.error("Error in getStudentRemindsOfStudy4HomeroomTeacher:", error);
+        throw error;
+    }
+};
+
+/**
+ * Lấy ra số lần và nội dung thông báo bị Nhắc nhở chuyên cần của sinh viên
+ * Logic: Tìm các alert có header chứa từ khóa chuyên cần/nghỉ/vắng VÀ thuộc về student_id
+ */
+const getStudentRemindsOfAttendance4HomeroomTeacher = async (student_id, page = 1, pageSize = 10) => {
+    try {
+        if (!student_id) {
+            throw new Error('student_id is required');
+        }
+
+        const page_num = parseInt(page) || 1;
+        const pageSize_num = parseInt(pageSize) || 10;
+        const skip = (page_num - 1) * pageSize_num;
+
+        // 1. Lấy TẤT CẢ các cảnh báo chuyên cần liên quan đến sinh viên này
+        const allAttendanceAlerts = await Alert.find({
+            $and: [
+                // 1. Header chứa từ khóa
+                {
+                    header: {
+                        $regex: 'Nhắc nhở chuyên cần',
+                        $options: 'i'
+                    }
+                },
+                // 2. Header PHẢI chứa mã sinh viên
+                {
+                    header: {
+                        $regex: student_id,
+                        $options: 'i'
+                    }
+                },
+                // 3. Người nhận phải là sinh viên
+                { receiverID: student_id }
+            ]
+        }).sort({ createdAt: -1 });
+
+        // 2. Format dữ liệu
+        const formattedAlerts = allAttendanceAlerts.map(alert => ({
+            _id: alert._id,
+            header: alert.header,
+            body: alert.body,
+            createdAt: alert.createdAt ? datetimeFormatter.formatDateTimeVN(alert.createdAt) : null,
+            isRead: alert.isRead
+        }));
+
+        // 3. Phân trang (In-memory)
+        const total = formattedAlerts.length;
+        const paginatedAlerts = formattedAlerts.slice(skip, skip + pageSize_num);
+
+        // 4. Tạo pagination links và pages array
+        const totalPages = Math.ceil(total / pageSize_num);
+
+        const linkPrev = page_num > 1
+            ? `/api/students/remind-attendance?student_id=${student_id}&page=${page_num - 1}&pageSize=${pageSize_num}`
+            : null;
+
+        const linkNext = (page_num - 1) * pageSize_num + paginatedAlerts.length < total
+            ? `/api/students/remind-attendance?student_id=${student_id}&page=${page_num + 1}&pageSize=${pageSize_num}`
+            : null;
+
+        const pages = [];
+        for (let i = 1; i <= totalPages; i++) {
+            if (i >= page_num && i < page_num + 3) {
+                pages.push(i);
+            }
+        }
+
+        return {
+            total,
+            page: page_num,
+            pageSize: pageSize_num,
+            alerts: paginatedAlerts,
+            linkPrev,
+            linkNext,
+            pages
+        };
+    } catch (error) {
+        console.error("Error in getStudentRemindsOfAttendance4HomeroomTeacher:", error);
+        throw error;
+    }
+};
+
 module.exports = {
     getStudentsScoreByCourseSectionId4Lecturer,
     getStudentInfoById4Lecturer,
@@ -1623,5 +1787,7 @@ module.exports = {
     getStudentExamSchedule,
     updateStudentAvatar,
     getFailedStudentsBySessionAndFaculty,
-    searchFailedStudentBySessionAndFacultyWithStudentId
+    searchFailedStudentBySessionAndFacultyWithStudentId,
+    getStudentRemindsOfStudy4HomeroomTeacher,
+    getStudentRemindsOfAttendance4HomeroomTeacher
 };
