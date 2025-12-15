@@ -33,6 +33,12 @@ class LecturerService {
         const response = await axiosInstance.post('/accounts/change-password', data);
         return response.data;
     }
+    
+    //GET /api/lecturers/students-in-homeroom
+    async getStudentsInHomeroom() {
+        const response = await axiosInstance.get('/lecturers/students-in-homeroom');
+        return response.data;
+    }
 }
 
 export const lecturerService = new LecturerService();
