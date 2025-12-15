@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useStudent, type StudentWithScore } from '../../../hooks/useStudent';
 import { useStatistics } from '../../../hooks/useStatistics';
 import HeaderLeCpn from '../../../components/lecturer/HeaderLeCpn';
@@ -11,6 +11,7 @@ import CourseStatisticsModal from '../statistics/CourseStatisticsModal';
 
 const StudentListWithScorePage: React.FC = () => {
   const { course_section_id } = useParams<{ course_section_id: string }>();
+   const navigate = useNavigate();
   const { loading, error, courseSectionData, studentInfo, fetchStudentsByCourseSection, fetchStudentInfo } = useStudent();
   
   const { getCourseSectionStatistics } = useStatistics();
@@ -167,6 +168,12 @@ const StudentListWithScorePage: React.FC = () => {
               </h1>
               
               <div className="flex gap-3">
+                <button
+                  onClick={() => navigate(`/lecturer/clazz/students-attendance/${course_section_id}`)}
+                  className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors duration-200"
+                >
+                  Xem buổi điểm danh
+                </button>
                 <button
                   onClick={handleShowStatistics}
                   disabled={!courseSectionData}

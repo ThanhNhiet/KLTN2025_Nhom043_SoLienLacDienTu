@@ -77,6 +77,11 @@ Số điện thoại: ${courseSectionData.lecturerPhone}`;
         receiverIDs.push(studentInfo.parent.parent_id);
       }
 
+       //Thêm giảng viên chủ nhiệm từ studentInfo
+      if (studentInfo.homeroomLeId) {
+        receiverIDs.push(studentInfo.homeroomLeId);
+      }
+
       if (receiverIDs.length === 0) {
         showToast('Không tìm thấy người nhận hợp lệ', 'error');
         return;
@@ -170,6 +175,16 @@ Số điện thoại: ${courseSectionData.lecturerPhone}`;
                   {!studentInfo?.parent && (
                     <div className="text-sm text-gray-500">
                       Không có thông tin phụ huynh
+                    </div>
+                  )}
+                  {studentInfo?.homeroomTeacherName && (
+                    <div className="text-sm">
+                      <span className="font-medium text-gray-700">Giảng viên chủ nhiệm:</span> {studentInfo.homeroomTeacherName} ({studentInfo.homeroomLeId})
+                    </div>
+                  )}
+                  {!studentInfo?.homeroomTeacherName && (
+                    <div className="text-sm text-gray-500">
+                      Không có thông tin giảng viên chủ nhiệm
                     </div>
                   )}
                 </div>

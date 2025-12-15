@@ -67,7 +67,6 @@ Số điện thoại: ${attendanceData.lecturerPhone}`;
         showToast('Không có thông tin sinh viên', 'error');
         return;
       }
-      console.log('Student Info:', studentInfo);
 
       // Tạo danh sách người nhận: sinh viên + phụ huynh
       const receiverIDs: string[] = [];
@@ -80,6 +79,11 @@ Số điện thoại: ${attendanceData.lecturerPhone}`;
       // Thêm phụ huynh từ studentInfo (single parent object)
       if (studentInfo.parent && studentInfo.parent.parent_id) {
         receiverIDs.push(studentInfo.parent.parent_id);
+      }
+
+      //Thêm giảng viên chủ nhiệm từ studentInfo
+      if (studentInfo.homeroomLeId) {
+        receiverIDs.push(studentInfo.homeroomLeId);
       }
 
       if (receiverIDs.length === 0) {
@@ -174,6 +178,16 @@ Số điện thoại: ${attendanceData.lecturerPhone}`;
                   {!studentInfo?.parent && (
                     <div className="text-sm text-gray-500">
                       Không có thông tin phụ huynh
+                    </div>
+                  )}
+                  {studentInfo?.homeroomTeacherName && (
+                    <div className="text-sm">
+                      <span className="font-medium text-gray-700">Giảng viên chủ nhiệm:</span> {studentInfo.homeroomTeacherName} ({studentInfo.homeroomLeId})
+                    </div>
+                  )}
+                  {!studentInfo?.homeroomTeacherName && (
+                    <div className="text-sm text-gray-500">
+                      Không có thông tin giảng viên chủ nhiệm
                     </div>
                   )}
                 </div>

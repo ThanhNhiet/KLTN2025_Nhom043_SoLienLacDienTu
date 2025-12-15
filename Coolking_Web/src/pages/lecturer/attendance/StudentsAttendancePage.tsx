@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAttendance, type Attendance } from '../../../hooks/useAttendance';
 import HeaderLeCpn from '../../../components/lecturer/HeaderLeCpn';
 import FooterLeCpn from '../../../components/lecturer/FooterLeCpn';
@@ -18,6 +18,7 @@ interface StudentAttendanceRecord {
 
 const StudentsAttendancePage: React.FC = () => {
   const { course_section_id } = useParams<{ course_section_id: string }>();
+  const navigate = useNavigate();
   const { loading, attendanceData, getStudentsWithAttendance, recordAttendance, updateAttendance, deleteAttendance } = useAttendance();
   const { fetchStudentInfo, studentInfo } = useStudent();
 
@@ -452,11 +453,18 @@ const StudentsAttendancePage: React.FC = () => {
           {/* Header with Course Section Info */}
           <div className="px-6 py-6 border-b border-gray-200">
             <div className="flex justify-between items-center mb-6">
+              
               <h1 className="text-2xl font-bold text-gray-800">
                 Danh sách sinh viên và điểm danh
               </h1>
 
               <div className="flex gap-3">
+                <button
+                  onClick={() => navigate(`/lecturer/clazz/students/${course_section_id}`)}
+                  className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors duration-200"
+                >
+                  Xem điểm và thông tin sinh viên
+                </button>
                 {selectedAttendanceForUpdate ? (
                   <>
                     <button

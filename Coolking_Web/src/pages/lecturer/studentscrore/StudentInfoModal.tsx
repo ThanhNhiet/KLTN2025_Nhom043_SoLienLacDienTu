@@ -66,23 +66,23 @@ const StudentInfoModal: React.FC<StudentInfoModalProps> = ({
                   </div>
                   <div>
                     <span className="text-sm font-medium text-gray-600">Ngày sinh:</span>
-                    <div className="text-base text-gray-800">{studentInfo.dob}</div>
+                    <div className="text-base font-semibold text-gray-800">{studentInfo.dob}</div>
                   </div>
                   <div>
                     <span className="text-sm font-medium text-gray-600">Giới tính:</span>
-                    <div className="text-base text-gray-800">{studentInfo.gender}</div>
+                    <div className="text-base font-semibold text-gray-800">{studentInfo.gender}</div>
                   </div>
                   <div>
                     <span className="text-sm font-medium text-gray-600">Số điện thoại:</span>
-                    <div className="text-base text-gray-800">{studentInfo.phone || 'Chưa cập nhật'}</div>
+                    <div className="text-base font-semibold text-gray-800">{studentInfo.phone || 'Chưa cập nhật'}</div>
                   </div>
                   <div>
                     <span className="text-sm font-medium text-gray-600">Email:</span>
-                    <div className="text-base text-gray-800">{studentInfo.email}</div>
+                    <div className="text-base font-semibold text-gray-800">{studentInfo.email}</div>
                   </div>
                   <div className="md:col-span-2">
                     <span className="text-sm font-medium text-gray-600">Địa chỉ:</span>
-                    <div className="text-base text-gray-800">{studentInfo.address || 'Chưa cập nhật'}</div>
+                    <div className="text-base font-semibold text-gray-800">{studentInfo.address || 'Chưa cập nhật'}</div>
                   </div>
                 </div>
               </div>
