@@ -433,7 +433,7 @@ const HeaderLECpn: React.FC = () => {
                                 Lớp học
                             </a>
                             <a
-                                href="/lecturer/clazz"
+                                href="/lecturer/homeroom"
                                 className="text-gray-700 hover:text-blue-600 font-medium transition-colors duration-200 px-3 py-2 rounded-md hover:bg-gray-50"
                             >
                                 Lớp chủ nhiệm
@@ -682,7 +682,7 @@ const HeaderLECpn: React.FC = () => {
                                 Lớp học
                             </button>
                             <button
-                                onClick={() => handleNavigation("/lecturer/clazz")}
+                                onClick={() => handleNavigation("/lecturer/homeroom")}
                                 className="block w-full text-left px-3 py-2 text-gray-700 hover:text-blue-600 hover:bg-gray-50 rounded-md font-medium"
                             >
                                 Lớp chủ nhiệm
