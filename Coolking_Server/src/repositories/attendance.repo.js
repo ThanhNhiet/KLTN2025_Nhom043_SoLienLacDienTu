@@ -418,7 +418,7 @@ const getAttendanceDetailsByCourseSectionID = async (course_section_id, user_id)
             lecturerEmail: courseSectionDetail.lecturerEmail,
             lecturerPhone: courseSectionDetail.lecturerPhone,
             practice_gr: courseSectionDetail.practice_gr,
-            start_lesson: schedules ? schedules.start_lesson : null, 
+            start_lesson: schedules ? schedules.start_lesson : null,
             end_lesson: schedules ? schedules.end_lesson : null,
             meta: {
                 totalTheoPeriods,
@@ -851,18 +851,26 @@ const getAttendanceByStudentBySubject = async (student_id, subject_id, course_se
                     course_section_id: cs.course_section.id
                 },
                 attributes: ['id', 'date_attendance', 'start_lesson', 'end_lesson'],
+                include: [
+                    {
+                        model: models.AttendanceStudent,
+                        as: 'attendance_students',
+                        where: {
+                            student_id: student_id
+                        },
+                        attributes: ['status', 'description'],
+                        required: false
+                    }
+                ],
                 order: [['date_attendance', 'ASC'], ['start_lesson', 'ASC']]
             });
 
             // Lấy chi tiết điểm danh của sinh viên
             for (const attendance of attendances) {
-                const studentAttendance = await models.AttendanceStudent.findOne({
-                    where: {
-                        attendance_id: attendance.id,
-                        student_id
-                    },
-                    attributes: ['status', 'description']
-                });
+                const studentAttendanceRecords = attendance.AttendanceStudents || attendance.attendance_students;
+                const studentAttendance = (studentAttendanceRecords && studentAttendanceRecords.length > 0)
+                    ? studentAttendanceRecords[0]
+                    : null;
 
                 // Skip records with DIFGR status
                 if (studentAttendance?.status === 'DIFGR') {
