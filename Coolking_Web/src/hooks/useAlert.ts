@@ -176,6 +176,52 @@ export const useAlert = () => {
         }
     }, []);
 
+    // đánh dấu thông báo cá nhân là đã đọc
+    const markPersonalAlertAsRead = useCallback(async (alertId: string) => {
+        try {
+            setLoading(true);
+            setError('');
+            const data = await alertService.markAlertAsRead(alertId);
+            return data;
+        } catch (error: any) {
+            setError(error.message || 'Failed to mark personal alert as read');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    //Xóa thông báo cá nhân cho người nhận là giảng viên
+    const deleteAlertPersonal4ReceiverLe = useCallback(async (alertId: string) => {
+        try {
+            setLoading(true);
+            setError('');
+            const data = await alertService.deleteAlertPersonal4ReceiverLe(alertId);
+            return data;
+        } catch (error: any) {
+            setError(error.message || 'Failed to delete personal alert for lecturer');
+        }
+        finally {
+            setLoading(false);
+        }
+    }, []);
+
+    // Xóa tất cả tin nhắn cá nhân
+    const deleteAllPersonalAlerts4ReceiverLe = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError('');
+            for (const alert of alerts) {
+                if (alert.targetScope === 'person') {
+                    await alertService.deleteAlertPersonal4ReceiverLe(alert._id);
+                }
+            }
+        } catch (error: any) {
+            setError(error.message || 'Failed to delete all personal alerts for lecturer');
+        } finally {
+            setLoading(false);
+        }
+    }, [alerts]);
+
     return {
         loading,
         loadingTotalSVPA,
@@ -197,6 +243,9 @@ export const useAlert = () => {
         deleteAllReadSystemAlerts,
         deleteLecturerAlert,
         getStudentsAndParentsByCourseSection,
-        searchAlertsByKeyword
+        searchAlertsByKeyword,
+        markPersonalAlertAsRead,
+        deleteAlertPersonal4ReceiverLe,
+        deleteAllPersonalAlerts4ReceiverLe
     };
 };

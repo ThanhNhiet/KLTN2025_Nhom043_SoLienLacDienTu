@@ -21,13 +21,17 @@ const HeaderLECpn: React.FC = () => {
         currentPage,
         markSystemAlertAsRead,
         deleteSystemAlert,
-        deleteAllReadSystemAlerts
+        deleteAllReadSystemAlerts,
+        markPersonalAlertAsRead,
+        deleteAlertPersonal4ReceiverLe,
+        deleteAllPersonalAlerts4ReceiverLe
     } = useAlert();
 
     const [showAlertBox, setShowAlertBox] = useState(false);
     const [alertPage, setAlertPage] = useState(1);
     const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
+    const [activeTab, setActiveTab] = useState<'all' | 'person'>('all');
     const [showMobileMenu, setShowMobileMenu] = useState(false);
     const [toast, setToast] = useState<{
         show: boolean;
@@ -116,6 +120,11 @@ const HeaderLECpn: React.FC = () => {
         setAlertPage(page);
     };
 
+    const handleTabChange = (tab: 'all' | 'person') => {
+        setActiveTab(tab);
+        setAlertPage(1); // Reset to first page when switching tabs
+    };
+
     const showToast = (message: string, type: 'success' | 'error') => {
         setToast({ show: true, message, type });
         setTimeout(() => {
@@ -132,6 +141,17 @@ const HeaderLECpn: React.FC = () => {
         if (alert.targetScope === 'all' && !alert.isRead) {
             try {
                 const response = await markSystemAlertAsRead(alert._id);
+                if (response?.success) {
+                    // Reload alerts để cập nhật trạng thái
+                    getMyAlerts(alertPage, 10);
+                }
+            } catch (error) {
+                console.error('Error marking alert as read:', error);
+            }
+        }
+        if (alert.targetScope === 'person' && !alert.isRead) {
+            try {
+                const response = await markPersonalAlertAsRead(alert._id);
                 if (response?.success) {
                     // Reload alerts để cập nhật trạng thái
                     getMyAlerts(alertPage, 10);
@@ -157,6 +177,29 @@ const HeaderLECpn: React.FC = () => {
             }
         } catch (error) {
             showToast('Có lỗi xảy ra khi xóa thông báo', 'error');
+        }
+    };
+
+    const handleDeletePersonalAlert = async (alertId: string, e: React.MouseEvent) => {
+        e.stopPropagation(); // Ngăn không cho click event lan truyền đến parent
+        try {
+            const response = await deleteAlertPersonal4ReceiverLe(alertId);
+            if (response?.success) {
+                showToast('Xóa thông báo cá nhân thành công', 'success');
+                getMyAlerts(alertPage, 10); // Reload alerts
+            }
+        } catch (error) {
+            showToast('Có lỗi xảy ra khi xóa thông báo cá nhân', 'error');
+        }
+    };
+
+    const handleDeleteAllReadPersonalAlerts = async () => {
+        try {
+            await deleteAllPersonalAlerts4ReceiverLe();
+            showToast('Xóa tất cả thông báo cá nhân đã đọc thành công', 'success');
+            getMyAlerts(alertPage, 10); // Reload alerts
+        } catch (error) {
+            showToast('Có lỗi xảy ra khi xóa tất cả thông báo cá nhân đã đọc', 'error');
         }
     };
 
@@ -188,8 +231,20 @@ const HeaderLECpn: React.FC = () => {
         navigate(url);
     };
 
+    // Filter alerts based on active tab
+    const filteredAlerts = alerts.filter(alert => alert.targetScope === activeTab);
+    
     // Kiểm tra xem có thể xóa tất cả thông báo không (tất cả đều đã đọc)
-    const canDeleteAll = alerts.length > 0 && alerts.every(alert => alert.isRead && alert.targetScope === 'all');
+    const canDeleteAll = filteredAlerts.length > 0 && filteredAlerts.every(alert => alert.isRead);
+    
+    // Handle delete all based on active tab
+    const handleDeleteAllByTab = () => {
+        if (activeTab === 'all') {
+            handleDeleteAllReadAlerts();
+        } else {
+            handleDeleteAllReadPersonalAlerts();
+        }
+    };
 
     return (
         <header className="bg-white shadow-md border-b">
@@ -232,17 +287,42 @@ const HeaderLECpn: React.FC = () => {
                             {/* Mobile Alert Box */}
                             {showAlertBox && (
                                 <div className="absolute right-1/2 translate-x-1/3 top-12 w-[90vw] bg-white rounded-lg shadow-xl border z-50">
-                                    <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
-                                        <h3 className="font-semibold text-gray-800">Thông báo</h3>
-                                        {canDeleteAll && (
+                                    <div className="p-4 border-b bg-gray-50">
+                                        <div className="flex justify-between items-center mb-3">
+                                            <h3 className="font-semibold text-gray-800">Thông báo</h3>
+                                            {canDeleteAll && (
+                                                <button
+                                                    onClick={handleDeleteAllByTab}
+                                                    className="text-xs bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded transition-colors"
+                                                    title={`Xóa tất cả thông báo ${activeTab === 'all' ? 'toàn trường' : 'cá nhân'} đã đọc`}
+                                                >
+                                                    Xóa tất cả
+                                                </button>
+                                            )}
+                                        </div>
+                                        {/* Tabs */}
+                                        <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
                                             <button
-                                                onClick={handleDeleteAllReadAlerts}
-                                                className="text-xs bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded transition-colors"
-                                                title="Xóa tất cả thông báo đã đọc"
+                                                onClick={() => handleTabChange('all')}
+                                                className={`flex-1 py-2 px-3 text-xs font-medium rounded-md transition-colors ${
+                                                    activeTab === 'all'
+                                                        ? 'bg-white text-blue-600 shadow-sm'
+                                                        : 'text-gray-600 hover:text-gray-800'
+                                                }`}
                                             >
-                                                Xóa tất cả
+                                                Toàn trường
                                             </button>
-                                        )}
+                                            <button
+                                                onClick={() => handleTabChange('person')}
+                                                className={`flex-1 py-2 px-3 text-xs font-medium rounded-md transition-colors ${
+                                                    activeTab === 'person'
+                                                        ? 'bg-white text-blue-600 shadow-sm'
+                                                        : 'text-gray-600 hover:text-gray-800'
+                                                }`}
+                                            >
+                                                Cá nhân
+                                            </button>
+                                        </div>
                                     </div>
 
                                     <div className="max-h-80 overflow-y-auto">
@@ -251,12 +331,12 @@ const HeaderLECpn: React.FC = () => {
                                                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
                                                 <p className="mt-2 text-gray-600">Đang tải...</p>
                                             </div>
-                                        ) : alerts.length === 0 ? (
+                                        ) : filteredAlerts.length === 0 ? (
                                             <div className="p-4 text-center text-gray-500">
                                                 Không có thông báo nào
                                             </div>
                                         ) : (
-                                            alerts.map((alert) => (
+                                            filteredAlerts.map((alert) => (
                                                 <div
                                                     key={alert._id}
                                                     onClick={() => handleAlertClick(alert)}
@@ -276,6 +356,17 @@ const HeaderLECpn: React.FC = () => {
                                                                     onClick={(e) => handleDeleteAlert(alert._id, e)}
                                                                     className="opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-700 p-1"
                                                                     title="Xóa thông báo"
+                                                                >
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                    </svg>
+                                                                </button>
+                                                            )}
+                                                            {alert.isRead && alert.targetScope === 'person' && (
+                                                                <button
+                                                                    onClick={(e) => handleDeletePersonalAlert(alert._id, e)}
+                                                                    className="opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-700 p-1"
+                                                                    title="Xóa thông báo cá nhân"
                                                                 >
                                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -384,17 +475,42 @@ const HeaderLECpn: React.FC = () => {
                                     <div
                                         className="absolute left-0 top-12 w-[90vw] sm:w-96 bg-white rounded-lg shadow-xl border z-50"
                                     >
-                                        <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
-                                            <h3 className="font-semibold text-gray-800">Thông báo</h3>
-                                            {canDeleteAll && (
+                                        <div className="p-4 border-b bg-gray-50">
+                                            <div className="flex justify-between items-center mb-3">
+                                                <h3 className="font-semibold text-gray-800">Thông báo</h3>
+                                                {canDeleteAll && (
+                                                    <button
+                                                        onClick={handleDeleteAllByTab}
+                                                        className="text-xs bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded transition-colors"
+                                                        title={`Xóa tất cả thông báo ${activeTab === 'all' ? 'toàn trường' : 'cá nhân'} đã đọc`}
+                                                    >
+                                                        Xóa tất cả
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {/* Tabs */}
+                                            <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
                                                 <button
-                                                    onClick={handleDeleteAllReadAlerts}
-                                                    className="text-xs bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded transition-colors"
-                                                    title="Xóa tất cả thông báo đã đọc"
+                                                    onClick={() => handleTabChange('all')}
+                                                    className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${
+                                                        activeTab === 'all'
+                                                            ? 'bg-white text-blue-600 shadow-sm'
+                                                            : 'text-gray-600 hover:text-gray-800'
+                                                    }`}
                                                 >
-                                                    Xóa tất cả
+                                                    Toàn trường
                                                 </button>
-                                            )}
+                                                <button
+                                                    onClick={() => handleTabChange('person')}
+                                                    className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${
+                                                        activeTab === 'person'
+                                                            ? 'bg-white text-blue-600 shadow-sm'
+                                                            : 'text-gray-600 hover:text-gray-800'
+                                                    }`}
+                                                >
+                                                    Cá nhân
+                                                </button>
+                                            </div>
                                         </div>
 
                                         <div className="max-h-80 overflow-y-auto">
@@ -403,12 +519,12 @@ const HeaderLECpn: React.FC = () => {
                                                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
                                                     <p className="mt-2 text-gray-600">Đang tải...</p>
                                                 </div>
-                                            ) : alerts.length === 0 ? (
+                                            ) : filteredAlerts.length === 0 ? (
                                                 <div className="p-4 text-center text-gray-500">
                                                     Không có thông báo nào
                                                 </div>
                                             ) : (
-                                                alerts.map((alert) => (
+                                                filteredAlerts.map((alert) => (
                                                     <div
                                                         key={alert._id}
                                                         onClick={() => handleAlertClick(alert)}
@@ -428,6 +544,17 @@ const HeaderLECpn: React.FC = () => {
                                                                         onClick={(e) => handleDeleteAlert(alert._id, e)}
                                                                         className="opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-700 p-1"
                                                                         title="Xóa thông báo"
+                                                                    >
+                                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                        </svg>
+                                                                    </button>
+                                                                )}
+                                                                {alert.isRead && alert.targetScope === 'person' && (
+                                                                    <button
+                                                                        onClick={(e) => handleDeletePersonalAlert(alert._id, e)}
+                                                                        className="opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-700 p-1"
+                                                                        title="Xóa thông báo cá nhân"
                                                                     >
                                                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
