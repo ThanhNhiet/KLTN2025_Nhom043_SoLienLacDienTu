@@ -91,3 +91,21 @@ exports.getCourseSectionsByStudent = async (req, res) => {
         res.status(500).json({ message: err.message });
     }
 };
+
+// GET /coursesections/student-4-homeroomle?student_id=&page=&pageSize=
+exports.getCourseSectionsByStudent = async (req, res) => {
+    try {
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
+        const decoded = jwtUtils.verifyAccessToken(token);
+        if (!decoded || decoded.role !== 'LECTURER') {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
+        const { student_id, page, pageSize } = req.query;
+        const result = await accountRepo.getCourseSectionsByStudent(student_id, page, pageSize);
+        res.status(200).json(result);
+    } catch (err) {
+        console.error('Error in getCourseSectionsByStudent:', err);
+        res.status(500).json({ message: err.message });
+    }
+};

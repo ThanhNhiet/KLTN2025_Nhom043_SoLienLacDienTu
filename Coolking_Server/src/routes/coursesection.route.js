@@ -8,6 +8,9 @@ router.get('/lecturer', courseSectionController.getCourseSectionsByLecturer);
 // GET /coursesections/student?page=&pageSize=
 router.get('/student', courseSectionController.getCourseSectionsByStudent);
 
+//GET /coursesections/student-4-homeroomle?student_id=&page=1&pageSize=10
+router.get('/student-4-homeroomle', courseSectionController.getCourseSectionsByStudent);
+
 // GET /coursesections/lecturer/search?keyword=&page=&pageSize=
 router.get('/lecturer/search', courseSectionController.searchCourseSectionsByKeyword4Lecturer);
 
