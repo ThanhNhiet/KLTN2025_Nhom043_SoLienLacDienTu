@@ -342,7 +342,7 @@ const getStudentInfoById4Lecturer = async (student_id) => {
         //Tìm kiếm giảng viên chủ nhiệm theo clazz_id
         const homeroomTeacher = await models.Lecturer.findOne({
             where: { homeroom_class_id: student.clazz_id, isDeleted: false },
-            attributes: ['name', 'email', 'phone']
+            attributes: ['lecturer_id','name', 'email', 'phone']
         });
 
         if (!student) throw new Error("Student not found");
@@ -377,6 +377,7 @@ const getStudentInfoById4Lecturer = async (student_id) => {
             address: student.address,
             className: student.clazz ? student.clazz.name : null,
             facultyName: student.clazz && student.clazz.faculty ? student.clazz.faculty.name : null,
+            homeroomLeId: homeroomTeacher ? homeroomTeacher.lecturer_id : null,
             homeroomTeacherName: homeroomTeacher ? homeroomTeacher.name : null,
             homeroomTeacherEmail: homeroomTeacher ? homeroomTeacher.email : null,
             homeroomTeacherPhone: homeroomTeacher ? homeroomTeacher.phone : null,

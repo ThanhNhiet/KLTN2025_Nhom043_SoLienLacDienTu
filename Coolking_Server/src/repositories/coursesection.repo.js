@@ -252,7 +252,6 @@ const filterCourseSections4Lecturer = async (lecturer_id, sessionId, facultyId, 
                 {
                     model: models.CourseSection,
                     as: 'course_section',
-                    where: { isCompleted: false },
                     attributes: ['id', 'createdAt'],
                     include: [
                         {
