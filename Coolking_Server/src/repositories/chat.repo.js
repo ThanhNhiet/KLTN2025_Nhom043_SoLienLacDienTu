@@ -2312,6 +2312,20 @@ const searchUserByKeyword4Lecturer = async (keyword) => {
         });
         if (result) result.type = 'Quản trị viên';
 
+        // Tìm kiếm trong Lecturer
+        result = await models.Lecturer.findOne({
+            where: {
+                [Op.or]: [
+                    { lecturer_id: searchKeyword },
+                    { phone: searchKeyword },
+                    { email: searchKeyword }
+                ]
+            },
+            attributes: ['lecturer_id', 'name', 'avatar'],
+            raw: true
+        });
+        if (result) result.type = 'Giảng viên';
+
         if (result === null) {
             // Tìm kiếm trong Student
             result = await models.Student.findOne({
