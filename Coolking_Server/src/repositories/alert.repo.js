@@ -472,8 +472,14 @@ const deleteAlert4Receiver = async (alertID, receiverID) => {
         if (!alert) {
             throw new Error('Không tìm thấy thông báo');
         }
-        if (alert.header && alert.header.startsWith('Cảnh báo học vụ')) {
-            throw new Error('Không thể xóa thông báo cảnh báo học vụ. Vui lòng liên hệ admin để biết thêm chi tiết.');
+        if (alert.header && alert.header.startsWith('Cảnh báo học vụ') && receiverID.startsWith('SV')) {
+            throw new Error('Không thể xóa thông báo cảnh báo học vụ.');
+        }
+        if (alert.header && alert.header.startsWith('Nhắc nhở học tập') && receiverID.startsWith('SV')) {
+            throw new Error('Không thể xóa thông báo nhắc nhở học tập.');
+        }
+        if (alert.header && alert.header.startsWith('Nhắc nhở chuyên cần') && receiverID.startsWith('SV')) {
+            throw new Error('Không thể xóa thông báo nhắc nhở chuyên cần.');
         }
 
         // Xóa thông báo

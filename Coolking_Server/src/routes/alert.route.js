@@ -41,4 +41,7 @@ router.post('/send-person', alertController.sendAlertToPerson);
 // GET /api/alerts/lecturer?page=1&pageSize=10
 router.get('/lecturer', alertController.getAlertsBySender);
 
+//GET /api/alerts/personal/:alertId
+router.delete('/personal/:alertId', alertController.deleteAlertPersonal4ReceiverLe);
+
 module.exports = router;

@@ -379,6 +379,27 @@ const deleteAlertSystem4Receiver = async (req, res) => {
     }
 };
 
+const deleteAlertPersonal4ReceiverLe = async (req, res) => {
+    try {
+        // Lấy thông tin người dùng từ token
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
+        const decoded = jwtUtils.verifyAccessToken(token);
+        if (decoded.role !== 'LECTURER') {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
+        const { alertId } = req.params;
+        const result = await alertRepo.deleteAlert4Receiver(alertId, decoded.user_id);
+        res.status(200).json(result);
+    } catch (error) {
+        console.error('Error in deleteAlertPersonal4ReceiverLe controller:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Lỗi server khi xóa thông báo cá nhân'
+        });
+    }
+};
+
 module.exports = {
     sendAlertToAll,
     sendAlertToPerson,
@@ -390,5 +411,6 @@ module.exports = {
     updateAlert4Admin,
     getAlertsBySender,
     markSystemAlertAsRead,
-    deleteAlertSystem4Receiver
+    deleteAlertSystem4Receiver,
+    deleteAlertPersonal4ReceiverLe
 };
