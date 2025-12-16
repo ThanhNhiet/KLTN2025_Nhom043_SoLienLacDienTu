@@ -26,6 +26,44 @@ const CleanUpGrchatOfCSCompleteModal: React.FC<CleanUpGrchatOfCSCompleteModalPro
     session.nameSession.toLowerCase().includes(sessionSearch.toLowerCase())
   );
 
+  // Get current session based on current date
+  const getCurrentSessionId = (): string => {
+    if (sessions.length === 0) return '';
+
+    const today = new Date();
+    const currentMonth = today.getMonth() + 1; // getMonth() returns 0-11
+    const currentYear = today.getFullYear();
+
+    let targetSessionName = '';
+
+    // Determine which semester based on current date
+    if (currentMonth >= 8 && currentMonth <= 12) {
+      // August to December: HK1 of current academic year
+      targetSessionName = `HK1 ${currentYear}-${currentYear + 1}`;
+    } else if (currentMonth >= 1 && currentMonth <= 5) {
+      // January to May: HK2 of previous academic year
+      targetSessionName = `HK2 ${currentYear - 1}-${currentYear}`;
+    } else if (currentMonth === 6 || currentMonth === 7) {
+      // June to July: HK3 of previous academic year
+      targetSessionName = `HK3 ${currentYear - 1}-${currentYear}`;
+    }
+
+    // Find session that matches the target session name
+    const currentSession = sessions.find(session =>
+      session.nameSession === targetSessionName
+    );
+
+    return currentSession ? currentSession.id : (sessions[0]?.id || '');
+  };
+
+  // Set current session as default when sessions are loaded
+  useEffect(() => {
+    if (sessions.length > 0 && !selectedSessionId) {
+      const currentSessionId = getCurrentSessionId();
+      setSelectedSessionId(currentSessionId);
+    }
+  }, [sessions, selectedSessionId]);
+
   useEffect(() => {
     if (isOpen) {
       fetchAllSessions();
@@ -36,7 +74,7 @@ const CleanUpGrchatOfCSCompleteModal: React.FC<CleanUpGrchatOfCSCompleteModalPro
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      
+
       if (!target.closest('.session-dropdown')) {
         setShowSessionDropdown(false);
       }
@@ -74,7 +112,7 @@ const CleanUpGrchatOfCSCompleteModal: React.FC<CleanUpGrchatOfCSCompleteModalPro
 
     try {
       const result = await cleanupGroupChatsOfCompletedCourseSections(selectedSessionId);
-      
+
       if (result?.success) {
         onSuccess(result.message);
         handleClose();
@@ -127,7 +165,7 @@ const CleanUpGrchatOfCSCompleteModal: React.FC<CleanUpGrchatOfCSCompleteModalPro
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Học kỳ <span className="text-red-500">*</span>
               </label>
-              
+
               {sessionsLoading ? (
                 <div className="flex items-center justify-center py-4">
                   <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24">
@@ -215,7 +253,7 @@ const CleanUpGrchatOfCSCompleteModal: React.FC<CleanUpGrchatOfCSCompleteModalPro
               >
                 Hủy
               </button>
-              
+
               <button
                 onClick={handleProceedToConfirm}
                 disabled={!selectedSessionId}
@@ -278,7 +316,7 @@ const CleanUpGrchatOfCSCompleteModal: React.FC<CleanUpGrchatOfCSCompleteModalPro
               >
                 Quay lại
               </button>
-              
+
               <button
                 onClick={handleCleanup}
                 disabled={loading || confirmText.toLowerCase() !== 'clean'}
