@@ -54,13 +54,13 @@ const SchedulePage: React.FC = () => {
     // Get current session based on current date
     const getCurrentSessionId = (): string => {
         if (sessions.length === 0) return '';
-        
+
         const today = new Date();
         const currentMonth = today.getMonth() + 1; // getMonth() returns 0-11
         const currentYear = today.getFullYear();
-        
+
         let targetSessionName = '';
-        
+
         // Determine which semester based on current date
         if (currentMonth >= 8 && currentMonth <= 12) {
             // August to December: HK1 of current academic year
@@ -72,12 +72,12 @@ const SchedulePage: React.FC = () => {
             // June to July: HK3 of previous academic year
             targetSessionName = `HK3 ${currentYear - 1}-${currentYear}`;
         }
-        
+
         // Find session that matches the target session name
-        const currentSession = sessions.find(session => 
+        const currentSession = sessions.find(session =>
             session.nameSession === targetSessionName
         );
-        
+
         return currentSession ? currentSession.id : (sessions[0]?.id || '');
     };
 
@@ -148,13 +148,13 @@ const SchedulePage: React.FC = () => {
     // Get default date for session based on session name
     const getSessionDefaultDate = (sessionName: string): string => {
         if (!sessionName) return '';
-        
+
         // Extract academic year from session name (e.g., "HK1 2025-2026")
         const yearMatch = sessionName.match(/(\d{4})-(\d{4})/);
         if (!yearMatch) return '';
-        
+
         const startYear = parseInt(yearMatch[1]);
-        
+
         if (sessionName.includes('HK1')) {
             return `01/08/${startYear}`; // August 1st of start year
         } else if (sessionName.includes('HK2')) {
@@ -162,7 +162,7 @@ const SchedulePage: React.FC = () => {
         } else if (sessionName.includes('HK3')) {
             return `01/06/${startYear + 1}`; // June 1st of next year
         }
-        
+
         return '';
     };
 
@@ -171,7 +171,7 @@ const SchedulePage: React.FC = () => {
         setSelectedSession(sessionId);
         setSessionSearch('');
         setShowSessionDropdown(false);
-        
+
         const sessionName = getSessionName(sessionId);
         if (sessionName) {
             const defaultDate = getSessionDefaultDate(sessionName);
@@ -328,7 +328,7 @@ const SchedulePage: React.FC = () => {
                             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
                                 {/* Session Dropdown */}
                                 <div className="relative session-dropdown min-w-[200px]">
-                                    
+
                                     <div className="relative">
                                         <input
                                             type="text"
@@ -364,7 +364,7 @@ const SchedulePage: React.FC = () => {
                                         )}
                                     </div>
                                 </div>
-                                
+
                                 {/* Date picker */}
                                 <div className="flex items-center gap-2">
                                     <DatePicker
@@ -426,26 +426,25 @@ const SchedulePage: React.FC = () => {
                         ) : (
                             <>
                                 {/* Desktop Grid View */}
-                                <div className="hidden md:block">
-                                    <div className="grid grid-cols-8 gap-1 h-auto overflow-x-auto">
+                                <div className="hidden md:block overflow-x-auto pb-4"> {/* Thêm pb-4 để thanh scroll dễ click hơn */}
+                                    {/* Thêm min-w-max để Grid tự giãn chiều ngang theo nội dung bên trong */}
+                                    <div className="grid grid-cols-8 gap-1 h-auto min-w-max">
                                         {/* Header row */}
-                                        <div className="bg-yellow-100 border border-gray-300 p-2 text-center font-medium text-sm">
+                                        <div className="bg-yellow-100 border border-gray-300 p-2 text-center font-medium text-sm sticky left-0 z-10">
                                             Ca học
                                         </div>
                                         {[1, 2, 3, 4, 5, 6, 7].map((dayOfWeek, index) => {
                                             let dayDate = new Date();
-
                                             if (weekStart) {
                                                 const [day, month, year] = weekStart.split('-');
                                                 const mondayDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
                                                 dayDate = new Date(mondayDate);
                                                 dayDate.setDate(mondayDate.getDate() + index);
                                             }
-
                                             return (
                                                 <div
                                                     key={dayOfWeek}
-                                                    className="bg-blue-100 border border-gray-300 p-2 text-center"
+                                                    className="bg-blue-100 border border-gray-300 p-2 text-center min-w-[150px]"
                                                 >
                                                     <div className="font-medium text-sm">{getDayName(dayOfWeek)}</div>
                                                     <div className="text-xs">
@@ -458,7 +457,7 @@ const SchedulePage: React.FC = () => {
                                         {/* Time slots */}
                                         {['Sáng', 'Chiều', 'Tối'].map((period, periodIndex) => (
                                             <React.Fragment key={period}>
-                                                <div className="bg-yellow-100 border border-gray-300 p-2 text-center font-medium text-sm">
+                                                <div className="bg-yellow-100 border border-gray-300 p-2 text-center font-medium text-sm flex items-center justify-center sticky left-0 z-10">
                                                     {period}
                                                 </div>
                                                 {[1, 2, 3, 4, 5, 6, 7].map((dayOfWeek) => {
@@ -474,21 +473,24 @@ const SchedulePage: React.FC = () => {
                                                             {periodSchedules.map((schedule, index) => (
                                                                 <div
                                                                     key={index}
-                                                                    className={`mb-1 p-1 rounded text-xs border ${getScheduleColor(schedule)}`}
+                                                                    // Thêm w-max để card tự mở rộng theo nội dung text bên trong
+                                                                    className={`mb-1 p-1 rounded text-xs border ${getScheduleColor(schedule)} w-max max-w-full`}
                                                                 >
-                                                                    <div className="font-medium truncate">{schedule.subjectName}</div>
-                                                                    <div className="truncate">{schedule.clazzName}</div>
-                                                                    <div>Phòng: {schedule.room}</div>
-                                                                    <div>Tiết: {schedule.start_lesson}-{schedule.end_lesson}</div>
-                                                                    <div className="truncate">GV: {schedule.lecturerName}</div>
+                                                                    {/* Thêm whitespace-nowrap vào từng dòng để cấm xuống hàng text */}
+                                                                    <div className="font-medium whitespace-nowrap">{schedule.subjectName}</div>
+                                                                    <div className="whitespace-nowrap">{schedule.clazzName}</div>
+                                                                    <div className="whitespace-nowrap">Phòng: {schedule.room}</div>
+                                                                    <div className="whitespace-nowrap">Tiết: {schedule.start_lesson}-{schedule.end_lesson}</div>
+                                                                    <div className="whitespace-nowrap">GV: {schedule.lecturerName}</div>
+
                                                                     {schedule.type === 'MAKEUP' && (
-                                                                        <div className="text-xs text-blue-600 font-medium">Học bù</div>
+                                                                        <div className="text-xs text-blue-600 font-medium whitespace-nowrap">Học bù</div>
                                                                     )}
                                                                     {schedule.status === 'ROOM_CHANGED' && (
-                                                                        <div className="text-xs text-orange-600 font-medium">Đổi phòng</div>
+                                                                        <div className="text-xs text-orange-600 font-medium whitespace-nowrap">Đổi phòng</div>
                                                                     )}
                                                                     {schedule.status === 'LECTURER_CHANGED' && (
-                                                                        <div className="text-xs text-purple-600 font-medium">Đổi GV</div>
+                                                                        <div className="text-xs text-purple-600 font-medium whitespace-nowrap">Đổi GV</div>
                                                                     )}
                                                                 </div>
                                                             ))}
