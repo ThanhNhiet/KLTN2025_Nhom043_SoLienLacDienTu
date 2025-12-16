@@ -13,6 +13,7 @@ const messageRoute = require('./message.route');
 const parentRoute = require('./parent.route');
 const scoreRoute = require('./score.route');
 const staffRoute = require('./staff.route');
+const dataimportRoute = require('./dataimport.route');
 
 const router = express.Router();
 
@@ -30,5 +31,6 @@ router.use('/messages', messageRoute);
 router.use('/parents', parentRoute);
 router.use('/scores', scoreRoute);
 router.use('/staffs', staffRoute);
+router.use('/dataimport', dataimportRoute);
 
 module.exports = router;
