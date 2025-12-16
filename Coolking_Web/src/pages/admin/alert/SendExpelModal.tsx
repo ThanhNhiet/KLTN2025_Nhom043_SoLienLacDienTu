@@ -20,6 +20,7 @@ interface SendWarningModalProps {
   onSuccess: () => void;
   studentData: StudentWarningData;
   sessionName: string;
+  homeroomLecturerInfo: any | null;
 }
 
 const SendWarningModal: React.FC<SendWarningModalProps> = ({
@@ -27,7 +28,8 @@ const SendWarningModal: React.FC<SendWarningModalProps> = ({
   onClose,
   onSuccess,
   studentData,
-  sessionName
+  sessionName,
+  homeroomLecturerInfo
 }) => {
   const defaultTitle = `Thông báo buộc thôi học - Sinh viên ${studentData.student_id}`;
   const defaultContent = `Kính gửi: Sinh viên ${studentData.studentName} và Quý Phụ huynh
@@ -103,7 +105,9 @@ Mọi chi tiết Quý phụ huynh và Sinh viên vui lòng liên hệ Phòng Cô
       if (studentData.parent_id) {
         receiverIDs.push(studentData.parent_id);
       }
-
+      if (homeroomLecturerInfo && homeroomLecturerInfo.lecturer_id) {
+        receiverIDs.push(homeroomLecturerInfo.lecturer_id);
+      }
       const response = await sendAlertPersonal(title, content, receiverIDs);
       if (response.success) {
         showToast(`Gửi thông báo buộc thôi học đến ${receiverIDs.join(', ')} thành công!`, 'success');

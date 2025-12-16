@@ -20,6 +20,7 @@ interface SendWarningModalProps {
   onSuccess: () => void;
   studentData: StudentWarningData;
   sessionName: string;
+  homeroomLecturerInfo: any | null;
 }
 
 const SendWarningModal: React.FC<SendWarningModalProps> = ({
@@ -27,7 +28,8 @@ const SendWarningModal: React.FC<SendWarningModalProps> = ({
   onClose,
   onSuccess,
   studentData,
-  sessionName
+  sessionName,
+  homeroomLecturerInfo
 }) => {
   const defaultTitle = `Cảnh báo học vụ - Sinh viên ${studentData.student_id} - ${sessionName}`;
   const defaultContent = `Kính gửi: Sinh viên ${studentData.studentName} và Quý Phụ huynh
@@ -48,7 +50,9 @@ Hệ quả và yêu cầu:
 (Cảnh cáo lần 2): Nếu không cải thiện ở kỳ tới, sinh viên sẽ bị buộc thôi học.
 (Cảnh cáo lần 3): Sinh viên làm thủ tục thôi học theo quy định.
 
-Đề nghị sinh viên và gia đình lưu ý để có phương án điều chỉnh kịp thời.`;
+Đề nghị sinh viên và gia đình lưu ý để có phương án điều chỉnh kịp thời.
+Mọi thắc mắc xin liên hệ Phòng Đào tạo để được giải đáp. SĐT: 0283xxxxxxx
+Trân trọng.`;
 
   const [title, setTitle] = useState(defaultTitle);
   const [content, setContent] = useState(defaultContent);
@@ -103,6 +107,9 @@ Hệ quả và yêu cầu:
       const receiverIDs = [studentData.student_id];
       if (studentData.parent_id) {
         receiverIDs.push(studentData.parent_id);
+      }
+      if (homeroomLecturerInfo && homeroomLecturerInfo.lecturer_id) {
+        receiverIDs.push(homeroomLecturerInfo.lecturer_id);
       }
 
       const response = await sendAlertPersonal(title, content, receiverIDs);

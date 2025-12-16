@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import SendWarningModal from './SendWarningModal';
 import SendExpelModal from './SendExpelModal';
+import StudentScoreDetailModal from './StudentScoreDetailModal';
 import { useNavigate } from 'react-router-dom';
 import { useStudent } from '../../../hooks/useStudent';
 import { useStatistics } from '../../../hooks/useStatistics';
+import { useLecturer } from '../../../hooks/useLecturer';
 import HeaderAdCpn from '../../../components/admin/HeaderAdCpn';
 import FooterAdCpn from '../../../components/admin/FooterAdCpn';
 
@@ -11,6 +13,7 @@ const WarningStudentsPage: React.FC = () => {
     const navigate = useNavigate();
     const { fetchStudentsWarningList, searchStudentWarningSubject, loading, error } = useStudent();
     const { sessions, faculties, fetchAllSessions, fetchAllFaculties } = useStatistics();
+    const { getLecturerInfoByHomeroomClassId } = useLecturer();
 
     // Dropdown states
     const [selectedSession, setSelectedSession] = useState('');
@@ -22,7 +25,8 @@ const WarningStudentsPage: React.FC = () => {
     const [showFacultyDropdown, setShowFacultyDropdown] = useState(false);
     // Filtered options for dropdowns
     const filteredSessions = sessions.filter(session =>
-        session.nameSession.toLowerCase().includes(sessionSearch.toLowerCase())
+        session.nameSession.toLowerCase().includes(sessionSearch.toLowerCase()) &&
+        !session.nameSession.startsWith('HK3')
     );
 
     const filteredFaculties = faculties.filter(faculty =>
@@ -41,7 +45,10 @@ const WarningStudentsPage: React.FC = () => {
     const [searchResult, setSearchResult] = useState<any | null>(null);
     const [showWarningModal, setShowWarningModal] = useState(false);
     const [showExpelModal, setShowExpelModal] = useState(false);
+    const [showScoreModal, setShowScoreModal] = useState(false);
     const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
+    const [homeroomLecturerInfo, setHomeroomLecturerInfo] = useState<any | null>(null);
+
     // Fetch danh sách sinh viên cần cảnh cáo
     const handleFetchStudents = async () => {
         if (!selectedSession || !selectedSessionName || !selectedFaculty || !selectedOption) return;
@@ -117,6 +124,16 @@ const WarningStudentsPage: React.FC = () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, []);
+
+    // Lấy thông tin giảng viên theo mã lớp chủ nhiệm
+    const handleFetchLecturerByHomeroomClassId = async (class_id: string) => {
+        try {
+            const data = await getLecturerInfoByHomeroomClassId(class_id);
+            setHomeroomLecturerInfo(data);
+        } catch (error) {
+            setHomeroomLecturerInfo(null);
+        }
+    };
 
     // UI only, logic fetch sẽ thêm sau
     return (
@@ -303,7 +320,13 @@ const WarningStudentsPage: React.FC = () => {
                                 )}
                                 {/* Nếu có searchResult thì hiển thị riêng */}
                                 {searchResult ? (
-                                    <tr>
+                                    <tr 
+                                        className="hover:bg-blue-50 cursor-pointer"
+                                        onClick={() => {
+                                            setSelectedStudent(searchResult);
+                                            setShowScoreModal(true);
+                                        }}
+                                    >
                                         <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-900">{searchResult.student_id}</td>
                                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{searchResult.studentName}</td>
                                         <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900">{searchResult.gpa10_in_session}</td>
@@ -321,11 +344,14 @@ const WarningStudentsPage: React.FC = () => {
                                                         ? 'bg-orange-500 hover:bg-orange-600 text-white'
                                                         : 'bg-red-500 hover:bg-red-600 text-white'
                                                 }`}
-                                                onClick={() => {
+                                                onClick={(e) => {
+                                                    e.stopPropagation(); // Prevent row click
                                                     setSelectedStudent(searchResult);
                                                     if (searchResult.totalWarnings === 2 && !searchResult.isWarningYet) {
+                                                        handleFetchLecturerByHomeroomClassId(searchResult.class_id);
                                                         setShowExpelModal(true);
                                                     } else {
+                                                        handleFetchLecturerByHomeroomClassId(searchResult.class_id);
                                                         setShowWarningModal(true);
                                                     }
                                                 }}
@@ -348,7 +374,14 @@ const WarningStudentsPage: React.FC = () => {
                                         </tr>
                                     ) : (
                                         !loading && students.map((student, idx) => (
-                                            <tr key={idx}>
+                                            <tr 
+                                                key={idx}
+                                                className="hover:bg-blue-50 cursor-pointer"
+                                                onClick={() => {
+                                                    setSelectedStudent(student);
+                                                    setShowScoreModal(true);
+                                                }}
+                                            >
                                                 <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-900">{student.student_id}</td>
                                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{student.studentName}</td>
                                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900">{student.gpa10_in_session}</td>
@@ -366,11 +399,15 @@ const WarningStudentsPage: React.FC = () => {
                                                                 ? 'bg-orange-500 hover:bg-orange-600 text-white'
                                                                 : 'bg-red-500 hover:bg-red-600 text-white'
                                                         }`}
-                                                        onClick={() => {
+                                                        onClick={(e) => {
+                                                            e.stopPropagation(); // Prevent row click
                                                             setSelectedStudent(student);
                                                             if (student.totalWarnings === 2 && !student.isWarningYet) {
+                                                                handleFetchLecturerByHomeroomClassId(student.class_id);
                                                                 setShowExpelModal(true);
                                                             } else {
+                                                                console.log('Warning modal for', student);
+                                                                handleFetchLecturerByHomeroomClassId(student.class_id);
                                                                 setShowWarningModal(true);
                                                             }
                                                         }}
@@ -431,6 +468,7 @@ const WarningStudentsPage: React.FC = () => {
                             onSuccess={handleFetchStudents} // Refresh list on success
                             studentData={selectedStudent}
                             sessionName={selectedSessionName}
+                            homeroomLecturerInfo={homeroomLecturerInfo}
                         />
                     )}
 
@@ -445,6 +483,20 @@ const WarningStudentsPage: React.FC = () => {
                             onSuccess={handleFetchStudents} // Refresh list on success
                             studentData={selectedStudent}
                             sessionName={selectedSessionName}
+                            homeroomLecturerInfo={homeroomLecturerInfo}
+                        />
+                    )}
+
+                    {/* Modal điểm số */}
+                    {showScoreModal && selectedStudent && (
+                        <StudentScoreDetailModal
+                            isOpen={showScoreModal}
+                            onClose={() => {
+                                setShowScoreModal(false);
+                                setSelectedStudent(null);
+                            }}
+                            studentId={selectedStudent.student_id}
+                            studentName={selectedStudent.studentName}
                         />
                     )}
                 </div>

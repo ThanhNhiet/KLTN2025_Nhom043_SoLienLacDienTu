@@ -16,34 +16,6 @@ export interface Lecturer {
     updatedAt: string;
 }
 
-// {
-//     "homeroomInfo": {
-//         "name": "Nguyễn Văn An",
-//         "email": "le00001@iuh.edu.vn",
-//         "phone": "0834258511",
-//         "facultyName": "Khoa Công nghệ thông tin",
-//         "homeroom_class_id": "3e4d4f9f-92a6-11f0-ae51-088fc3521198",
-//         "homeroomClassName": "DHCNTT17A"
-//     },
-//     "students": [
-//         {
-//             "student_id": "SV2100001",
-//             "name": "Sinh Vien 001",
-//             "dob": "02-01-2003",
-//             "gender": "Nam",
-//             "email": "sv2100001@stu.edu.vn",
-//             "phone": "0907000001",
-//             "address": "Ha Noi",
-//             "parent_id": "PA00001",
-//             "parentName": "Phu huynh 001",
-//             "parentDob": "02-02-1971",
-//             "parentGender": "Nam",
-//             "parentPhone": "0915000001",
-//             "parentEmail": "pa00001@stu.edu.vn",
-//             "parentAddress": "Ha Noi",
-//             "totalWarnings": 0,
-//             "gotExpelAlertYet": false
-//         },
 export interface StudentInHomeroom {
     student_id: string;
     name: string;
@@ -158,6 +130,20 @@ export const useLecturer = () => {
         }
     }, []);
 
+    //Lấy thông tin giảng viên theo mã lớp chủ nhiệm
+    const getLecturerInfoByHomeroomClassId = useCallback(async (class_id: string) => {
+        try {
+            setLoading(true);
+            setError('');
+            const data = await lecturerService.getLecturerInfoByHomeroomClassId(class_id);
+            return data;
+        } catch (error: any) {
+            setError(error.message);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     return {
         loading,
         error,
@@ -169,5 +155,6 @@ export const useLecturer = () => {
         updateLecturerAvatar,
         changePassword,
         getHomeroomData,
+        getLecturerInfoByHomeroomClassId
     };
 };
