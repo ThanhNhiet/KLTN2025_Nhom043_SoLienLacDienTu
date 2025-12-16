@@ -1,4 +1,6 @@
 import React from 'react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface GradeDistribution {
   excellent: number;
@@ -147,11 +149,89 @@ const CourseStatisticsModal: React.FC<Props> = ({ isOpen, onClose, data, loading
     { label: 'Tỷ lệ muộn', value: `${attendance_statistics.late_rate}%`, icon: '⏱️' }
   ];
 
+  // Export to PDF - captures full scrollable content
+  const exportToPDF = async () => {
+    const element = document.getElementById('course-statistics-modal-content');
+    const modalContainer = document.getElementById('course-statistics-modal-container');
+    if (!element || !modalContainer) return;
+
+    try {
+      // Store original styles
+      const originalOverflow = modalContainer.style.overflow;
+      const originalMaxHeight = modalContainer.style.maxHeight;
+      const originalHeight = modalContainer.style.height;
+      
+      // Temporarily modify styles to show full content
+      modalContainer.style.overflow = 'visible';
+      modalContainer.style.maxHeight = 'none';
+      modalContainer.style.height = 'auto';
+      
+      // Wait for layout to update
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        height: element.scrollHeight,
+        windowHeight: element.scrollHeight,
+        scrollY: 0
+      });
+
+      // Restore original styles
+      modalContainer.style.overflow = originalOverflow;
+      modalContainer.style.maxHeight = originalMaxHeight;
+      modalContainer.style.height = originalHeight;
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+
+      const margin = 10; // 10mm lề cho tất cả các bên
+      const pageRealHeight = pdf.internal.pageSize.getHeight();
+      const pageRealWidth = pdf.internal.pageSize.getWidth();
+      
+      const imgWidth = pageRealWidth - margin * 2;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const usablePageHeight = pageRealHeight - margin * 2;
+      
+      let heightLeft = imgHeight; // Chiều cao ảnh còn lại
+      let position = margin;      // Vị trí Y ban đầu (bắt đầu từ lề trên)
+
+      pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+
+      // Tính toán chiều cao ảnh còn lại sau khi lấp đầy trang 1
+      heightLeft -= usablePageHeight;
+
+      // Vòng lặp phân trang (nếu ảnh vẫn còn)
+      while (heightLeft > 0) {
+        // Cập nhật 'position' cho trang tiếp theo. Cắt tấm ảnh lên trên bằng cách trừ đi toàn bộ chiều cao của trang bao gồm cả lề
+        position -= pageRealHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+        heightLeft -= usablePageHeight;
+      }
+
+      pdf.save(`Chi-tiet-thong-ke-lop-hoc-phan-${course_section_id}.pdf`);
+      
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Có lỗi xảy ra khi xuất PDF. Vui lòng thử lại.');
+      
+      // Ensure styles are restored even if error occurs
+      const modalContainer = document.getElementById('course-statistics-modal-container');
+      if (modalContainer) {
+        modalContainer.style.overflow = 'hidden';
+        modalContainer.style.maxHeight = '95vh';
+        modalContainer.style.height = '';
+      }
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-6xl w-full max-h-[95vh] overflow-hidden flex flex-col">
+      <div id="course-statistics-modal-container" className="bg-white rounded-lg max-w-6xl w-full max-h-[95vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6">
+        <div className="bg-gradient-to-r from-pink-600 to-purple-600 text-white p-6">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-bold mb-2">Chi tiết thống kê lớp học phần</h2>
@@ -162,19 +242,30 @@ const CourseStatisticsModal: React.FC<Props> = ({ isOpen, onClose, data, loading
                 {course_section_info.facultyName} - {course_section_info.sessionName}
               </p>
             </div>
-            <button
-              onClick={onClose}
-              className="text-white hover:text-gray-300 transition-colors duration-200 p-2"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={exportToPDF}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200 font-medium"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Xuất PDF
+              </button>
+              <button
+                onClick={onClose}
+                className="text-white hover:text-gray-300 transition-colors duration-200 p-2"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div id="course-statistics-modal-content" className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Basic Information */}
           <div className="bg-gray-50 rounded-lg p-6 border">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
@@ -198,10 +289,10 @@ const CourseStatisticsModal: React.FC<Props> = ({ isOpen, onClose, data, loading
 
           {/* Student Statistics */}
           <div className="bg-white rounded-lg p-6 border">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+            {/* <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
               <span className="text-2xl mr-2">👥</span>
               Thống kê sinh viên
-            </h3>
+            </h3> */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {studentStatsData.map((stat, index) => (
                 <div key={index} className="bg-gray-50 rounded-lg p-4 border">
