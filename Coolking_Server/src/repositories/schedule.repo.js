@@ -342,7 +342,8 @@ const getSchedulesByUserId = async (user_id, currentDate) => {
             const baseScheduleData = {
                 subjectName: schedule.course_section?.subject?.name || 'N/A',
                 clazzName: schedule.course_section?.clazz?.name || 'N/A',
-                lecturerName: schedule.course_section?.lecturers_course_sections?.[0]?.lecturer?.name || 'N/A'
+                //Lấy tất cả giảng viên
+                lecturerName: schedule.course_section?.lecturers_course_sections?.map(lcs => lcs.lecturer?.name).join(', ') || 'N/A',
             };
 
             // Tạo map các ngày có exception cho schedule này
