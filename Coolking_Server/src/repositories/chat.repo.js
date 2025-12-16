@@ -2425,6 +2425,180 @@ const deleteMemberFromGroupChat4Admin = async (chat_id, user_id) => {
     }
 };
 
+/**
+ * Tạo hàng loạt nhóm chat chủ nhiệm cho TẤT CẢ giảng viên có lớp chủ nhiệm
+ * (Chỉ tạo nếu nhóm chưa tồn tại)
+ * @param {string} admin_id - ID của admin thực hiện
+ */
+const createBulkGroupChatsWithHomeroomLecturers = async (admin_id) => {
+    try {
+        // BƯỚC 1: Lấy tất cả giảng viên có lớp chủ nhiệm (homeroom_class_id không null)
+        const lecturers = await models.Lecturer.findAll({
+            where: {
+                homeroom_class_id: {
+                    [Op.ne]: null
+                }
+            },
+            attributes: ['lecturer_id', 'name', 'avatar', 'homeroom_class_id']
+        });
+
+        if (lecturers.length === 0) {
+            return { success: true, message: 'Không có giảng viên nào có lớp chủ nhiệm để tạo nhóm.' };
+        }
+
+        // Lấy danh sách các class_id cần xử lý
+        const classIds = lecturers.map(l => l.homeroom_class_id);
+
+        // BƯỚC 2: Lấy thông tin Lớp và Sinh viên song song (Promise.all) để tối ưu
+        const [classes, students] = await Promise.all([
+            // Lấy thông tin tên lớp
+            models.Clazz.findAll({
+                where: { id: classIds },
+                attributes: ['id', 'name']
+            }),
+            // Lấy tất cả sinh viên thuộc các lớp này
+            models.Student.findAll({
+                where: { clazz_id: classIds },
+                attributes: ['student_id', 'name', 'avatar', 'clazz_id']
+            })
+        ]);
+
+        // BƯỚC 3: Chuẩn bị dữ liệu để truy xuất nhanh (Mapping)
+        // Map: class_id -> class_name
+        const classMap = new Map();
+        classes.forEach(c => classMap.set(c.id, c.name));
+
+        // Map: class_id -> danh sách sinh viên
+        const studentsByClass = new Map();
+        students.forEach(s => {
+            if (!studentsByClass.has(s.clazz_id)) {
+                studentsByClass.set(s.clazz_id, []);
+            }
+            studentsByClass.get(s.clazz_id).push(s);
+        });
+
+        // BƯỚC 4: Kiểm tra các nhóm chat đã tồn tại trong MongoDB để tránh trùng lặp
+        // Giả sử tên nhóm là unique key logic: "Chủ nhiệm [Tên lớp]"
+        const expectedGroupNames = classes.map(c => "Chủ nhiệm " + c.name);
+        const existingChats = await Chat.find({
+            type: ChatType.GROUP,
+            name: { $in: expectedGroupNames }
+        }).select('name');
+        
+        const existingChatNames = new Set(existingChats.map(c => c.name));
+
+        // BƯỚC 5: Xây dựng danh sách các Chat Object cần insert
+        const chatsToInsert = [];
+        const now = new Date();
+        let skippedCount = 0;
+
+        for (const lecturer of lecturers) {
+            const className = classMap.get(lecturer.homeroom_class_id);
+            if (!className) continue;
+
+            const chatName = "Chủ nhiệm " + className;
+
+            // Nếu nhóm đã tồn tại thì bỏ qua
+            if (existingChatNames.has(chatName)) {
+                skippedCount++;
+                continue;
+            }
+
+            const members = [];
+
+            // 5.1. Thêm giảng viên
+            members.push({
+                userID: lecturer.lecturer_id,
+                userName: lecturer.name,
+                avatar: lecturer?.avatar || 'https://res.cloudinary.com/dplg9r6z1/image/upload/v1758809711/privateavatar_hagxki.png',
+                role: MemberRole.LECTURER,
+                joinedAt: now,
+                muted: false
+            });
+
+            // 5.2. Thêm sinh viên của lớp đó
+            const classStudents = studentsByClass.get(lecturer.homeroom_class_id) || [];
+            classStudents.forEach(student => {
+                members.push({
+                    userID: student.student_id,
+                    userName: student.name,
+                    avatar: student?.avatar || 'https://res.cloudinary.com/dplg9r6z1/image/upload/v1758809711/privateavatar_hagxki.png',
+                    role: MemberRole.MEMBER,
+                    joinedAt: now,
+                    muted: false
+                });
+            });
+
+            // 5.3. Tạo object Chat
+            chatsToInsert.push({
+                _id: uuidv4(),
+                type: ChatType.GROUP,
+                name: chatName,
+                avatar: "https://res.cloudinary.com/dplg9r6z1/image/upload/v1758809477/groupavatar_driiwd.png",
+                createdBy: admin_id,
+                updatedBy: admin_id,
+                members: members,
+                createdAt: now,
+                updatedAt: now
+            });
+        }
+
+        // BƯỚC 6: Thực hiện Bulk Insert vào MongoDB
+        if (chatsToInsert.length > 0) {
+            await Chat.insertMany(chatsToInsert);
+        }
+
+        return {
+            success: true,
+            message: `Hoàn tất xử lý. Đã tạo mới: ${chatsToInsert.length} nhóm. Bỏ qua (đã tồn tại): ${skippedCount} nhóm.`,
+            details: {
+                created: chatsToInsert.length,
+                skipped: skippedCount,
+                total_lecturers_scanned: lecturers.length
+            }
+        };
+
+    } catch (error) {
+        console.error('Error creating bulk group chats:', error);
+        throw new Error(`Failed to create bulk group chats: ${error.message}`);
+    }
+};
+
+// Xóa tất cả các nhóm chat chủ nhiệm dựa theo tên lớp danh nghĩa + khóa
+// ví dụ:"DHCNTT17" sẽ xóa tất cả nhóm tên "Chủ nhiệm DHCNTT17A", "Chủ nhiệm DHCNTT17B",...
+const cleanupHomeroomChatsByClazzName = async (clazzName) => {
+    try {
+        if (!clazzName || clazzName.trim() === '') {
+            return {
+                success: false,
+                message: 'Tên lớp không được để trống'
+            };
+        }
+        // clazzName phải kết thúc bằng số
+        if (!/\d$/.test(clazzName.trim())) {
+            return {
+                success: false,
+                message: 'Tên lớp phải kết thúc bằng số'
+            };
+        }
+
+        const prefix = `Chủ nhiệm ${clazzName.trim()}`;
+
+        // Tìm và xóa các nhóm chat có tên bắt đầu với prefix
+        const deleteResult = await Chat.deleteMany({
+            type: ChatType.GROUP,
+            name: { $regex: `^${prefix}` }
+        });
+        return {
+            success: true,
+            message: `Đã xóa ${deleteResult.deletedCount} nhóm chat chủ nhiệm cho lớp ${clazzName}.`
+        };
+    } catch (error) {
+        console.error('Error cleaning up completed course section chats:', error);
+        throw new Error(`Failed to clean up completed course section chats: ${error.message}`);
+    }
+};
+
 module.exports = {
     createGroupChat4Admin,
     createPrivateChat4Users,
@@ -2446,6 +2620,8 @@ module.exports = {
     getNonChatCourseSectionsBySessionFaculty,
     getChatInfoById,
     getChatInfoById4Admin,
+    createBulkGroupChatsWithHomeroomLecturers,
+    cleanupHomeroomChatsByClazzName,
 
     searchUserByKeyword,
     searchUserByKeyword4Parent,

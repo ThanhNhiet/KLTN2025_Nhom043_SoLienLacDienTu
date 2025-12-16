@@ -590,3 +590,50 @@ exports.deleteMemberFromGroupChat = async (req, res) => {
         });
     }
 };
+
+// POST /api/chats/bulk-create-homeroom
+exports.createBulkGroupChatsWithHomeroomLecturers = async (req, res) => {
+    try {
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
+        const decoded = jwtUtils.verifyAccessToken(token);
+        if (!decoded || decoded.role !== 'ADMIN') {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
+        const result = await chatRepo.createBulkGroupChatsWithHomeroomLecturers(decoded.user_id);
+        res.status(201).json(result);
+    } catch (error) {
+        console.error('Error in createBulkGroupChatsWithHomeroomLecturers controller:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Lỗi server khi tạo hàng loạt nhóm chat với giảng viên chủ nhiệm'
+        });
+    }
+};
+
+// DELETE /api/chats/cleanup-homeroom-chats/:clazz_name
+exports.cleanupHomeroomChatsByClazzName = async (req, res) => {
+    try {
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
+        const decoded = jwtUtils.verifyAccessToken(token);
+        if (!decoded || decoded.role !== 'ADMIN') {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
+        const { clazz_name } = req.params;
+        if (!clazz_name) {
+            return res.status(400).json({
+                success: false,
+                message: 'clazz_name là bắt buộc'
+            });
+        }
+        const result = await chatRepo.cleanupHomeroomChatsByClazzName(clazz_name);
+        res.status(200).json(result);
+    } catch (error) {
+        console.error('Error in cleanupHomeroomChatsByClazzName controller:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Lỗi server khi dọn dẹp nhóm chat chủ nhiệm theo tên lớp'
+        });
+    }
+};

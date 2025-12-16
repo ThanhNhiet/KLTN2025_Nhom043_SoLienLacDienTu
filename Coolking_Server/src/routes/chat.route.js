@@ -66,6 +66,10 @@ router.post('/homeroom/:lecturer_id', chatController.createGroupChatWithHomeroom
 // POST /api/chats/bulk-create
 router.post('/bulk-create', chatController.createBulkGroupChats);
 
+// Tạo hàng loạt nhóm chat cho các giảng viên chủ nhiệm chưa có chat
+// POST /api/chats/bulk-create-homeroom
+router.post('/bulk-create-homeroom', chatController.createBulkGroupChatsWithHomeroomLecturers);
+
 // // Lấy danh sách các lớp học phần chưa có group chat theo học kỳ và Khoa dành cho admin
 // GET /api/chats/nonchat-course-sections/session/:session_id/faculty/:faculty_id
 router.get('/nonchat-course-sections/session/:session_id/faculty/:faculty_id', chatController.getNonChatCourseSectionsBySessionFaculty);
@@ -73,6 +77,10 @@ router.get('/nonchat-course-sections/session/:session_id/faculty/:faculty_id', c
 // Dọn dẹp các nhóm chat của các course section đã hoàn thành
 // DELETE /api/chats/cleanup-gr-completed/:session_id
 router.delete('/cleanup-gr-completed/:session_id', chatController.cleanupCompletedCourseSectionChats);
+
+// Dọn dẹp các nhóm chat của các lớp chủ nhiệm theo tên lớp + khóa
+// DELETE /api/chats/cleanup-homeroom-chats/:clazz_name
+router.delete('/cleanup-homeroom-chats/:clazz_name', chatController.cleanupHomeroomChatsByClazzName);
 
 // Cập nhật trạng thái tắt thông báo của cuộc trò chuyện
 // PUT /api/chats/mute/:chatID
