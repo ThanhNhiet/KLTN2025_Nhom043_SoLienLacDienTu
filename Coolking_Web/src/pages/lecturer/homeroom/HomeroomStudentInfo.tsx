@@ -4,6 +4,7 @@ import type { StudentInHomeroom } from '../../../hooks/useLecturer';
 import HeaderLeCpn from '../../../components/lecturer/HeaderLeCpn';
 import FooterLeCpn from '../../../components/lecturer/FooterLeCpn';
 import AttendanceDetailModal from './AttendanceDetailModal';
+import SendFormModalHRInfo from './SendFormModalHRInfo';
 
 interface HomeroomStudentInfoProps {
   student: StudentInHomeroom;
@@ -34,6 +35,7 @@ const HomeroomStudentInfo: React.FC<HomeroomStudentInfoProps> = ({ student, onBa
   const [showRemindStudyModal, setShowRemindStudyModal] = useState(false);
   const [showRemindAttendanceModal, setShowRemindAttendanceModal] = useState(false);
   const [showAttendanceDetailModal, setShowAttendanceDetailModal] = useState(false);
+  const [showSendNotificationModal, setShowSendNotificationModal] = useState(false);
   const [selectedCourseSection, setSelectedCourseSection] = useState<HomeroomStudentCourseSection | null>(null);
   
   // Pagination states for remind lists
@@ -74,7 +76,7 @@ const HomeroomStudentInfo: React.FC<HomeroomStudentInfoProps> = ({ student, onBa
     loadStudentData();
   }, [student?.student_id]);
 
-  const showToast = (message: string, type: 'success' | 'error') => {
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ show: true, message, type });
     setTimeout(() => {
       setToast({ show: false, message: '', type: 'success' });
@@ -240,7 +242,15 @@ const HomeroomStudentInfo: React.FC<HomeroomStudentInfoProps> = ({ student, onBa
               <h1 className="text-2xl font-bold text-gray-800">
                 Thông tin chi tiết sinh viên
               </h1>
-              <div></div> {/* Spacer */}
+              <button
+                onClick={() => setShowSendNotificationModal(true)}
+                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+                Gửi thông báo
+              </button>
             </div>
           </div>
 
@@ -725,6 +735,14 @@ const HomeroomStudentInfo: React.FC<HomeroomStudentInfoProps> = ({ student, onBa
           loading={loading}
         />
       )}
+
+      {/* Send Notification Modal */}
+      <SendFormModalHRInfo
+        isOpen={showSendNotificationModal}
+        onClose={() => setShowSendNotificationModal(false)}
+        onSuccess={showToast}
+        student={student}
+      />
 
       {/* Toast Notification */}
       {toast.show && (
