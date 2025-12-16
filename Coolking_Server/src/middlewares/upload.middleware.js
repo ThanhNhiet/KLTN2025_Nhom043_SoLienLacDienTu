@@ -27,7 +27,7 @@ const uploadCSVDB = multer({
     filename: function (req, file, cb) {
       const ext = path.extname(file.originalname);
       const filename = file.fieldname + '-' + Date.now() + ext;
-      console.log('Uploading file to:', path.join(uploadPath, filename));
+      // console.log('Uploading file to:', path.join(uploadPath, filename));
       cb(null, filename);
     }
   }),
