@@ -1261,6 +1261,7 @@ const getFailedStudentsBySessionAndFaculty = async (session_id, session_name, fa
                 processedStudents.push({
                     student_id: studentId,
                     studentName: studentInfo.name,
+                    class_id: studentInfo.clazz_id || null,
                     className: studentInfo.clazz ? studentInfo.clazz.name : null,
                     facultyName: studentInfo.clazz && studentInfo.clazz.faculty ? studentInfo.clazz.faculty.name : null,
                     gpa10_in_session: gpa10_in_session,
@@ -1591,6 +1592,7 @@ const searchFailedStudentBySessionAndFacultyWithStudentId = async (session_id, s
             return {
                 student_id: student_id,
                 studentName: targetStudent.name,
+                class_id: targetStudent.clazz_id || null,
                 className: targetStudent.clazz ? targetStudent.clazz.name : null,
                 facultyName: targetStudent.clazz && targetStudent.clazz.faculty ? targetStudent.clazz.faculty.name : null,
                 gpa10_in_session: gpa10_in_session,

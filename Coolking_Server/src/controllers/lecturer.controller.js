@@ -77,3 +77,21 @@ exports.getStudentsInfoInHomeroomClass = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+//GET /lecturer/homeroom-info/:class_id
+exports.getLecturerInfoByHomeroomClassId = async (req, res) => {
+    try {
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
+        const decoded = jwtUtils.verifyAccessToken(token);
+        if (!decoded || decoded.role !== 'ADMIN') {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
+        const class_id = req.params.class_id;
+        const lecturer = await lecturerRepo.getLecturerInfoByHomeroomClassId(class_id);
+        if (!lecturer) return res.status(404).json({ message: 'Lớp học không tồn tại hoặc chưa có giáo viên chủ nhiệm' });
+        res.status(200).json(lecturer);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};

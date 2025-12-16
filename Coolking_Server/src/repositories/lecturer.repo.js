@@ -426,6 +426,19 @@ const getStudentsInfoInHomeroomClassByLecturerId = async (lecturer_id) => {
     }
 };
 
+const getLecturerInfoByHomeroomClassId = async (homeroom_class_id) => {
+  try {
+    const lecturer = await models.Lecturer.findOne({
+      attributes: ['lecturer_id', 'name'],
+      where: { homeroom_class_id, isDeleted: false }
+    });
+    if (!lecturer) throw new Error("Lecturer not found");
+    return lecturer;
+  } catch (error) {
+    throw error;
+  }
+};
+
 module.exports = {
   getLecturerByLecturer_id,
   createLecturer,
@@ -433,6 +446,7 @@ module.exports = {
   deleteLecturer,
   uploadAvatar,
   getLecturerById4Admin,
-  getStudentsInfoInHomeroomClassByLecturerId
+  getStudentsInfoInHomeroomClassByLecturerId,
+  getLecturerInfoByHomeroomClassId
 };
 
