@@ -22,6 +22,7 @@ import NotFoundPage from '../components/shared/NotFoundPage'
 import ProfileADInfoPage from '../pages/admin/profile/ProfileInfoPage';
 import WarningStudentsPage from '../pages/admin/alert/WarningStudentsPage';
 import HomeroomStudentsPage from '../pages/lecturer/homeroom/HomeroomStudentsPage';
+import DataImportPage from '../pages/admin/dataimport/DataImportPage';
 
 const Router: React.FC = () => {
   return (
@@ -97,6 +98,14 @@ const Router: React.FC = () => {
           element={
             <ProtectedRoute requiredRole="ADMIN">
               <WarningStudentsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route 
+          path="/admin/data-import" 
+          element={
+            <ProtectedRoute requiredRole="ADMIN">
+              <DataImportPage />
             </ProtectedRoute>
           }
         />

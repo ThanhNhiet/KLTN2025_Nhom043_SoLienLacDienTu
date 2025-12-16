@@ -29,7 +29,7 @@ const HeaderAdCpn: React.FC = () => {
               <span className="text-xl font-bold text-blue-600">CoolKing</span>
             </div>
 
-            <nav className="hidden md:flex space-x-6">
+            <nav className="hidden md:flex space-x-4">
               <a
                 href="/admin/accounts"
                 className="text-gray-700 hover:text-blue-600 font-medium transition-colors duration-200 px-3 py-2 rounded-md hover:bg-gray-50"
@@ -53,6 +53,12 @@ const HeaderAdCpn: React.FC = () => {
                 className="text-gray-700 hover:text-blue-600 font-medium transition-colors duration-200 px-3 py-2 rounded-md hover:bg-gray-50"
               >
                 Thống kê
+              </a>
+              <a
+                href="/admin/data-import"
+                className="text-gray-700 hover:text-blue-600 font-medium transition-colors duration-200 px-3 py-2 rounded-md hover:bg-gray-50"
+              >
+                Nhập liệu
               </a>
               <a
                 href="/admin/chat"
