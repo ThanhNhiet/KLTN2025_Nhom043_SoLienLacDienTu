@@ -472,6 +472,34 @@ export const useChat = () => {
         }
     }, []);
 
+    // Tạo hàng loạt nhóm chat với giảng viên chủ nhiệm
+    const bulkCreateGroupChatsWithHomeroomLecturers = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError('');
+            const data = await chatServices.createBulkGroupChatsWithHomeroomLecturers();
+            return data;
+        } catch (error: any) {
+            setError(error.message || 'Failed to bulk create group chats with homeroom lecturers');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    // Dọn dép nhóm chat chủ nhiệm theo tên lớp + khóa
+    const cleanupHomeroomChatsByClazzName = useCallback(async (clazz_name: string) => {
+        try {
+            setLoading(true);
+            setError('');
+            const data = await chatServices.cleanupHomeroomChats(clazz_name);
+            return data;
+        } catch (error: any) {
+            setError(error.message || 'Failed to cleanup homeroom chats by class name');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     return {
         loading,
         loadingAddMembers,
@@ -510,6 +538,8 @@ export const useChat = () => {
         getChatInfoByID4Admin,
         deleteMemberFromGroupChat4Admin,
         getNonChatCourseSectionsBySessionAndFaculty,
-        bulkCreateGroupChats
+        bulkCreateGroupChats,
+        bulkCreateGroupChatsWithHomeroomLecturers,
+        cleanupHomeroomChatsByClazzName
     };
 };

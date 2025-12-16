@@ -9,10 +9,11 @@ import ChatDetailInfoModal from './ChatDetailInfoModal';
 import CreateHomeroomGrModal from './CreateHomeroomGrModal';
 import CleanUpGrchatOfCSCompleteModal from './CleanUpGrchatOfCSCompleteModal';
 import BulkCreateGrChatsModal from './BulkCreateGrChatsModal';
+import CleanUpHomeroomModal from './CleanUpHomeroomModal';
 
 const ChatDashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { chats, loading, error, currentPage, pageSize, pages, getChats, searchChats, deleteChat } = useChat();
+  const { chats, loading, error, currentPage, pageSize, pages, getChats, searchChats, deleteChat, bulkCreateGroupChatsWithHomeroomLecturers } = useChat();
   const [searchKeyword, setSearchKeyword] = useState('');
   const [showActionMenu, setShowActionMenu] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -27,6 +28,8 @@ const ChatDashboardPage: React.FC = () => {
   const [showCreateHomeroomModal, setShowCreateHomeroomModal] = useState(false);
   const [showCleanUpCompleteModal, setShowCleanUpCompleteModal] = useState(false);
   const [showBulkCreateModal, setShowBulkCreateModal] = useState(false);
+  const [showBulkCreateHomeroomModal, setShowBulkCreateHomeroomModal] = useState(false);
+  const [showCleanUpHomeroomModal, setShowCleanUpHomeroomModal] = useState(false);
 
   useEffect(() => {
     getChats(1, 10);
@@ -141,6 +144,10 @@ const ChatDashboardPage: React.FC = () => {
     setShowDetailModal(true);
   };
 
+  const handleCreateBulkGroupChatsWithHomeroomLecturers = () => {
+    setShowBulkCreateHomeroomModal(true);
+  };
+
   const getChatTypeBadge = (type: string) => {
     const baseClasses = "px-3 py-1 rounded-full text-xs font-medium";
     if (type === 'group') {
@@ -215,6 +222,16 @@ const ChatDashboardPage: React.FC = () => {
                 </button>
 
                 <button
+                  onClick={() => handleCreateBulkGroupChatsWithHomeroomLecturers()}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg transition-colors duration-200 font-medium"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  <span>Tạo nhiều nhóm chat chủ nhiệm</span>
+                </button>
+
+                <button
                   onClick={() => setShowCleanUpModal(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200 font-medium"
                 >
@@ -233,6 +250,17 @@ const ChatDashboardPage: React.FC = () => {
                   </svg>
                   <span>Dọn dẹp nhóm chat đã hoàn thành</span>
                 </button>
+
+                <button
+                  onClick={() => setShowCleanUpHomeroomModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200 font-medium"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  <span>Dọn dẹp nhóm chat chủ nhiệm</span>
+                </button>
+
               </div>
             </div>
           </div>
@@ -498,6 +526,78 @@ const ChatDashboardPage: React.FC = () => {
       <BulkCreateGrChatsModal
         isOpen={showBulkCreateModal}
         onClose={() => setShowBulkCreateModal(false)}
+        onSuccess={handleCleanUpSuccess}
+      />
+
+      {/* Bulk Create Homeroom Chats Confirmation Modal */}
+      {showBulkCreateHomeroomModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center mb-4">
+              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Xác nhận tạo nhóm chat chủ nhiệm
+              </h3>
+            </div>
+            <p className="text-gray-700 mb-6">
+              Hành động sẽ tạo tất cả nhóm chat chủ nhiệm, tiếp tục?
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowBulkCreateHomeroomModal(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors duration-200"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const data = await bulkCreateGroupChatsWithHomeroomLecturers();
+                    if (data?.success) {
+                      setSuccessMessage(data.message);
+                      setShowSuccessNotification(true);
+                      
+                      // Refresh the chats list
+                      if (searchKeyword.trim()) {
+                        await searchChats(searchKeyword, currentPage, pageSize);
+                      } else {
+                        await getChats(currentPage, pageSize);
+                      }
+
+                      // Auto hide success notification after 5 seconds
+                      setTimeout(() => {
+                        setShowSuccessNotification(false);
+                      }, 5000);
+                    }
+                  } catch (error) {
+                    console.error('Error creating bulk homeroom chats:', error);
+                  }
+                  setShowBulkCreateHomeroomModal(false);
+                }}
+                disabled={loading}
+                className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {loading && (
+                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                )}
+                {loading ? 'Đang tạo...' : 'Tiếp tục'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clean Up Homeroom Modal */}
+      <CleanUpHomeroomModal
+        isOpen={showCleanUpHomeroomModal}
+        onClose={() => setShowCleanUpHomeroomModal(false)}
         onSuccess={handleCleanUpSuccess}
       />
     </div>
