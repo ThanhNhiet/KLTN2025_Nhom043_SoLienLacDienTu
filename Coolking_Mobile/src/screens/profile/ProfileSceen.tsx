@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -8,32 +8,82 @@ import {
   TouchableOpacity,
   FlatList,
   Alert,
+  Switch,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 import BottomNavigation from "@/src/components/navigations/BottomNavigations";
-import TopNavigations_Profile from"@/src/components/navigations/TopNavigations_Profile";
+import TopNavigations_Profile from "@/src/components/navigations/TopNavigations_Profile";
 import { useLogin_out } from "@/src/services/useapi/Login/UseLogin_Forgot";
 import { useProfile } from "@/src/services/useapi/profile/UseProfile";
+import { unregisterPushToken, registerPushToken } from '@/src/utils/notifications';
+import { deleteNotifile, getNotifile, saveNotifile } from '@/src/utils/TokenManager';
+
+
+
 
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
   const { getlogout } = useLogin_out();
   const { profileNavigation, role, loading, avatarUrl, fetchProfile } = useProfile();
-  const [busy, setBusy] = React.useState(false);
+
+  const [busy, setBusy] = useState(false);
+  const [notiEnabled, setNotiEnabled] = useState(true);
+
+  // ✅ Load toggle state
+  useEffect(() => {
+    (async () => {
+      try {
+        const saved = await getNotifile();
+        if (saved !== null) setNotiEnabled(saved === "true");
+      } catch (e) {
+        console.error("Load noti setting error:", e);
+      }
+    })();
+  }, []);
+
+  // ✅ Toggle handler
+  const toggleNotifications = async (next: boolean) => {
+    try {
+      setNotiEnabled(next);
+      const userId = await AsyncStorage.getItem("userId");
+     
+      if (!userId) throw new Error("No user ID found for notification toggle.");
+
+      if (next) {
+       
+        await registerPushToken(userId);
+        await saveNotifile(next);
+
+      } else {
+       
+        await unregisterPushToken(userId);
+        await saveNotifile(next);
+      }
+    } catch (e) {
+      console.error("Toggle noti error:", e);
+      Alert.alert("Lỗi", "Không thể cập nhật cài đặt thông báo.");
+      setNotiEnabled((prev) => !prev); // rollback
+    }
+  };
 
   // ✅ Memoize profile data - include avatarUrl
-  const memoizedProfileNav = useMemo(() => ({
-    ...profileNavigation,
-    avatar: avatarUrl
-  }), [profileNavigation?.name, avatarUrl]);
-  
+  const memoizedProfileNav = useMemo(
+    () => ({
+      ...profileNavigation,
+      avatar: avatarUrl,
+    }),
+    [profileNavigation?.name, avatarUrl]
+  );
+
   const memoizedRole = useMemo(() => role, [role]);
 
-  // ✅ Refresh profile when screen is focused (returning from ProfileDetailScreen)
+  // ✅ Refresh profile when screen is focused
   useFocusEffect(
-    React.useCallback(() => {
+    useCallback(() => {
       fetchProfile();
     }, [fetchProfile])
   );
@@ -43,16 +93,22 @@ export default function ProfileScreen() {
     icon: string;
     route?: string;
     onPress?: () => Promise<void> | void;
+    type?: "switch";
   };
 
   const data: MenuItem[] = [
     { title: "Thông tin cá nhân", icon: "person-outline", route: "ProfileDetailScreen" },
     { title: "Đổi mật khẩu", icon: "lock-closed-outline", route: "ProfileChangePasswordScreen" },
-    { title: "Thông báo", icon: "notifications-outline", route: "Notifications" },
-    { title: "Đăng xuất", icon: "log-out-outline", onPress: async () => { await getlogout(); } },
+
+    // ✅ Switch thay vì chuyển màn
+    { title: "Thông báo", icon: "notifications-outline", type: "switch" },
+
+    { title: "Đăng xuất", icon: "log-out-outline", onPress: async () =>{ await getlogout() }},
   ];
 
   const renderItem = ({ item }: { item: MenuItem }) => {
+    const isSwitch = item.type === "switch";
+
     const handleLogout = (item: MenuItem) => {
       Alert.alert("Xác nhận", "Bạn có chắc chắn muốn đăng xuất?", [
         { text: "Hủy", style: "cancel" },
@@ -76,6 +132,7 @@ export default function ProfileScreen() {
     };
 
     const onPressItem = () => {
+      if (isSwitch) return; // ✅ switch không navigate
       if (item.onPress) return handleLogout(item);
       if (item.route) return navigation.navigate(item.route);
     };
@@ -85,7 +142,7 @@ export default function ProfileScreen() {
         style={styles.item}
         activeOpacity={0.7}
         onPress={onPressItem}
-        disabled={busy && !!item.onPress}
+        disabled={(busy && !!item.onPress) || isSwitch}
       >
         <View style={styles.itemLeft}>
           <View style={styles.iconContainer}>
@@ -94,12 +151,15 @@ export default function ProfileScreen() {
           <Text style={styles.itemText}>{item.title}</Text>
         </View>
 
-        {!item.onPress && <Ionicons name="chevron-forward" size={20} color="#999" />}
+        {isSwitch ? (
+          <Switch value={notiEnabled} onValueChange={toggleNotifications} />
+        ) : (
+          !item.onPress && <Ionicons name="chevron-forward" size={20} color="#999" />
+        )}
       </TouchableOpacity>
     );
   };
 
-  // ✅ Update header with new avatar
   if (loading) {
     return (
       <SafeAreaProvider>
@@ -128,14 +188,12 @@ export default function ProfileScreen() {
           animated
         />
 
-        {/* Top Navigation - gets updated avatar */}
         <TopNavigations_Profile
           navigation={navigation}
           profileNavigation={memoizedProfileNav}
           role={memoizedRole ?? undefined}
         />
 
-        {/* Nội dung chính */}
         <View style={styles.content}>
           <FlatList
             data={data}
@@ -146,7 +204,6 @@ export default function ProfileScreen() {
           />
         </View>
 
-        {/* Thanh điều hướng dưới */}
         <View style={styles.bottomWrapper}>
           <BottomNavigation navigation={navigation} />
         </View>
@@ -160,14 +217,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f8f9fa",
   },
-
   content: {
     flex: 1,
     justifyContent: "flex-start",
     alignItems: "stretch",
     paddingTop: 8,
   },
-
   bottomWrapper: {
     position: "absolute",
     bottom: 0,
@@ -176,13 +231,12 @@ const styles = StyleSheet.create({
     width: "100%",
   },
 
-  // ============ Danh sách menu ============
   item: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 18, // cao hơn (trước 14)
-    paddingHorizontal: 22, // rộng hơn
+    paddingVertical: 18,
+    paddingHorizontal: 22,
     backgroundColor: "#fff",
   },
   itemLeft: {
@@ -190,23 +244,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   iconContainer: {
-    width: 44, // to hơn (trước 38)
+    width: 44,
     height: 44,
     borderRadius: 14,
     backgroundColor: "#E8F1FF",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 16, // tăng khoảng cách
+    marginRight: 16,
   },
   itemText: {
-    fontSize: 17, // chữ lớn hơn
+    fontSize: 17,
     fontWeight: "600",
     color: "#222",
   },
   separator: {
     height: 1,
     backgroundColor: "#E8E8E8",
-    marginLeft: 80, // canh đều với icon mới
+    marginLeft: 80,
   },
   loadingContainer: {
     flex: 1,
@@ -214,4 +268,3 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 });
-

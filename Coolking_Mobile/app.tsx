@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { ActivityIndicator, View, Text, TextInput } from "react-native";
 import { NavigationContainer, NavigationContainerRef } from "@react-navigation/native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -9,24 +9,27 @@ import { initNotifications } from "./src/utils/notifications";
 import { useFonts } from "expo-font";
 
 export default function App() {
-  // =========================
-  // HOOKS
-  // =========================
   const [fontsLoaded] = useFonts({
     "BeVietnam-Regular": require("./src/assets/frond/BeVietnamPro-Regular.ttf"),
     "BeVietnam-Bold": require("./src/assets/frond/BeVietnamPro-Bold.ttf"),
   });
 
   const navigationRef = useRef<NavigationContainerRef<any>>(null);
+
   const pendingChatRef = useRef<string | null>(null);
+  const pendingAlertRef = useRef<boolean>(false);
   const navLockRef = useRef(false);
-  const [checking, setChecking] = useState(true);
+
   const [isNavigationReady, setIsNavigationReady] = useState(false);
-  const [userID, setUserID] = useState<string>("");
+
+  const [checking, setChecking] = useState(true);      // ✅ bootstrap loading
+  const [userID, setUserID] = useState<string>("");    // ✅ lấy từ storage
+  const [isAuthed, setIsAuthed] = useState<boolean>(false); // ✅ kết quả check session
+
   const hasSetDefaultFont = useRef(false);
 
   // =========================
-  // HELPER FUNCTIONS
+  // Helpers
   // =========================
   const lockNavigation = (ms = 2000) => {
     navLockRef.current = true;
@@ -35,104 +38,103 @@ export default function App() {
     }, ms);
   };
 
-  const safeNavigateToChat = (chatId: string) => {
-    // khóa điều hướng để tránh bị reset về Login/Home ngay khi từ push mở vào
+  const safeNavigateToChat = useCallback((chatId: string) => {
     lockNavigation(2500);
-
     if (!navigationRef.current || !navigationRef.current.isReady()) {
-      // navigator chưa sẵn sàng → lưu lại, khi onReady sẽ xử lý
       pendingChatRef.current = chatId;
       return;
     }
-
     navigationRef.current.navigate("MessageScreen" as any, { chatId });
-  };
+  }, []);
 
-  const handleNavigation = (ok: boolean) => {
-    if (navLockRef.current || pendingChatRef.current) return false;
-    if (!navigationRef.current || !isNavigationReady) return false;
-
-    try {
-      const targetScreen = ok ? "HomeScreen" : "LoginScreen";
-      navigationRef.current.reset({
-        index: 0,
-        routes: [{ name: targetScreen }],
-      });
-      return true;
-    } catch (error) {
-      console.error("❌ Navigation failed:", error);
-      return false;
+  const safeNavigateToAlert = useCallback(() => {
+    lockNavigation(2500);
+    if (!navigationRef.current || !navigationRef.current.isReady()) {
+      pendingAlertRef.current = true;
+      return;
     }
-  };
+    navigationRef.current.navigate("HomeScreen" as any);
+    // nếu chưa có AlertScreen thì đổi thành HomeScreen
+    // navigationRef.current.navigate("HomeScreen" as any);
+  }, []);
+
+  const resetTo = useCallback((screenName: string) => {
+    if (!navigationRef.current || !navigationRef.current.isReady()) return;
+    navigationRef.current.reset({
+      index: 0,
+      routes: [{ name: screenName as any }],
+    });
+  }, []);
 
   // =========================
-  // INIT NOTIFICATIONS
-  // =========================
-  // ...
-useEffect(() => {
-  if (!userID) return;
-
-  let cleanupFn: (() => void) | null = null;
-
-  initNotifications(
-    // navigateToChat
-    (chatId) => {
-      if (!navigationRef.current?.isReady()) return;
-      navigationRef.current.navigate("MessageScreen" as any, { chatId });
-    },
-    // navigateToAlert
-    () => {
-      if (!navigationRef.current?.isReady()) return;
-      navigationRef.current.navigate("HomeScreen" as any);
-    },
-    // options
-    { userId: userID }
-  )
-    .then((res) => {
-      cleanupFn = res?.cleanup ?? null;
-    })
-    .catch((err) => console.warn("initNotifications error", err));
-
-  return () => {
-    if (cleanupFn) cleanupFn();
-  };
-}, [userID]);
-
-  // =========================
-  // CHECK SESSION + NAVIGATION
+  // 1) BOOTSTRAP: check session trước khi show Login/Home
   // =========================
   useEffect(() => {
-    const init = async () => {
+    const bootstrap = async () => {
       try {
-        const ok = await checkAndRefreshSession();
-
+        // 1. đọc userId trước
         const storedUserID = await AsyncStorage.getItem("userId");
-        setUserID(storedUserID || "");
+        const uid = storedUserID || "";
+        setUserID(uid);
 
-        if (!isNavigationReady) {
+        // 2. nếu không có userId => chắc chắn chưa login
+        if (!uid) {
+          setIsAuthed(false);
           return;
         }
 
-        if (pendingChatRef.current && navigationRef.current?.isReady?.()) {
-          const chatId = pendingChatRef.current;
-          pendingChatRef.current = null;
-          safeNavigateToChat(chatId!);
-          return;
-        }
-
-        handleNavigation(ok);
-      } catch (error) {
-        console.error("❌ Init error:", error);
+        // 3. có userId => check/refresh session
+        const ok = await checkAndRefreshSession();
+        setIsAuthed(!!ok);
+      } catch (e) {
+        console.error("❌ bootstrap error:", e);
+        setIsAuthed(false);
       } finally {
         setChecking(false);
       }
     };
 
-    init();
-  }, [isNavigationReady]);
+    bootstrap();
+  }, []);
 
   // =========================
-  // SET DEFAULT FONT
+  // 2) Khi nav ready + bootstrap done => reset route đúng màn
+  // =========================
+  useEffect(() => {
+    if (!isNavigationReady) return;
+    if (checking) return;
+
+    // nếu đang xử lý noti thì đừng reset đè lên
+    if (navLockRef.current || pendingChatRef.current || pendingAlertRef.current) return;
+
+    resetTo(isAuthed ? "HomeScreen" : "LoginScreen");
+  }, [isNavigationReady, checking, isAuthed, resetTo]);
+
+  // =========================
+  // 3) Init notifications sau khi có userID
+  // =========================
+  useEffect(() => {
+    if (!userID) return;
+
+    let cleanupFn: (() => void) | null = null;
+
+    initNotifications(
+      (chatId) => safeNavigateToChat(chatId),
+      () => safeNavigateToAlert(),
+      { userId: userID }
+    )
+      .then((res) => {
+        cleanupFn = res?.cleanup ?? null;
+      })
+      .catch((err) => console.warn("initNotifications error", err));
+
+    return () => {
+      if (cleanupFn) cleanupFn();
+    };
+  }, [userID, safeNavigateToChat, safeNavigateToAlert]);
+
+  // =========================
+  // 4) Set default font
   // =========================
   useEffect(() => {
     if (fontsLoaded && !hasSetDefaultFont.current) {
@@ -161,14 +163,7 @@ useEffect(() => {
   // =========================
   if (!fontsLoaded || checking) {
     return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-          backgroundColor: "#fff",
-        }}
-      >
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#fff" }}>
         <ActivityIndicator size="large" color="#007AFF" />
       </View>
     );
@@ -182,10 +177,19 @@ useEffect(() => {
       ref={navigationRef}
       onReady={() => {
         setIsNavigationReady(true);
+
+        // ưu tiên xử lý noti pending ngay khi navigator ready
         if (pendingChatRef.current && navigationRef.current?.isReady?.()) {
           const chatId = pendingChatRef.current;
           pendingChatRef.current = null;
           safeNavigateToChat(chatId!);
+          return;
+        }
+
+        if (pendingAlertRef.current && navigationRef.current?.isReady?.()) {
+          pendingAlertRef.current = false;
+          safeNavigateToAlert();
+          return;
         }
       }}
     >

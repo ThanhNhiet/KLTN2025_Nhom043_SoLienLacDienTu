@@ -13,6 +13,7 @@ import { useNavigation } from "@react-navigation/native";
 import React, { useState } from "react";
 import NetInfo from '@react-native-community/netinfo'; // Install if not already
 import { unregisterPushToken, registerPushToken } from '@/src/utils/notifications';
+import { deleteNotifile, getNotifile, saveNotifile } from '@/src/utils/TokenManager';
 
 export const useLogin_out = () => {
     const navigation = useNavigation<any>();
@@ -55,6 +56,7 @@ export const useLogin_out = () => {
                 throw new Error("Invalid login response");
                 return;
             }
+            const notifile = await getNotifile();
             const token = data.access_token;
             const refreshToken = data.refresh_token;
             if (!token || !refreshToken) {
@@ -65,7 +67,9 @@ export const useLogin_out = () => {
                 await AsyncStorage.setItem('refreshToken', refreshToken);
                 const userId = await AsyncStorage.getItem('userId');
                 if (userId) {
+                    if (notifile == null ){
                     await registerPushToken(userId);
+                    }
                 }
                 
                 navigation.navigate("HomeScreen");
@@ -289,6 +293,7 @@ export const useLogin_out = () => {
             throw new Error("No user ID found for logout");
             }
             await unregisterPushToken(currentUserId);
+            await deleteNotifile();
             const data = await logout();
 
             // Điều hướng về Login và xoá history
