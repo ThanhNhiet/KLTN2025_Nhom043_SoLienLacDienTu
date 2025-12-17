@@ -9,7 +9,7 @@ router.get('/lecturer', courseSectionController.getCourseSectionsByLecturer);
 router.get('/student', courseSectionController.getCourseSectionsByStudent);
 
 //GET /coursesections/student-4-homeroomle?student_id=&page=1&pageSize=10
-router.get('/student-4-homeroomle', courseSectionController.getCourseSectionsByStudent);
+router.get('/student-4-homeroomle', courseSectionController.getCourseSectionsByStudentByLecturer);
 
 // GET /coursesections/lecturer/search?keyword=&page=&pageSize=
 router.get('/lecturer/search', courseSectionController.searchCourseSectionsByKeyword4Lecturer);

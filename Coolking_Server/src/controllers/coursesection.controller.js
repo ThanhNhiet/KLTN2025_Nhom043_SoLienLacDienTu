@@ -93,7 +93,7 @@ exports.getCourseSectionsByStudent = async (req, res) => {
 };
 
 // GET /coursesections/student-4-homeroomle?student_id=&page=&pageSize=
-exports.getCourseSectionsByStudent = async (req, res) => {
+exports.getCourseSectionsByStudentByLecturer = async (req, res) => {
     try {
         const authHeader = req.headers['authorization'];
         const token = authHeader && authHeader.split(' ')[1];
