@@ -115,6 +115,12 @@ class AlertService {
       const response = await axiosInstance.get(`/coursesections/${course_section_id}/students-parents`);
       return response.data;
    }
+
+   // GET  /api/alerts/personal/:alertId
+   async deleteAlertPersonal4ReceiverLe(alertId: string) {
+      const response = await axiosInstance.delete(`/alerts/personal/${alertId}`);
+      return response.data;
+   }
 }
 // Export singleton instance
 export const alertService = new AlertService();

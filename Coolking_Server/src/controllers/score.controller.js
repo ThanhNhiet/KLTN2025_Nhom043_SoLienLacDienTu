@@ -7,9 +7,6 @@ exports.getStudentScoresBySemester = async (req, res) => {
         const authHeader = req.headers['authorization'];
         const token = authHeader && authHeader.split(' ')[1];
         const decoded = jwtUtils.verifyAccessToken(token);
-        if (!decoded || decoded.role === 'ADMIN') {
-            return res.status(403).json({ message: 'Forbidden' });
-        }
         const studentId = req.params.id;
         if (decoded.role === 'STUDENT' && decoded.user_id !== studentId) {
             return res.status(403).json({ message: 'You can only access your own scores' });
@@ -30,9 +27,6 @@ exports.getParentStudentScoresBySemester = async (req, res) => {
         const authHeader = req.headers['authorization'];
         const token = authHeader && authHeader.split(' ')[1];
         const decoded = jwtUtils.verifyAccessToken(token);
-        if (!decoded || decoded.role === 'ADMIN') {
-            return res.status(403).json({ message: 'Forbidden' });
-        }
         const parentId = req.params.id;
         const studentId = req.params.studentId;
         if (decoded.role === 'PARENT' && decoded.user_id !== parentId) {

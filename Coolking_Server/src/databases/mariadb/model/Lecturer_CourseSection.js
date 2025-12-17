@@ -22,6 +22,15 @@ module.exports = function(sequelize, DataTypes) {
         model: 'course_sections',
         key: 'id'
       }
+    },
+    isMain: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true
+    },
+    practice_gr: {
+      type: DataTypes.STRING(50),
+      allowNull: true
     }
   }, {
     sequelize,

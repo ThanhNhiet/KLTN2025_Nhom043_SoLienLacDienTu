@@ -9,12 +9,12 @@ import CourseSectionStatisticsChart from './CourseSectionStatisticsChart';
 type StatisticsType = 'faculty' | 'lecturer' | 'course_section' | '';
 
 const StatisticsMainPage: React.FC = () => {
-  const { 
-    loading, 
-    error, 
-    sessions, 
-    faculties, 
-    fetchAllSessions, 
+  const {
+    loading,
+    error,
+    sessions,
+    faculties,
+    fetchAllSessions,
     fetchAllFaculties,
     getFacultyStatistics,
     getLecturersStatistics,
@@ -33,17 +33,55 @@ const StatisticsMainPage: React.FC = () => {
   const [showFacultyDropdown, setShowFacultyDropdown] = useState(false);
 
   // Filtered options for dropdowns
-  const filteredSessions = sessions.filter(session => 
+  const filteredSessions = sessions.filter(session =>
     session.nameSession.toLowerCase().includes(sessionSearch.toLowerCase())
   );
 
-  const filteredFaculties = faculties.filter(faculty => 
+  const filteredFaculties = faculties.filter(faculty =>
     faculty.name.toLowerCase().includes(facultySearch.toLowerCase()) ||
     faculty.faculty_id.toLowerCase().includes(facultySearch.toLowerCase())
   );
 
   // Check if all required fields are selected
   const canShowResults = statisticsType && selectedSession && selectedFaculty;
+
+  // Get current session based on current date
+  const getCurrentSessionId = (): string => {
+    if (sessions.length === 0) return '';
+
+    const today = new Date();
+    const currentMonth = today.getMonth() + 1; // getMonth() returns 0-11
+    const currentYear = today.getFullYear();
+
+    let targetSessionName = '';
+
+    // Determine which semester based on current date
+    if (currentMonth >= 8 && currentMonth <= 12) {
+      // August to December: HK1 of current academic year
+      targetSessionName = `HK1 ${currentYear}-${currentYear + 1}`;
+    } else if (currentMonth >= 1 && currentMonth <= 5) {
+      // January to May: HK2 of previous academic year
+      targetSessionName = `HK2 ${currentYear - 1}-${currentYear}`;
+    } else if (currentMonth === 6 || currentMonth === 7) {
+      // June to July: HK3 of previous academic year
+      targetSessionName = `HK3 ${currentYear - 1}-${currentYear}`;
+    }
+
+    // Find session that matches the target session name
+    const currentSession = sessions.find(session =>
+      session.nameSession === targetSessionName
+    );
+
+    return currentSession ? currentSession.id : (sessions[0]?.id || '');
+  };
+
+  // Set current session as default when sessions are loaded
+  useEffect(() => {
+    if (sessions.length > 0 && !selectedSession) {
+      const currentSessionId = getCurrentSessionId();
+      setSelectedSession(currentSessionId);
+    }
+  }, [sessions, selectedSession]);
 
   useEffect(() => {
     fetchAllSessions();
@@ -54,12 +92,12 @@ const StatisticsMainPage: React.FC = () => {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      
+
       // Check if click is outside session dropdown
       if (!target.closest('.session-dropdown')) {
         setShowSessionDropdown(false);
       }
-      
+
       // Check if click is outside faculty dropdown
       if (!target.closest('.faculty-dropdown')) {
         setShowFacultyDropdown(false);
@@ -129,13 +167,13 @@ const StatisticsMainPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <HeaderAdCpn />
-      
+
       <main className="flex-1 max-w-7xl mx-auto px-6 py-8 w-full">
         <div className="bg-white rounded-lg shadow-sm border">
           {/* Header */}
           <div className="px-6 py-4 border-b border-gray-200">
             <h1 className="text-2xl font-bold text-gray-800 mb-6 text-center">Thống kê</h1>
-            
+
             {/* Filter Controls */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               {/* Statistics Type Dropdown */}
@@ -259,11 +297,10 @@ const StatisticsMainPage: React.FC = () => {
                 <button
                   onClick={handleViewResults}
                   disabled={!canShowResults || loadingResults}
-                  className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors duration-200 ${
-                    canShowResults && !loadingResults
+                  className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors duration-200 ${canShowResults && !loadingResults
                       ? 'bg-blue-600 hover:bg-blue-700 text-white'
                       : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  }`}
+                    }`}
                 >
                   {loadingResults ? (
                     <div className="flex items-center justify-center">
@@ -277,7 +314,7 @@ const StatisticsMainPage: React.FC = () => {
                     'Xem kết quả'
                   )}
                 </button>
-                
+
                 {showResults && (
                   <button
                     onClick={handleReset}

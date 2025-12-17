@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useAlert, type Alert } from '../../../hooks/useAlert';
-import SendFormModal from './SendFormModal';
 import AlertDetailModal from './AlertDetailModal';
 import HeaderLeCpn from '../../../components/lecturer/HeaderLeCpn';
 import FooterLeCpn from '../../../components/lecturer/FooterLeCpn';
@@ -9,7 +8,6 @@ const AlertListPage: React.FC = () => {
     const { alerts, loading, error, currentPage, pages, getAlertsForLecturer, deleteLecturerAlert, searchAlertsByKeyword } = useAlert();
     const [searchKeyword, setSearchKeyword] = useState('');
     const [isSearching, setIsSearching] = useState(false);
-    const [showSendModal, setShowSendModal] = useState(false);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [alertToDelete, setAlertToDelete] = useState<Alert | null>(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
@@ -91,12 +89,6 @@ const AlertListPage: React.FC = () => {
         setAlertToDelete(null);
     };
 
-    const handleSendSuccess = (message: string) => {
-        showToast(message, 'success');
-        // Refresh data
-        getAlertsForLecturer(currentPage, 10);
-    };
-
     const getScopeBadge = (scope: string) => {
         const baseClasses = "px-3 py-1 rounded-full text-xs font-medium";
         if (scope === 'all') {
@@ -113,7 +105,7 @@ const AlertListPage: React.FC = () => {
                 <div className="bg-white rounded-lg shadow-sm border">
                     {/* Header */}
                     <div className="px-4 md:px-6 py-4 border-b border-gray-200">
-                        <h1 className="text-xl md:text-2xl font-bold text-gray-800 mb-4 text-center">Quản lý Thông Báo</h1>
+                        <h1 className="text-xl md:text-2xl font-bold text-gray-800 mb-4 text-center">Thông Báo đã gửi</h1>
 
                         {/* Search and Actions */}
                         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
@@ -137,16 +129,6 @@ const AlertListPage: React.FC = () => {
                             </div>
 
                             <div className="flex flex-col sm:flex-row gap-3">
-                                <button
-                                    onClick={() => setShowSendModal(true)}
-                                    className="flex items-center justify-center gap-2 px-3 md:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 font-medium text-sm md:text-base"
-                                >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                    </svg>
-                                    <span>Gửi thông báo</span>
-                                </button>
-
                                 <button
                                     onClick={() => {
                                         setSearchKeyword('');
@@ -344,13 +326,6 @@ const AlertListPage: React.FC = () => {
                     </div>
                 </div>
             )}
-
-            {/* Send Alert Modal */}
-            <SendFormModal
-                isOpen={showSendModal}
-                onClose={() => setShowSendModal(false)}
-                onSuccess={handleSendSuccess}
-            />
 
             {/* Alert Detail Modal */}
             <AlertDetailModal

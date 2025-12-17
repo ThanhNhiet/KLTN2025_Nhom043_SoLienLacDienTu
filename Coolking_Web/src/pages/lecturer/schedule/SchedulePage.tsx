@@ -4,6 +4,7 @@ import 'react-datepicker/dist/react-datepicker.css';
 import HeaderLeCpn from '../../../components/lecturer/HeaderLeCpn';
 import FooterLeCpn from '../../../components/lecturer/FooterLeCpn';
 import { useSchedule, type Schedule } from '../../../hooks/useSchedule';
+import { useStatistics } from '../../../hooks/useStatistics';
 
 // Custom styles for react-datepicker
 const datePickerStyles = `
@@ -36,7 +37,71 @@ const datePickerStyles = `
 
 const SchedulePage: React.FC = () => {
     const { loading, error, schedules, linkPrev, linkNext, weekStart, getSchedulesByUser } = useSchedule();
+    const { sessions, fetchAllSessions } = useStatistics();
     const [selectedDate, setSelectedDate] = useState<string>('');
+    const [selectedSession, setSelectedSession] = useState<string>('');
+    const [sessionSearch, setSessionSearch] = useState<string>('');
+    const [showSessionDropdown, setShowSessionDropdown] = useState<boolean>(false);
+
+    // Fetch sessions on mount and set latest session as default
+    useEffect(() => {
+        const loadSessions = async () => {
+            await fetchAllSessions();
+        };
+        loadSessions();
+    }, [fetchAllSessions]);
+
+    // Get current session based on current date
+    const getCurrentSessionId = (): string => {
+        if (sessions.length === 0) return '';
+
+        const today = new Date();
+        const currentMonth = today.getMonth() + 1; // getMonth() returns 0-11
+        const currentYear = today.getFullYear();
+
+        let targetSessionName = '';
+
+        // Determine which semester based on current date
+        if (currentMonth >= 8 && currentMonth <= 12) {
+            // August to December: HK1 of current academic year
+            targetSessionName = `HK1 ${currentYear}-${currentYear + 1}`;
+        } else if (currentMonth >= 1 && currentMonth <= 5) {
+            // January to May: HK2 of previous academic year
+            targetSessionName = `HK2 ${currentYear - 1}-${currentYear}`;
+        } else if (currentMonth === 6 || currentMonth === 7) {
+            // June to July: HK3 of previous academic year
+            targetSessionName = `HK3 ${currentYear - 1}-${currentYear}`;
+        }
+
+        // Find session that matches the target session name
+        const currentSession = sessions.find(session =>
+            session.nameSession === targetSessionName
+        );
+
+        return currentSession ? currentSession.id : (sessions[0]?.id || '');
+    };
+
+    // Set current session as default when sessions are loaded
+    useEffect(() => {
+        if (sessions.length > 0 && !selectedSession) {
+            const currentSessionId = getCurrentSessionId();
+            setSelectedSession(currentSessionId);
+        }
+    }, [sessions, selectedSession]);
+
+    // Handle click outside to close dropdown
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as HTMLElement;
+            if (!target.closest('.session-dropdown')) {
+                setShowSessionDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
 
     // Khởi tạo với ngày hiện tại
     useEffect(() => {
@@ -73,6 +138,54 @@ const SchedulePage: React.FC = () => {
         const year = date.getFullYear();
         return `${day}/${month}/${year}`;
     };
+
+    // Get session name by ID
+    const getSessionName = (sessionId: string): string => {
+        const session = sessions.find(s => s.id === sessionId);
+        return session ? session.nameSession : '';
+    };
+
+    // Get default date for session based on session name
+    const getSessionDefaultDate = (sessionName: string): string => {
+        if (!sessionName) return '';
+
+        // Extract academic year from session name (e.g., "HK1 2025-2026")
+        const yearMatch = sessionName.match(/(\d{4})-(\d{4})/);
+        if (!yearMatch) return '';
+
+        const startYear = parseInt(yearMatch[1]);
+
+        if (sessionName.includes('HK1')) {
+            return `01/08/${startYear}`; // August 1st of start year
+        } else if (sessionName.includes('HK2')) {
+            return `01/01/${startYear + 1}`; // January 1st of next year
+        } else if (sessionName.includes('HK3')) {
+            return `01/06/${startYear + 1}`; // June 1st of next year
+        }
+
+        return '';
+    };
+
+    // Handle session selection
+    const handleSessionSelect = (sessionId: string) => {
+        setSelectedSession(sessionId);
+        setSessionSearch('');
+        setShowSessionDropdown(false);
+
+        const sessionName = getSessionName(sessionId);
+        if (sessionName) {
+            const defaultDate = getSessionDefaultDate(sessionName);
+            if (defaultDate) {
+                setSelectedDate(defaultDate);
+                getSchedulesByUser(defaultDate);
+            }
+        }
+    };
+
+    // Filter sessions for dropdown
+    const filteredSessions = sessions.filter(session =>
+        session.nameSession.toLowerCase().includes(sessionSearch.toLowerCase())
+    );
 
 
 
@@ -213,6 +326,45 @@ const SchedulePage: React.FC = () => {
 
                             {/* Controls */}
                             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                                {/* Session Dropdown */}
+                                <div className="relative session-dropdown min-w-[200px]">
+
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            placeholder="Tìm và chọn học kỳ..."
+                                            value={selectedSession ? getSessionName(selectedSession) : sessionSearch}
+                                            onChange={(e) => {
+                                                setSessionSearch(e.target.value);
+                                                if (selectedSession && e.target.value !== getSessionName(selectedSession)) {
+                                                    setSelectedSession('');
+                                                }
+                                            }}
+                                            onFocus={() => setShowSessionDropdown(true)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+                                        />
+                                        {showSessionDropdown && (
+                                            <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                                {filteredSessions.length > 0 ? (
+                                                    filteredSessions.map((session) => (
+                                                        <div
+                                                            key={session.id}
+                                                            onClick={() => handleSessionSelect(session.id)}
+                                                            className="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                                                        >
+                                                            <div className="font-medium text-gray-900">{session.nameSession}</div>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <div className="px-3 py-2 text-gray-500 text-center">
+                                                        Không tìm thấy học kỳ nào
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
                                 {/* Date picker */}
                                 <div className="flex items-center gap-2">
                                     <DatePicker
@@ -274,26 +426,25 @@ const SchedulePage: React.FC = () => {
                         ) : (
                             <>
                                 {/* Desktop Grid View */}
-                                <div className="hidden md:block">
-                                    <div className="grid grid-cols-8 gap-1 h-auto overflow-x-auto">
+                                <div className="hidden md:block overflow-x-auto pb-4"> {/* Thêm pb-4 để thanh scroll dễ click hơn */}
+                                    {/* Thêm min-w-max để Grid tự giãn chiều ngang theo nội dung bên trong */}
+                                    <div className="grid grid-cols-8 gap-1 h-auto min-w-max">
                                         {/* Header row */}
-                                        <div className="bg-yellow-100 border border-gray-300 p-2 text-center font-medium text-sm">
+                                        <div className="bg-yellow-100 border border-gray-300 p-2 text-center font-medium text-sm sticky left-0 z-10">
                                             Ca học
                                         </div>
                                         {[1, 2, 3, 4, 5, 6, 7].map((dayOfWeek, index) => {
                                             let dayDate = new Date();
-
                                             if (weekStart) {
                                                 const [day, month, year] = weekStart.split('-');
                                                 const mondayDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
                                                 dayDate = new Date(mondayDate);
                                                 dayDate.setDate(mondayDate.getDate() + index);
                                             }
-
                                             return (
                                                 <div
                                                     key={dayOfWeek}
-                                                    className="bg-blue-100 border border-gray-300 p-2 text-center"
+                                                    className="bg-blue-100 border border-gray-300 p-2 text-center min-w-[150px]"
                                                 >
                                                     <div className="font-medium text-sm">{getDayName(dayOfWeek)}</div>
                                                     <div className="text-xs">
@@ -306,7 +457,7 @@ const SchedulePage: React.FC = () => {
                                         {/* Time slots */}
                                         {['Sáng', 'Chiều', 'Tối'].map((period, periodIndex) => (
                                             <React.Fragment key={period}>
-                                                <div className="bg-yellow-100 border border-gray-300 p-2 text-center font-medium text-sm">
+                                                <div className="bg-yellow-100 border border-gray-300 p-2 text-center font-medium text-sm flex items-center justify-center sticky left-0 z-10">
                                                     {period}
                                                 </div>
                                                 {[1, 2, 3, 4, 5, 6, 7].map((dayOfWeek) => {
@@ -322,21 +473,24 @@ const SchedulePage: React.FC = () => {
                                                             {periodSchedules.map((schedule, index) => (
                                                                 <div
                                                                     key={index}
-                                                                    className={`mb-1 p-1 rounded text-xs border ${getScheduleColor(schedule)}`}
+                                                                    // Thêm w-max để card tự mở rộng theo nội dung text bên trong
+                                                                    className={`mb-1 p-1 rounded text-xs border ${getScheduleColor(schedule)} w-max max-w-full`}
                                                                 >
-                                                                    <div className="font-medium truncate">{schedule.subjectName}</div>
-                                                                    <div className="truncate">{schedule.clazzName}</div>
-                                                                    <div>Phòng: {schedule.room}</div>
-                                                                    <div>Tiết: {schedule.start_lesson}-{schedule.end_lesson}</div>
-                                                                    <div className="truncate">GV: {schedule.lecturerName}</div>
+                                                                    {/* Thêm whitespace-nowrap vào từng dòng để cấm xuống hàng text */}
+                                                                    <div className="font-medium whitespace-nowrap">{schedule.subjectName}</div>
+                                                                    <div className="whitespace-nowrap">{schedule.clazzName}</div>
+                                                                    <div className="whitespace-nowrap">Phòng: {schedule.room}</div>
+                                                                    <div className="whitespace-nowrap">Tiết: {schedule.start_lesson}-{schedule.end_lesson}</div>
+                                                                    <div className="whitespace-nowrap">GV: {schedule.lecturerName}</div>
+
                                                                     {schedule.type === 'MAKEUP' && (
-                                                                        <div className="text-xs text-blue-600 font-medium">Học bù</div>
+                                                                        <div className="text-xs text-blue-600 font-medium whitespace-nowrap">Học bù</div>
                                                                     )}
                                                                     {schedule.status === 'ROOM_CHANGED' && (
-                                                                        <div className="text-xs text-orange-600 font-medium">Đổi phòng</div>
+                                                                        <div className="text-xs text-orange-600 font-medium whitespace-nowrap">Đổi phòng</div>
                                                                     )}
                                                                     {schedule.status === 'LECTURER_CHANGED' && (
-                                                                        <div className="text-xs text-purple-600 font-medium">Đổi GV</div>
+                                                                        <div className="text-xs text-purple-600 font-medium whitespace-nowrap">Đổi GV</div>
                                                                     )}
                                                                 </div>
                                                             ))}

@@ -205,6 +205,18 @@ class ChatServices {
         });
         return response.data;
     }
+
+    // POST api/chats/bulk-create-homeroom
+    async createBulkGroupChatsWithHomeroomLecturers() {
+        const response = await axiosInstance.post(`/chats/bulk-create-homeroom`);
+        return response.data;
+    }
+
+    // POST /api/chats/cleanup-homeroom-chats/:clazz_name
+    async cleanupHomeroomChats(clazz_name: string) {
+        const response = await axiosInstance.delete(`/chats/cleanup-homeroom-chats/${clazz_name}`);
+        return response.data;
+    }
 }
 
 export const chatServices = new ChatServices();

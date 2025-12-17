@@ -1,0 +1,3 @@
+id,user_id,course_section_id,isExam,day_of_week,date,room,start_lesson,end_lesson,start_date,end_date,isCompleted
+11111,LE00019,405e283d-93a7-11f0-a902-088fc3521198,false,3,,H3.1,1,3,2023-10-14,2023-12-31,1
+47f05c73-c1dd-11f0-bc63-601895530606,LE00018,406020c5-93a7-11f0-a902-088fc3521198,0,1,,A1.01,1,3,2026-01-01,2026-05-01,0

@@ -252,7 +252,6 @@ const filterCourseSections4Lecturer = async (lecturer_id, sessionId, facultyId, 
                 {
                     model: models.CourseSection,
                     as: 'course_section',
-                    where: { isCompleted: false },
                     attributes: ['id', 'createdAt'],
                     include: [
                         {
@@ -428,6 +427,7 @@ const getCourseSectionsByStudent = async (studentId, page, pageSize = 10) => {
                         {
                             model: models.LecturerCourseSection,
                             as: 'lecturers_course_sections',
+                            where: { isMain: true },
                             include: [
                                 {
                                     model: models.Lecturer,

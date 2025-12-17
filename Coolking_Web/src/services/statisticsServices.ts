@@ -56,6 +56,17 @@ class StatisticsServices {
         });
         return response.data;
     }
+
+    // GET /api/statistics/course-section-overview?course_section_id=<course_section_id>&session_id=<session_id>
+    async getCourseSectionOverview(course_section_id: string, session_id: string) {
+        const response = await axiosInstance.get(`/statistics/course-section-overview`, {
+            params: {
+                course_section_id,
+                session_id
+            }
+        });
+        return response.data;
+    }
 }
 
 export const statisticsServices = new StatisticsServices();

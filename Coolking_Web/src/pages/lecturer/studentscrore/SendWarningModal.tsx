@@ -24,13 +24,16 @@ const SendWarningModal: React.FC<SendWarningModalProps> = ({
 
 Trong môn học ${courseSectionData.subjectName} (mã lớp học phần: ${courseSectionData.course_section_id}), thuộc lớp ${courseSectionData.className}, học kỳ ${courseSectionData.sessionName}, tôi nhận thấy rằng:
 
-Kết quả học tập vừa qua của em đang ở mức dưới trung bình. Đây là kết quả rất đáng lo ngại và có ảnh hưởng lớn đến điểm tổng kết của môn học. Kết quả này cho thấy em đang bị hổng kiến thức nghiêm trọng và có nguy cơ rất cao sẽ không đạt môn học này.
+Điểm giữa kỳ của là ${student.score.mid} theo thang điểm 10. Đây là kết quả rất đáng lo ngại và có ảnh hưởng lớn đến điểm tổng kết của môn học. Kết quả này cho thấy em đang bị hổng kiến thức nghiêm trọng và có nguy cơ rất cao sẽ không đạt môn học này.
 
 Đề nghị sinh viên nghiêm túc xem lại và củng cố lại toàn bộ kiến thức đã học và bài kiểm tra vừa rồi. Lên kế hoạch học tập chi tiết cho phần còn lại của học kỳ.
 
 Nhà trường và giảng viên luôn tạo điều kiện hỗ trợ, nhưng sự nỗ lực từ chính bản thân em mới là yếu tố quyết định.
 
-Trân trọng.`;
+Trân trọng.
+Giảng viên phụ trách môn học: ${courseSectionData.lecturerName}
+Email: ${courseSectionData.lecturerEmail}
+Số điện thoại: ${courseSectionData.lecturerPhone}`;
 
   const [title, setTitle] = useState(defaultTitle);
   const [content, setContent] = useState(defaultContent);
@@ -72,6 +75,11 @@ Trân trọng.`;
       // Thêm phụ huynh từ studentInfo (single parent object)
       if (studentInfo.parent && studentInfo.parent.parent_id) {
         receiverIDs.push(studentInfo.parent.parent_id);
+      }
+
+       //Thêm giảng viên chủ nhiệm từ studentInfo
+      if (studentInfo.homeroomLeId) {
+        receiverIDs.push(studentInfo.homeroomLeId);
       }
 
       if (receiverIDs.length === 0) {
@@ -124,7 +132,7 @@ Trân trọng.`;
         <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
           {/* Header */}
           <div className="flex justify-between items-center p-6 border-b">
-            <h2 className="text-xl font-semibold text-gray-900">Gửi yêu cầu cảnh báo học vụ</h2>
+            <h2 className="text-xl font-semibold text-gray-900">Gửi nhắc nhở học tập</h2>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -145,7 +153,7 @@ Trân trọng.`;
                 <div><span className="font-medium">Họ tên:</span> {student.name}</div>
                 <div><span className="font-medium">MSSV:</span> {student.student_id}</div>
                 <div><span className="font-medium">Ngày sinh:</span> {student.dob}</div>
-                <div><span className="font-medium">Đánh giá:</span> {student.initial_evaluate === "Not passed" ? "Cần nhắc nhở" : "Bình thường"}</div>
+                <div><span className="font-medium">Đánh giá:</span> {student.initial_evaluate === 'ok' ? "Bình thường" : "Cần nhắc nhở"}</div>
               </div>
             </div>
 
@@ -167,6 +175,16 @@ Trân trọng.`;
                   {!studentInfo?.parent && (
                     <div className="text-sm text-gray-500">
                       Không có thông tin phụ huynh
+                    </div>
+                  )}
+                  {studentInfo?.homeroomTeacherName && (
+                    <div className="text-sm">
+                      <span className="font-medium text-gray-700">Giảng viên chủ nhiệm:</span> {studentInfo.homeroomTeacherName} ({studentInfo.homeroomLeId})
+                    </div>
+                  )}
+                  {!studentInfo?.homeroomTeacherName && (
+                    <div className="text-sm text-gray-500">
+                      Không có thông tin giảng viên chủ nhiệm
                     </div>
                   )}
                 </div>

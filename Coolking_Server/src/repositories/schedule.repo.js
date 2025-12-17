@@ -3,6 +3,7 @@ const sequelize = require("../config/mariadb.conf");
 const { initModels } = require("../databases/mariadb/model/init-models");
 const models = initModels(sequelize);
 const datetimeFormatter = require("../utils/format/datetime-formatter");
+const { where } = require("../databases/mongodb/schemas/Alert");
 
 /**
  * Chuyển đổi từ JavaScript day (0-6) sang database day_of_week (1-7)
@@ -295,6 +296,7 @@ const getSchedulesByUserId = async (user_id, currentDate) => {
                                 {
                                     model: models.LecturerCourseSection,
                                     as: 'lecturers_course_sections',
+                                    where: { isMain: true },
                                     include: [{ model: models.Lecturer, as: 'lecturer', attributes: ['name'] }]
                                 }
                             ]
@@ -340,7 +342,8 @@ const getSchedulesByUserId = async (user_id, currentDate) => {
             const baseScheduleData = {
                 subjectName: schedule.course_section?.subject?.name || 'N/A',
                 clazzName: schedule.course_section?.clazz?.name || 'N/A',
-                lecturerName: schedule.course_section?.lecturers_course_sections?.[0]?.lecturer?.name || 'N/A'
+                //Lấy tất cả giảng viên
+                lecturerName: schedule.course_section?.lecturers_course_sections?.map(lcs => lcs.lecturer?.name).join(', ') || 'N/A',
             };
 
             // Tạo map các ngày có exception cho schedule này

@@ -48,16 +48,17 @@ const getStudentsScoreByCourseSectionId4Lecturer = async (course_section_id) => 
                 {
                     model: models.Session,
                     as: 'session',
-                    attributes: ['name', 'years']
+                    attributes: ['id', 'name', 'years']
                 },
                 {
                     model: models.LecturerCourseSection,
                     as: 'lecturers_course_sections',
+                    where: { isMain: true },
                     include: [
                         {
                             model: models.Lecturer,
                             as: 'lecturer',
-                            attributes: ['name']
+                            attributes: ['name', 'email', 'phone']
                         }
                     ]
                 }
@@ -71,8 +72,8 @@ const getStudentsScoreByCourseSectionId4Lecturer = async (course_section_id) => 
         // Lấy danh sách student_id từ Student_CourseSection
         const studentCourseSections = await models.StudentCourseSection.findAll({
             where: { course_section_id: course_section_id },
-            attributes: ['student_id'],
-            order: [['createdAt', 'ASC']] // Sắp xếp theo thời gian đăng ký
+            attributes: ['student_id']
+            // order: [['createdAt', 'ASC']] // Sắp xếp theo thời gian đăng ký
         });
 
         if (studentCourseSections.length === 0) {
@@ -81,9 +82,12 @@ const getStudentsScoreByCourseSectionId4Lecturer = async (course_section_id) => 
                 course_section_id: courseSectionDetail.id,
                 subjectName: courseSectionDetail.subject?.name || 'N/A',
                 className: courseSectionDetail.clazz?.name || 'N/A',
+                sessionId: courseSectionDetail?.session ? courseSectionDetail.session.id : 'N/A',
                 sessionName: courseSectionDetail?.session ? courseSectionDetail.session.name + ' ' + courseSectionDetail.session.years : 'N/A',
                 facultyName: courseSectionDetail.subject?.faculty?.name || 'N/A',
                 lecturerName: courseSectionDetail.lecturers_course_sections?.[0]?.lecturer?.name || 'N/A',
+                leturerEmail: courseSectionDetail.lecturers_course_sections?.[0]?.lecturer?.email || 'N/A',
+                leturerPhone: courseSectionDetail.lecturers_course_sections?.[0]?.lecturer?.phone || 'N/A',
                 students: []
             };
         }
@@ -222,9 +226,12 @@ const getStudentsScoreByCourseSectionId4Lecturer = async (course_section_id) => 
             course_section_id: courseSectionDetail.id,
             subjectName: courseSectionDetail.subject?.name || 'N/A',
             className: courseSectionDetail.clazz?.name || 'N/A',
+            sessionId: courseSectionDetail?.session ? courseSectionDetail.session.id : 'N/A',
             sessionName: courseSectionDetail?.session ? courseSectionDetail.session.name + ' ' + courseSectionDetail.session.years : 'N/A',
             facultyName: courseSectionDetail.subject?.faculty?.name || 'N/A',
             lecturerName: courseSectionDetail.lecturers_course_sections?.[0]?.lecturer?.name || 'N/A',
+            lecturerEmail: courseSectionDetail.lecturers_course_sections?.[0]?.lecturer?.email || 'N/A',
+            lecturerPhone: courseSectionDetail.lecturers_course_sections?.[0]?.lecturer?.phone || 'N/A',
             students: processedStudents
         };
 
@@ -297,7 +304,7 @@ const updateStudentAvatar = async (student_id, file) => {
 const getStudentInfoById4Lecturer = async (student_id) => {
     try {
         const student = await models.Student.findOne({
-            attributes: { exclude: ['id', 'isDeleted', 'clazz_id', 'major_id', 'createdAt', 'updatedAt'] },
+            attributes: { exclude: ['id', 'isDeleted', 'major_id', 'createdAt', 'updatedAt'] },
             where: { student_id, isDeleted: false },
             include: [
                 // use the actual association alias defined in your models (singular 'parent' per error)
@@ -329,6 +336,13 @@ const getStudentInfoById4Lecturer = async (student_id) => {
                     required: false
                 }
             ]
+        });
+        console.log("clazz_id:", student.clazz_id);
+
+        //Tìm kiếm giảng viên chủ nhiệm theo clazz_id
+        const homeroomTeacher = await models.Lecturer.findOne({
+            where: { homeroom_class_id: student.clazz_id, isDeleted: false },
+            attributes: ['lecturer_id','name', 'email', 'phone']
         });
 
         if (!student) throw new Error("Student not found");
@@ -363,6 +377,10 @@ const getStudentInfoById4Lecturer = async (student_id) => {
             address: student.address,
             className: student.clazz ? student.clazz.name : null,
             facultyName: student.clazz && student.clazz.faculty ? student.clazz.faculty.name : null,
+            homeroomLeId: homeroomTeacher ? homeroomTeacher.lecturer_id : null,
+            homeroomTeacherName: homeroomTeacher ? homeroomTeacher.name : null,
+            homeroomTeacherEmail: homeroomTeacher ? homeroomTeacher.email : null,
+            homeroomTeacherPhone: homeroomTeacher ? homeroomTeacher.phone : null,
             majorName: student.major ? student.major.name : null,
             parent: {
                 parent_id: student.parent ? student.parent.parent_id : null,
@@ -1086,7 +1104,7 @@ const getFailedStudentsBySessionAndFaculty = async (session_id, session_name, fa
             distinctStudentIds.forEach(studentId => {
                 // Kiểm tra header chứa studentId (Case insensitive)
                 const matchedByHeader = new RegExp(studentId, 'i').test(header);
-                
+
                 if (matchedByHeader) {
                     // Tăng biến đếm tổng (chỉ đếm 1 lần cho mỗi header duy nhất)
                     alertMap[studentId].count += 1;
@@ -1102,12 +1120,12 @@ const getFailedStudentsBySessionAndFaculty = async (session_id, session_name, fa
         // Xử lý Expulsion Alerts - chỉ cần kiểm tra có hay không, không cần so session
         allExpulsionAlerts.forEach(alert => {
             const receiverID = alert.receiverID;
-            
+
             // Kiểm tra receiverID có trong danh sách không
             if (receiverID && alertMap[receiverID]) {
                 alertMap[receiverID].gotExpelAlertYet = true;
             }
-            
+
             // Cũng kiểm tra trong header (backup)
             const header = alert.header || "";
             distinctStudentIds.forEach(studentId => {
@@ -1208,7 +1226,7 @@ const getFailedStudentsBySessionAndFaculty = async (session_id, session_name, fa
                 Object.keys(academicYearSessions).forEach(year => {
                     const semesters = academicYearSessions[year];
                     const currentYear = Math.floor(currentSessionOrder / 10);
-                    
+
                     if (parseInt(year) < currentYear) {
                         // Năm học trước đây - tính là đã hoàn thành
                         completedAcademicYears++;
@@ -1223,7 +1241,7 @@ const getFailedStudentsBySessionAndFaculty = async (session_id, session_name, fa
                 // Chỉ áp dụng ĐTBCTL nếu sinh viên không phải mới chỉ học HK1 duy nhất
                 if (completedAcademicYears > 0 || currentYearStatus === 'in_progress') {
                     const academicYear = completedAcademicYears + (currentYearStatus === 'in_progress' ? 1 : 0);
-                    
+
                     if (academicYear === 1 && gpa4_cumulative < 1.20) {
                         failByCumulativeGPA = true;
                     } else if (academicYear === 2 && gpa4_cumulative < 1.40) {
@@ -1243,6 +1261,7 @@ const getFailedStudentsBySessionAndFaculty = async (session_id, session_name, fa
                 processedStudents.push({
                     student_id: studentId,
                     studentName: studentInfo.name,
+                    class_id: studentInfo.clazz_id || null,
                     className: studentInfo.clazz ? studentInfo.clazz.name : null,
                     facultyName: studentInfo.clazz && studentInfo.clazz.faculty ? studentInfo.clazz.faculty.name : null,
                     gpa10_in_session: gpa10_in_session,
@@ -1482,7 +1501,7 @@ const searchFailedStudentBySessionAndFacultyWithStudentId = async (session_id, s
             Object.keys(academicYearSessions).forEach(year => {
                 const semesters = academicYearSessions[year];
                 const currentYear = Math.floor(currentSessionOrder / 10);
-                
+
                 if (parseInt(year) < currentYear) {
                     // Năm học trước đây - tính là đã hoàn thành
                     completedAcademicYears++;
@@ -1497,7 +1516,7 @@ const searchFailedStudentBySessionAndFacultyWithStudentId = async (session_id, s
             // Chỉ áp dụng ĐTBCTL nếu sinh viên không phải mới chỉ học HK1 duy nhất
             if (completedAcademicYears > 0 || currentYearStatus === 'in_progress') {
                 const academicYear = completedAcademicYears + (currentYearStatus === 'in_progress' ? 1 : 0);
-                
+
                 if (academicYear === 1 && gpa4_cumulative < 1.20) {
                     failByCumulativeGPA = true;
                 } else if (academicYear === 2 && gpa4_cumulative < 1.40) {
@@ -1528,7 +1547,7 @@ const searchFailedStudentBySessionAndFacultyWithStudentId = async (session_id, s
                 }
             ]
         });
-        
+
         // Đếm số header duy nhất
         const uniqueCurrentHeaders = new Set(currentSessionAlerts.map(alert => alert.header));
         const countCurrentSession = uniqueCurrentHeaders.size;
@@ -1545,7 +1564,7 @@ const searchFailedStudentBySessionAndFacultyWithStudentId = async (session_id, s
                 }
             ]
         });
-        
+
         // Đếm số header duy nhất
         const uniqueTotalHeaders = new Set(totalAlerts.map(alert => alert.header));
         const countTotal = uniqueTotalHeaders.size;
@@ -1564,7 +1583,7 @@ const searchFailedStudentBySessionAndFacultyWithStudentId = async (session_id, s
                 }
             ]
         });
-        
+
         const gotExpelAlertYet = expulsionAlerts.length > 0;
 
         // BƯỚC 5: Trả về kết quả
@@ -1573,6 +1592,7 @@ const searchFailedStudentBySessionAndFacultyWithStudentId = async (session_id, s
             return {
                 student_id: student_id,
                 studentName: targetStudent.name,
+                class_id: targetStudent.clazz_id || null,
                 className: targetStudent.clazz ? targetStudent.clazz.name : null,
                 facultyName: targetStudent.clazz && targetStudent.clazz.faculty ? targetStudent.clazz.faculty.name : null,
                 gpa10_in_session: gpa10_in_session,
@@ -1596,6 +1616,170 @@ const searchFailedStudentBySessionAndFacultyWithStudentId = async (session_id, s
     }
 };
 
+/**
+ * Lấy ra số lần và nội dung thông báo bị Nhắc nhở học tập của sinh viên
+ * Logic: Tìm các alert có header chứa từ khóa học tập/cảnh báo học vụ VÀ thuộc về student_id
+ */
+const getStudentRemindsOfStudy4HomeroomTeacher = async (student_id, page = 1, pageSize = 10) => {
+    try {
+        if (!student_id) {
+            throw new Error('student_id is required');
+        }
+
+        const page_num = parseInt(page) || 1;
+        const pageSize_num = parseInt(pageSize) || 10;
+        const skip = (page_num - 1) * pageSize_num;
+
+        // 1. Lấy TẤT CẢ các cảnh báo học tập liên quan đến sinh viên này
+        const allStudyAlerts = await Alert.find({
+            $and: [
+                // 1. Header chứa từ khóa
+                {
+                    header: {
+                        $regex: 'Nhắc nhở học tập',
+                        $options: 'i'
+                    }
+                },
+                // 2. Header PHẢI chứa mã sinh viên
+                {
+                    header: {
+                        $regex: student_id,
+                        $options: 'i'
+                    }
+                },
+                // 3. Người nhận phải là sinh viên
+                { receiverID: student_id }
+            ]
+        }).sort({ createdAt: -1 });
+
+        // 2. Format dữ liệu
+        const formattedAlerts = allStudyAlerts.map(alert => ({
+            _id: alert._id,
+            header: alert.header,
+            body: alert.body,
+            createdAt: alert.createdAt ? datetimeFormatter.formatDateTimeVN(alert.createdAt) : null,
+            isRead: alert.isRead // Có thể hiển thị trạng thái xem SV đã đọc chưa
+        }));
+
+        // 3. Phân trang (In-memory pagination theo yêu cầu logic mẫu)
+        const total = formattedAlerts.length;
+        const paginatedAlerts = formattedAlerts.slice(skip, skip + pageSize_num);
+
+        // 4. Tạo pagination links và pages array
+        const totalPages = Math.ceil(total / pageSize_num);
+
+        const linkPrev = page_num > 1
+            ? `/api/students/remind-study?student_id=${student_id}&page=${page_num - 1}&pageSize=${pageSize_num}`
+            : null;
+
+        const linkNext = (page_num - 1) * pageSize_num + paginatedAlerts.length < total
+            ? `/api/students/remind-study?student_id=${student_id}&page=${page_num + 1}&pageSize=${pageSize_num}`
+            : null;
+
+        const pages = [];
+        for (let i = 1; i <= totalPages; i++) {
+            if (i >= page_num && i < page_num + 3) {
+                pages.push(i);
+            }
+        }
+
+        return {
+            total,
+            page: page_num,
+            pageSize: pageSize_num,
+            alerts: paginatedAlerts,
+            linkPrev,
+            linkNext,
+            pages
+        };
+    } catch (error) {
+        console.error("Error in getStudentRemindsOfStudy4HomeroomTeacher:", error);
+        throw error;
+    }
+};
+
+/**
+ * Lấy ra số lần và nội dung thông báo bị Nhắc nhở chuyên cần của sinh viên
+ * Logic: Tìm các alert có header chứa từ khóa chuyên cần/nghỉ/vắng VÀ thuộc về student_id
+ */
+const getStudentRemindsOfAttendance4HomeroomTeacher = async (student_id, page = 1, pageSize = 10) => {
+    try {
+        if (!student_id) {
+            throw new Error('student_id is required');
+        }
+
+        const page_num = parseInt(page) || 1;
+        const pageSize_num = parseInt(pageSize) || 10;
+        const skip = (page_num - 1) * pageSize_num;
+
+        // 1. Lấy TẤT CẢ các cảnh báo chuyên cần liên quan đến sinh viên này
+        const allAttendanceAlerts = await Alert.find({
+            $and: [
+                // 1. Header chứa từ khóa
+                {
+                    header: {
+                        $regex: 'Nhắc nhở chuyên cần',
+                        $options: 'i'
+                    }
+                },
+                // 2. Header PHẢI chứa mã sinh viên
+                {
+                    header: {
+                        $regex: student_id,
+                        $options: 'i'
+                    }
+                },
+                // 3. Người nhận phải là sinh viên
+                { receiverID: student_id }
+            ]
+        }).sort({ createdAt: -1 });
+
+        // 2. Format dữ liệu
+        const formattedAlerts = allAttendanceAlerts.map(alert => ({
+            _id: alert._id,
+            header: alert.header,
+            body: alert.body,
+            createdAt: alert.createdAt ? datetimeFormatter.formatDateTimeVN(alert.createdAt) : null,
+            isRead: alert.isRead
+        }));
+
+        // 3. Phân trang (In-memory)
+        const total = formattedAlerts.length;
+        const paginatedAlerts = formattedAlerts.slice(skip, skip + pageSize_num);
+
+        // 4. Tạo pagination links và pages array
+        const totalPages = Math.ceil(total / pageSize_num);
+
+        const linkPrev = page_num > 1
+            ? `/api/students/remind-attendance?student_id=${student_id}&page=${page_num - 1}&pageSize=${pageSize_num}`
+            : null;
+
+        const linkNext = (page_num - 1) * pageSize_num + paginatedAlerts.length < total
+            ? `/api/students/remind-attendance?student_id=${student_id}&page=${page_num + 1}&pageSize=${pageSize_num}`
+            : null;
+
+        const pages = [];
+        for (let i = 1; i <= totalPages; i++) {
+            if (i >= page_num && i < page_num + 3) {
+                pages.push(i);
+            }
+        }
+
+        return {
+            total,
+            page: page_num,
+            pageSize: pageSize_num,
+            alerts: paginatedAlerts,
+            linkPrev,
+            linkNext,
+            pages
+        };
+    } catch (error) {
+        console.error("Error in getStudentRemindsOfAttendance4HomeroomTeacher:", error);
+        throw error;
+    }
+};
+
 module.exports = {
     getStudentsScoreByCourseSectionId4Lecturer,
     getStudentInfoById4Lecturer,
@@ -1606,5 +1790,7 @@ module.exports = {
     getStudentExamSchedule,
     updateStudentAvatar,
     getFailedStudentsBySessionAndFaculty,
-    searchFailedStudentBySessionAndFacultyWithStudentId
+    searchFailedStudentBySessionAndFacultyWithStudentId,
+    getStudentRemindsOfStudy4HomeroomTeacher,
+    getStudentRemindsOfAttendance4HomeroomTeacher
 };

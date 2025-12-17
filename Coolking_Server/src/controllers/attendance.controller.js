@@ -19,7 +19,7 @@ exports.getAttendanceDetailsByCourseSectionAndAttendanceID = async (req, res) =>
             });
         }
 
-        const attendanceDetails = await attendanceRepo.getAttendanceDetailsByCourseSectionID(course_section_id);
+        const attendanceDetails = await attendanceRepo.getAttendanceDetailsByCourseSectionID(course_section_id, decoded.user_id);
         return res.status(200).json(attendanceDetails);
 
     } catch (error) {
@@ -170,6 +170,35 @@ exports.getAttendanceByStudentByCourseID = async (req, res) => {
             });
         }
         const attendanceRecords = await attendanceRepo.getAttendanceByStudentBySubject(studentId, subject_id, course_section_id);
+        return res.status(200).json(attendanceRecords);
+
+    } catch (error) {
+        console.error('Error in getAttendanceByStudentBySubject:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Internal Server Error',
+            error: error.message
+        });
+    }
+};
+
+// GET /attendances/student-by-le?course_section_id=&subject_id=&student_id=
+exports.getAttendanceStudentByLecturer = async (req, res) => {
+    try {
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
+        const decoded = jwtUtils.verifyAccessToken(token);
+        if (!decoded || decoded.role !== 'LECTURER') {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
+        const {subject_id, course_section_id, student_id } = req.query;
+        if (!course_section_id || !subject_id) {
+            return res.status(400).json({
+                success: false,
+                message: 'Mã học phần (subject_id) và mã lớp học phần (course_section_id) là bắt buộc'
+            });
+        }
+        const attendanceRecords = await attendanceRepo.getAttendanceByStudentBySubject(student_id, subject_id, course_section_id);
         return res.status(200).json(attendanceRecords);
 
     } catch (error) {

@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAttendance, type Attendance } from '../../../hooks/useAttendance';
 import HeaderLeCpn from '../../../components/lecturer/HeaderLeCpn';
 import FooterLeCpn from '../../../components/lecturer/FooterLeCpn';
 import CreateAttendanceModal from './CreateAttendanceModal';
 import ConfirmationModal from './ConfirmationModal';
+import SendFormModal from '../alert/SendFormModal';
+import SendRemindModal from './SendRemindModal';
+import StudentInfoModal from './StudentInfoModal';
+import { useStudent } from '../../../hooks/useStudent';
 
 interface StudentAttendanceRecord {
   student_id: string;
@@ -14,24 +18,33 @@ interface StudentAttendanceRecord {
 
 const StudentsAttendancePage: React.FC = () => {
   const { course_section_id } = useParams<{ course_section_id: string }>();
-  const { loading, error, attendanceData, getStudentsWithAttendance, recordAttendance, updateAttendance, deleteAttendance } = useAttendance();
-  
+  const navigate = useNavigate();
+  const { loading, attendanceData, getStudentsWithAttendance, recordAttendance, updateAttendance, deleteAttendance } = useAttendance();
+  const { fetchStudentInfo, studentInfo } = useStudent();
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isCreatingAttendance, setIsCreatingAttendance] = useState(false);
   const [selectedAttendanceForUpdate, setSelectedAttendanceForUpdate] = useState<string | null>(null);
   const [showActionMenu, setShowActionMenu] = useState<string | null>(null);
   const [showTooltip, setShowTooltip] = useState<{ studentId: string, attendanceId: string } | null>(null);
-  
-  // For creating new attendance
+  const [showSendFormModal, setShowSendFormModal] = useState(false);
+  const [showRemindModal, setShowRemindModal] = useState(false);
+  const [selectedStudentForRemind, setSelectedStudentForRemind] = useState<any>(null);
+  const [showStudentInfoModal, setShowStudentInfoModal] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<any>(null);
+
+  // Update state để lưu thêm lessonType và practiceGroup
   const [newAttendanceData, setNewAttendanceData] = useState<{
     date: string;
     startLesson: number;
     endLesson: number;
+    lessonType?: 'LT' | 'TH';
+    practiceGroup?: number;
   } | null>(null);
-  
+
   const [newStudentsAttendance, setNewStudentsAttendance] = useState<StudentAttendanceRecord[]>([]);
   const [newUpdateStudentsAttendance, setNewUpdateStudentsAttendance] = useState<StudentAttendanceRecord[]>([]);
-  
+
   // Toast notification state
   const [toast, setToast] = useState<{
     show: boolean;
@@ -55,7 +68,7 @@ const StudentsAttendancePage: React.FC = () => {
     show: false,
     title: '',
     message: '',
-    onConfirm: () => {},
+    onConfirm: () => { },
     type: 'warning'
   });
 
@@ -69,11 +82,11 @@ const StudentsAttendancePage: React.FC = () => {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      
+
       if (!target.closest('.action-dropdown')) {
         setShowActionMenu(null);
       }
-      
+
       if (!target.closest('.tooltip-container')) {
         setShowTooltip(null);
       }
@@ -86,7 +99,6 @@ const StudentsAttendancePage: React.FC = () => {
   }, []);
 
   const formatDate = (dateString: string) => {
-    // Convert dd-MM-yyyy to dd/M/yyyy
     return dateString.replace(/-/g, '/').replace(/^0(\d)\//, '$1/').replace(/\/0(\d)\//, '/$1/');
   };
 
@@ -97,28 +109,61 @@ const StudentsAttendancePage: React.FC = () => {
     }, 3000);
   };
 
-  const handleCreateAttendance = (startLesson: number, endLesson: number) => {
+  // --- LOGIC XỬ LÝ KHI TẠO ĐIỂM DANH---
+  const handleCreateAttendance = (
+    startLesson: number,
+    endLesson: number,
+    lessonType: 'LT' | 'TH',
+    practiceGroup: number
+  ) => {
+
+    // 1. Lấy danh sách sinh viên hiện tại để kiểm tra
+    const studentList = attendanceData?.attendances[0]?.students || attendanceData?.students || [];
+
+    // 2. [MỚI] Kiểm tra logic: Nếu là TH, nhóm chọn phải có sinh viên
+    if (lessonType === 'TH' && studentList.length > 0) {
+      // Kiểm tra xem có ít nhất 1 sinh viên thuộc nhóm này không
+      const groupExists = studentList.some(s => s.practice_gr && parseInt(s.practice_gr) === practiceGroup);
+
+      if (!groupExists) {
+        showToast(`Không tìm thấy sinh viên nào thuộc Nhóm ${practiceGroup} trong lớp học này!`, 'error');
+        return; // Dừng lại, không mở modal hay lưu state
+      }
+    }
+
     const today = new Date();
     const formattedDate = `${today.getDate()}/${today.getMonth() + 1}/${today.getFullYear()}`;
-    
+
+    // Lưu thông tin buổi học vào state
     setNewAttendanceData({
       date: formattedDate,
       startLesson,
-      endLesson
+      endLesson,
+      lessonType,
+      practiceGroup
     });
-    
-    // Initialize students attendance with empty status
-    // Use fallback to attendanceData.students if attendances array is empty
-    const studentList = attendanceData?.attendances[0]?.students || attendanceData?.students || [];
+
     if (studentList.length > 0) {
-      const initialData = studentList.map(student => ({
-        student_id: student.student_id,
-        status: '',
-        description: ''
-      }));
+      const initialData = studentList.map(student => {
+        let status = '';
+        // LOGIC QUAN TRỌNG: Kiểm tra nhóm
+        // Nếu là Thực hành (TH) và nhóm của sinh viên khác với nhóm đã chọn -> set status = DIFGR
+        if (lessonType === 'TH') {
+          const studentGroup = student.practice_gr ? parseInt(student.practice_gr) : 0;
+          if (studentGroup !== practiceGroup) {
+            status = 'DIFGR';
+          }
+        }
+
+        return {
+          student_id: student.student_id,
+          status: status,
+          description: ''
+        };
+      });
       setNewStudentsAttendance(initialData);
     }
-    
+
     setIsCreatingAttendance(true);
     setShowCreateModal(false);
   };
@@ -169,27 +214,45 @@ const StudentsAttendancePage: React.FC = () => {
     }
   };
 
+  const handleMarkAllPresent = () => {
+    setNewStudentsAttendance(prev =>
+      prev.map(student => {
+        // Chỉ đánh dấu có mặt cho những sinh viên không có status DIFGR
+        if (student.status === 'DIFGR') {
+          return student; // Giữ nguyên status DIFGR
+        }
+        return {
+          ...student,
+          status: 'PRESENT'
+        };
+      })
+    );
+  };
+
   const handleSaveWithDefaults = async () => {
     if (!course_section_id || !newAttendanceData) return;
-    
-    // Set empty statuses to ABSENT
+
+    // Set những status rỗng thành ABSENT (những status DIFGR giữ nguyên)
     const finalData = newStudentsAttendance.map(student => ({
       ...student,
       status: student.status || 'ABSENT'
     }));
-    
+
     try {
-      await recordAttendance(
+      const response = await recordAttendance(
         course_section_id,
         newAttendanceData.startLesson,
         newAttendanceData.endLesson,
         finalData
       );
-      
-      // Refresh data and reset form
-      getStudentsWithAttendance(course_section_id);
-      handleCancelCreate();
-      showToast('Lưu kết quả điểm danh thành công!', 'success');
+
+      if (response && response.success) {
+        getStudentsWithAttendance(course_section_id);
+        handleCancelCreate();
+        showToast('Lưu kết quả điểm danh thành công!', 'success');
+      } else {
+        showToast(response?.message || 'Có lỗi xảy ra khi lưu điểm danh!', 'error');
+      }
     } catch (error) {
       showToast('Có lỗi xảy ra khi lưu điểm danh!', 'error');
     }
@@ -198,8 +261,9 @@ const StudentsAttendancePage: React.FC = () => {
   const handleSaveAttendance = async () => {
     if (!course_section_id || !newAttendanceData) return;
 
+    // Tìm những sinh viên chưa có status (không tính DIFGR là chưa có)
     const emptyStatuses = newStudentsAttendance.filter(student => !student.status);
-    
+
     if (emptyStatuses.length > 0) {
       setConfirmModal({
         show: true,
@@ -211,35 +275,34 @@ const StudentsAttendancePage: React.FC = () => {
       });
       return;
     }
-    
-    // If all students have status, save directly
-    if (!course_section_id || !newAttendanceData) return;
-    
+
     try {
-      await recordAttendance(
+      const response = await recordAttendance(
         course_section_id,
         newAttendanceData.startLesson,
         newAttendanceData.endLesson,
         newStudentsAttendance
       );
-      
-      // Refresh data and reset form
-      getStudentsWithAttendance(course_section_id);
-      handleCancelCreate();
-      showToast('Lưu kết quả điểm danh thành công!', 'success');
+
+      if (response && response.success) {
+        getStudentsWithAttendance(course_section_id);
+        handleCancelCreate();
+        showToast('Lưu kết quả điểm danh thành công!', 'success');
+      } else {
+        showToast(response?.message || 'Có lỗi xảy ra khi lưu điểm danh!', 'error');
+      }
     } catch (error) {
       showToast('Có lỗi xảy ra khi lưu điểm danh!', 'error');
     }
   };
 
   const handleUpdateAttendance = async (attendance: Attendance) => {
-    // Load existing data for update
     const existingData = attendance.students.map(student => ({
       student_id: student.student_id,
       status: student.status,
-      description: student.description || '' // Ensure description is never undefined
+      description: student.description || ''
     }));
-    
+
     setNewUpdateStudentsAttendance(existingData);
     setSelectedAttendanceForUpdate(attendance.attendance_id);
   };
@@ -252,8 +315,7 @@ const StudentsAttendancePage: React.FC = () => {
         attendance.end_lesson,
         newUpdateStudentsAttendance
       );
-      
-      // Refresh data and reset form
+
       getStudentsWithAttendance(course_section_id!);
       setSelectedAttendanceForUpdate(null);
       setNewUpdateStudentsAttendance([]);
@@ -282,6 +344,26 @@ const StudentsAttendancePage: React.FC = () => {
     });
   };
 
+  const handleSendRemind = async (student: any) => {
+    setSelectedStudentForRemind(student);
+    await fetchStudentInfo(student.student_id);
+    setShowRemindModal(true);
+  };
+
+  const handleRemindSuccess = () => {
+    setShowRemindModal(false);
+    setSelectedStudentForRemind(null);
+    if (course_section_id) {
+      getStudentsWithAttendance(course_section_id);
+    }
+  };
+
+  const handleStudentClick = async (student: any) => {
+    setSelectedStudent(student);
+    await fetchStudentInfo(student.student_id);
+    setShowStudentInfoModal(true);
+  };
+
   const getStatusOptions = () => [
     { value: 'PRESENT', label: 'Có mặt' },
     { value: 'ABSENT', label: 'Vắng' },
@@ -290,6 +372,7 @@ const StudentsAttendancePage: React.FC = () => {
   ];
 
   const getStatusLabel = (status: string) => {
+    if (status === 'DIFGR') return 'Khác nhóm';
     const option = getStatusOptions().find(opt => opt.value === status);
     return option ? option.label : status;
   };
@@ -305,6 +388,8 @@ const StudentsAttendancePage: React.FC = () => {
         return `${baseClasses} bg-yellow-100 text-yellow-800`;
       case 'LATE':
         return `${baseClasses} bg-orange-100 text-orange-800`;
+      case 'DIFGR':
+        return `${baseClasses} bg-gray-200 text-gray-500`; // Màu xám cho Khác nhóm
       default:
         return `${baseClasses} bg-gray-100 text-gray-800`;
     }
@@ -328,20 +413,20 @@ const StudentsAttendancePage: React.FC = () => {
     );
   }
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col">
-        <HeaderLeCpn />
-        <main className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="text-red-600 text-lg font-medium mb-2">Lỗi</div>
-            <div className="text-gray-600">{error}</div>
-          </div>
-        </main>
-        <FooterLeCpn />
-      </div>
-    );
-  }
+  // if (error) {
+  //   return (
+  //     <div className="min-h-screen bg-gray-50 flex flex-col">
+  //       <HeaderLeCpn />
+  //       <main className="flex-1 flex items-center justify-center">
+  //         <div className="text-center">
+  //           <div className="text-red-600 text-lg font-medium mb-2">Lỗi</div>
+  //           <div className="text-gray-600">{error}</div>
+  //         </div>
+  //       </main>
+  //       <FooterLeCpn />
+  //     </div>
+  //   );
+  // }
 
   if (!attendanceData) {
     return (
@@ -357,25 +442,30 @@ const StudentsAttendancePage: React.FC = () => {
     );
   }
 
-  // Get unique students list from first attendance or create from available data
-  const allStudents = attendanceData.attendances[0]?.students || attendanceData.students || [];
+  const allStudents = attendanceData.students || [];
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <HeaderLeCpn />
-      
+
       <main className="flex-1 max-w-full mx-auto px-4 py-8">
         <div className="bg-white rounded-lg shadow-sm border">
           {/* Header with Course Section Info */}
           <div className="px-6 py-6 border-b border-gray-200">
             <div className="flex justify-between items-center mb-6">
+              
               <h1 className="text-2xl font-bold text-gray-800">
                 Danh sách sinh viên và điểm danh
               </h1>
-              
+
               <div className="flex gap-3">
+                <button
+                  onClick={() => navigate(`/lecturer/clazz/students/${course_section_id}`)}
+                  className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors duration-200"
+                >
+                  Xem điểm và thông tin sinh viên
+                </button>
                 {selectedAttendanceForUpdate ? (
-                  // Khi đang cập nhật điểm danh
                   <>
                     <button
                       onClick={() => {
@@ -397,15 +487,21 @@ const StudentsAttendancePage: React.FC = () => {
                     </button>
                   </>
                 ) : !isCreatingAttendance ? (
-                  // Khi không tạo mới và không cập nhật
-                  <button
-                    onClick={() => setShowCreateModal(true)}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors duration-200"
-                  >
-                    Tạo buổi điểm danh
-                  </button>
+                  <>
+                    <button
+                      onClick={() => setShowSendFormModal(true)}
+                      className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors duration-200"
+                    >
+                      Gửi thông báo
+                    </button>
+                    <button
+                      onClick={() => setShowCreateModal(true)}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors duration-200"
+                    >
+                      Tạo buổi điểm danh
+                    </button>
+                  </>
                 ) : (
-                  // Khi đang tạo buổi điểm danh mới
                   <>
                     <button
                       onClick={handleSaveAttendance}
@@ -423,7 +519,7 @@ const StudentsAttendancePage: React.FC = () => {
                 )}
               </div>
             </div>
-            
+
             {/* Course Section Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 bg-blue-50 rounded-lg p-4">
               <div>
@@ -450,6 +546,10 @@ const StudentsAttendancePage: React.FC = () => {
                 <span className="text-sm font-medium text-gray-600">Giảng viên phụ trách:</span>
                 <div className="text-base font-semibold text-gray-800">{attendanceData.lecturerName}</div>
               </div>
+              <div>
+                <span className="text-sm font-medium text-gray-600">Lớp thực hành phụ trách:</span>
+                <div className="text-base font-semibold text-gray-800">{attendanceData.practice_gr ? attendanceData.practice_gr : 'Không có'}</div>
+              </div>
             </div>
           </div>
 
@@ -462,85 +562,122 @@ const StudentsAttendancePage: React.FC = () => {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-28 bg-gray-50 z-10">Họ tên</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ngày sinh</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Giới tính</th>
-                  
-                  {/* Existing attendance columns */}
-                  {attendanceData.attendances.map((attendance) => (
-                    <th key={attendance.attendance_id} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider relative">
-                      <div className="flex items-center justify-between">
-                        <span>
-                          {formatDate(attendance.date_attendance)} Tiết {attendance.start_lesson} - {attendance.end_lesson}
-                        </span>
-                        {!isCreatingAttendance && (
-                          <div className="relative action-dropdown">
-                            <button
-                              onClick={() => setShowActionMenu(showActionMenu === attendance.attendance_id ? null : attendance.attendance_id)}
-                              className="p-1 hover:bg-gray-200 rounded text-gray-400 hover:text-gray-600"
-                            >
-                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                              </svg>
-                            </button>
-                            
-                            {showActionMenu === attendance.attendance_id && (
-                              <div className="absolute right-0 top-8 mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                                <div className="py-1">
-                                  <button
-                                    onClick={() => {
-                                      handleUpdateAttendance(attendance);
-                                      setShowActionMenu(null);
-                                    }}
-                                    className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm text-gray-700 border-b border-gray-100"
-                                  >
-                                    Cập nhật
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      handleDeleteAttendance(attendance.attendance_id);
-                                      setShowActionMenu(null);
-                                    }}
-                                    className="w-full text-left px-3 py-2 hover:bg-red-50 text-sm text-gray-700"
-                                  >
-                                    Xóa
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </th>
-                  ))}
-                  
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Nhóm TH</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Vắng LT</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Vắng TH</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Đánh giá</th>
+
                   {/* New attendance column when creating */}
                   {isCreatingAttendance && newAttendanceData && (
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider relative">
-                      <div className="flex items-center justify-between">
-                        <span>
-                          {newAttendanceData.date} Tiết {newAttendanceData.startLesson} - {newAttendanceData.endLesson}
-                        </span>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider relative min-w-[200px]">
+                      <div className="flex flex-col items-center space-y-2">
+                        <div className="flex items-center justify-between w-full">
+                          <span>
+                            {newAttendanceData.date} Tiết {newAttendanceData.startLesson} - {newAttendanceData.endLesson} <br />
+                            <span className="text-blue-600 font-bold">({newAttendanceData.lessonType})</span>
+                            {newAttendanceData.lessonType === 'TH' && <span className="ml-1 text-gray-500">- N{newAttendanceData.practiceGroup}</span>}
+                          </span>
+                          <button
+                            onClick={handleCancelCreate}
+                            className="p-1 hover:bg-red-100 rounded text-red-500 hover:text-red-700"
+                          >
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                        </div>
                         <button
-                          onClick={handleCancelCreate}
-                          className="p-1 hover:bg-red-100 rounded text-red-500 hover:text-red-700"
+                          onClick={handleMarkAllPresent}
+                          className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded-md font-medium transition-colors duration-200"
+                          title="Đánh dấu tất cả là có mặt"
                         >
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                          </svg>
+                          ✓ Tất cả có mặt
                         </button>
                       </div>
                     </th>
                   )}
+
+                  {/* Existing attendance columns */}
+                  {attendanceData.attendances.map((attendance) => {
+                    // LOGIC HIỂN THỊ HEADER:
+                    // Nếu buổi điểm danh có ít nhất 1 sinh viên là "DIFGR" -> Đây là buổi TH, ngược lại là LT
+                    const isPracticeSession = attendance.students.some(s => s.status === 'DIFGR');
+                    const sessionTypeLabel = isPracticeSession ? '(TH)' : '(LT)';
+
+                    return (
+                      <th key={attendance.attendance_id} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider relative">
+                        <div className="flex items-center justify-center">
+                          <span>
+                            {formatDate(attendance.date_attendance)} Tiết {attendance.start_lesson} - {attendance.end_lesson} <br />
+                            <span className={`text-xs ${isPracticeSession ? 'text-purple-600' : 'text-blue-600'}`}>
+                              {sessionTypeLabel}
+                            </span>
+                          </span>
+                          {!isCreatingAttendance && (
+                            <div className="relative action-dropdown">
+                              <button
+                                onClick={() => setShowActionMenu(showActionMenu === attendance.attendance_id ? null : attendance.attendance_id)}
+                                className="p-1 hover:bg-gray-200 rounded text-gray-400 hover:text-gray-600"
+                              >
+                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                  <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                                </svg>
+                              </button>
+
+                              {showActionMenu === attendance.attendance_id && (
+                                <div className="absolute right-0 top-8 mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                                  <div className="py-1">
+                                    <button
+                                      onClick={() => {
+                                        handleUpdateAttendance(attendance);
+                                        setShowActionMenu(null);
+                                      }}
+                                      className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm text-gray-700 border-b border-gray-100"
+                                    >
+                                      Cập nhật
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        handleDeleteAttendance(attendance.attendance_id);
+                                        setShowActionMenu(null);
+                                      }}
+                                      className="w-full text-left px-3 py-2 hover:bg-red-50 text-sm text-gray-700"
+                                    >
+                                      Xóa
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {allStudents.length === 0 ? (
                   <tr>
-                    <td colSpan={4 + attendanceData.attendances.length + (isCreatingAttendance ? 1 : 0)} className="px-6 py-4 text-center text-gray-500">
+                    <td colSpan={5 + attendanceData.attendances.length + (isCreatingAttendance ? 1 : 0)} className="px-6 py-4 text-center text-gray-500">
                       Không có sinh viên nào trong lớp học phần này
                     </td>
                   </tr>
                 ) : (
                   allStudents.map((student) => (
-                    <tr key={student.student_id} className="hover:bg-gray-50 transition-colors duration-150">
+                    <tr
+                      key={student.student_id}
+                      onClick={(e) => {
+                        // Prevent click when clicking on buttons or interactive elements
+                        if (e.target instanceof HTMLElement) {
+                          const isInteractive = e.target.closest('button, select, input, .action-dropdown');
+                          if (!isInteractive) {
+                            handleStudentClick(student);
+                          }
+                        }
+                      }}
+                      className="hover:bg-gray-50 cursor-pointer transition-colors duration-150"
+                    >
                       <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-blue-600 sticky left-0 bg-white z-10">
                         {student.student_id}
                       </td>
@@ -553,85 +690,166 @@ const StudentsAttendancePage: React.FC = () => {
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                         {student.gender ? 'Nam' : 'Nữ'}
                       </td>
-                      
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
+                        {student.practice_gr || '-'}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
+                        {student.absentTheo || 0}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
+                        {student.absentPra || 0}
+                      </td>
+
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
+                        {student.banFromTakingExam ? (
+                          // 1. Ưu tiên cao nhất: Bị cấm thi
+                          <span className="inline-block px-3 py-1 rounded-md text-xs font-bold bg-red-600 text-white shadow-sm">
+                            Cấm thi
+                          </span>
+                        ) : (
+                          // 2. Nếu chưa bị cấm, xét tiếp logic nhắc nhở
+                          student.need2Remind ? (
+                            student.isRemindYet ? (
+                              // Đã gửi nhắc nhở -> Disable
+                              <button
+                                disabled
+                                className="px-3 py-1 rounded-md text-xs font-medium bg-gray-300 text-gray-600 cursor-not-allowed border border-gray-300"
+                              >
+                                Đã gửi nhắc nhở
+                              </button>
+                            ) : (
+                              // Cần nhắc nhở -> Nút cam Active
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation(); // Ngăn chặn sự kiện click vào dòng
+                                  handleSendRemind(student);
+                                }}
+                                className="px-3 py-1 rounded-md text-xs font-medium bg-orange-600 text-white hover:bg-orange-700 transition-colors shadow-sm"
+                              >
+                                Cần nhắc nhở
+                              </button>
+                            )
+                          ) : (
+                            // Bình thường -> Nút xanh nhạt Disable
+                            <button
+                              disabled
+                              className="px-3 py-1 rounded-md text-xs font-medium bg-green-100 text-green-800 cursor-default border border-green-200"
+                            >
+                              Bình thường
+                            </button>
+                          )
+                        )}
+                      </td>
+
+                      {/* New attendance column when creating */}
+                      {isCreatingAttendance && newAttendanceData && (
+                        <td className="px-4 py-4 whitespace-nowrap text-center bg-blue-50/30 min-w-[200px]">
+                          <div className="flex flex-col gap-2">
+                            {(() => {
+                              // LOGIC KHÓA CREATE: Kiểm tra status trong state newStudentsAttendance
+                              const currentRecord = newStudentsAttendance.find(s => s.student_id === student.student_id);
+                              const isLocked = currentRecord?.status === 'DIFGR';
+
+                              if (isLocked) {
+                                return (
+                                  <div className="w-full px-2 py-1 bg-gray-100 border border-gray-200 rounded text-sm text-gray-500 italic text-center cursor-not-allowed">
+                                    Khác nhóm
+                                  </div>
+                                );
+                              }
+
+                              return (
+                                <>
+                                  <select
+                                    value={currentRecord?.status || ''}
+                                    onChange={(e) => handleStatusChange(student.student_id, e.target.value)}
+                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm mb-1 focus:ring-2 focus:ring-blue-500"
+                                  >
+                                    <option value="">Chọn trạng thái</option>
+                                    {getStatusOptions().map(option => (
+                                      <option key={option.value} value={option.value}>
+                                        {option.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <input
+                                    type="text"
+                                    placeholder="Ghi chú..."
+                                    value={currentRecord?.description || ''}
+                                    onChange={(e) => handleDescriptionChange(student.student_id, e.target.value)}
+                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                  />
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </td>
+                      )}
+
                       {/* Existing attendance columns */}
                       {attendanceData.attendances.map((attendance) => {
                         const studentAttendance = attendance.students.find(s => s.student_id === student.student_id);
                         const isUpdating = selectedAttendanceForUpdate === attendance.attendance_id;
                         const updateRecord = newUpdateStudentsAttendance.find(s => s.student_id === student.student_id);
-                        
+
+                        // LOGIC KHÓA UPDATE: Nếu student đang có status là DIFGR thì không cho sửa
+                        const isLocked = isUpdating && updateRecord?.status === 'DIFGR';
+
                         return (
-                          <td key={attendance.attendance_id} className="px-4 py-4 whitespace-nowrap text-center">
-                            {isUpdating ? (
-                              <select
-                                value={updateRecord?.status || studentAttendance?.status || ''}
-                                onChange={(e) => handleStatusChange(student.student_id, e.target.value, true)}
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                              >
-                                <option value="">Chọn trạng thái</option>
-                                {getStatusOptions().map(option => (
-                                  <option key={option.value} value={option.value}>
-                                    {option.label}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : (
-                              <div className="tooltip-container relative">
-                                <span
-                                  className={`cursor-pointer ${getStatusBadge(studentAttendance?.status || '')}`}
-                                  onMouseEnter={() => setShowTooltip({ studentId: student.student_id, attendanceId: attendance.attendance_id })}
-                                  onMouseLeave={() => setShowTooltip(null)}
-                                >
-                                  {getStatusLabel(studentAttendance?.status || '')}
-                                </span>
-                                
-                                {showTooltip?.studentId === student.student_id && showTooltip?.attendanceId === attendance.attendance_id && (
-                                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg shadow-lg z-50 whitespace-nowrap">
-                                    <div className="font-medium">Ghi chú:</div>
-                                    <div>{studentAttendance?.description || 'Không có ghi chú'}</div>
-                                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
+                          <td key={attendance.attendance_id} className="px-4 py-4 whitespace-nowrap text-center min-w-[200px]">
+                            <div className="flex flex-col gap-2 justify-center">
+                              {isUpdating ? (
+                                isLocked ? (
+                                  <div className="w-full px-2 py-1 bg-gray-100 border border-gray-200 rounded text-sm text-gray-500 italic text-center cursor-not-allowed">
+                                    Khác nhóm
                                   </div>
-                                )}
-                              </div>
-                            )}
-                            
-                            {isUpdating && (
-                              <input
-                                type="text"
-                                placeholder="Ghi chú..."
-                                value={updateRecord?.description || ''}
-                                onChange={(e) => handleDescriptionChange(student.student_id, e.target.value, true)}
-                                className="w-full mt-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                              />
-                            )}
+                                ) : (
+                                  <select
+                                    value={updateRecord?.status || studentAttendance?.status || ''}
+                                    onChange={(e) => handleStatusChange(student.student_id, e.target.value, true)}
+                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
+                                  >
+                                    <option value="">Chọn trạng thái</option>
+                                    {getStatusOptions().map(option => (
+                                      <option key={option.value} value={option.value}>
+                                        {option.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                )
+                              ) : (
+                                <div className="tooltip-container relative">
+                                  <span
+                                    className={`cursor-pointer ${getStatusBadge(studentAttendance?.status || '')}`}
+                                    onMouseEnter={() => setShowTooltip({ studentId: student.student_id, attendanceId: attendance.attendance_id })}
+                                    onMouseLeave={() => setShowTooltip(null)}
+                                  >
+                                    {getStatusLabel(studentAttendance?.status || '')}
+                                  </span>
+
+                                  {showTooltip?.studentId === student.student_id && showTooltip?.attendanceId === attendance.attendance_id && (
+                                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg shadow-lg z-50 whitespace-nowrap">
+                                      <div className="font-medium">Ghi chú:</div>
+                                      <div>{studentAttendance?.description || 'Không có ghi chú'}</div>
+                                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {isUpdating && !isLocked && (
+                                <input
+                                  type="text"
+                                  placeholder="Ghi chú..."
+                                  value={updateRecord?.description || ''}
+                                  onChange={(e) => handleDescriptionChange(student.student_id, e.target.value, true)}
+                                  className="w-full mt-1 px-2 py-1 border border-gray-300 rounded text-sm"
+                                />
+                              )}
+                            </div>
                           </td>
                         );
                       })}
-                      
-                      {/* New attendance column when creating */}
-                      {isCreatingAttendance && newAttendanceData && (
-                        <td className="px-4 py-4 whitespace-nowrap text-center">
-                          <select
-                            value={newStudentsAttendance.find(s => s.student_id === student.student_id)?.status || ''}
-                            onChange={(e) => handleStatusChange(student.student_id, e.target.value)}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                          >
-                            <option value="">Chọn trạng thái</option>
-                            {getStatusOptions().map(option => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-                          <input
-                            type="text"
-                            placeholder="Ghi chú..."
-                            value={newStudentsAttendance.find(s => s.student_id === student.student_id)?.description || ''}
-                            onChange={(e) => handleDescriptionChange(student.student_id, e.target.value)}
-                            className="w-full mt-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                          />
-                        </td>
-                      )}
                     </tr>
                   ))
                 )}
@@ -649,6 +867,23 @@ const StudentsAttendancePage: React.FC = () => {
           isOpen={showCreateModal}
           onClose={() => setShowCreateModal(false)}
           onConfirm={handleCreateAttendance}
+          start_lesson={attendanceData.start_lesson}
+          end_lesson={attendanceData.end_lesson}
+          allowedPracticeGroupsStr={attendanceData?.practice_gr || null}
+        />
+      )}
+
+      {/* Send Form Modal */}
+      {showSendFormModal && (
+        <SendFormModal
+          isOpen={showSendFormModal}
+          onClose={() => setShowSendFormModal(false)}
+          onSuccess={(message) => {
+            showToast(message, 'success');
+            setShowSendFormModal(false);
+          }}
+          subjectName={attendanceData?.subjectName}
+          courseSectionId={attendanceData?.course_section_id}
         />
       )}
 
@@ -663,13 +898,34 @@ const StudentsAttendancePage: React.FC = () => {
         type={confirmModal.type}
       />
 
+      {/* Send Remind Modal */}
+      {showRemindModal && selectedStudentForRemind && attendanceData && (
+        <SendRemindModal
+          isOpen={showRemindModal}
+          onClose={() => setShowRemindModal(false)}
+          onSuccess={handleRemindSuccess}
+          studentRaw={selectedStudentForRemind}
+          attendanceData={attendanceData}
+          studentInfo={studentInfo}
+        />
+      )}
+
+      {/* Student Info Modal */}
+      {showStudentInfoModal && selectedStudent && (
+        <StudentInfoModal
+          isOpen={showStudentInfoModal}
+          onClose={() => setShowStudentInfoModal(false)}
+          studentInfo={studentInfo}
+          loading={loading}
+        />
+      )}
+
       {/* Toast Notification */}
       {toast.show && (
-        <div className={`fixed top-4 right-4 z-[9999] p-4 rounded-lg shadow-lg transform transition-all duration-300 ${
-          toast.type === 'success' 
-            ? 'bg-green-500 text-white' 
-            : 'bg-red-500 text-white'
-        }`}>
+        <div className={`fixed top-4 right-4 z-[9999] p-4 rounded-lg shadow-lg transform transition-all duration-300 ${toast.type === 'success'
+          ? 'bg-green-500 text-white'
+          : 'bg-red-500 text-white'
+          }`}>
           <div className="flex items-center">
             {toast.type === 'success' ? (
               <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">

@@ -1,18 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useStudent, type StudentWithScore } from '../../../hooks/useStudent';
+import { useStatistics } from '../../../hooks/useStatistics';
 import HeaderLeCpn from '../../../components/lecturer/HeaderLeCpn';
 import FooterLeCpn from '../../../components/lecturer/FooterLeCpn';
 import SendWarningModal from './SendWarningModal';
 import StudentInfoModal from './StudentInfoModal';
+import SendFormModal from '../alert/SendFormModal';
+import CourseStatisticsModal from '../statistics/CourseStatisticsModal';
 
 const StudentListWithScorePage: React.FC = () => {
   const { course_section_id } = useParams<{ course_section_id: string }>();
+   const navigate = useNavigate();
   const { loading, error, courseSectionData, studentInfo, fetchStudentsByCourseSection, fetchStudentInfo } = useStudent();
+  
+  const { getCourseSectionStatistics } = useStatistics();
+  const [isFetchingStats, setIsFetchingStats] = useState(false);
   
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [showStudentInfoModal, setShowStudentInfoModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<StudentWithScore | null>(null);
+  const [showSendFormModal, setShowSendFormModal] = useState(false);
+  const [showStatisticsModal, setShowStatisticsModal] = useState(false);
+  const [statisticsData, setStatisticsData] = useState<any>(null);
+  
+  // Toast notification state
+  const [toast, setToast] = useState<{
+    show: boolean;
+    message: string;
+    type: 'success' | 'error';
+  }>({
+    show: false,
+    message: '',
+    type: 'success'
+  });
 
   useEffect(() => {
     if (course_section_id) {
@@ -38,6 +59,32 @@ const StudentListWithScorePage: React.FC = () => {
     setSelectedStudent(student);
     await fetchStudentInfo(student.student_id);
     setShowStudentInfoModal(true);
+  };
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast({ show: false, message: '', type: 'success' });
+    }, 3000);
+  };
+
+  const handleShowStatistics = async () => {
+    if (!courseSectionData?.course_section_id || !courseSectionData?.sessionId) {
+      showToast('Không thể tải thống kê: thiếu thông tin lớp học phần', 'error');
+      return;
+    }
+
+    try {
+      setIsFetchingStats(true); 
+      setShowStatisticsModal(true);
+      const data = await getCourseSectionStatistics(courseSectionData.course_section_id, courseSectionData.sessionId);
+      setStatisticsData(data);
+    } catch (error) {
+      console.error(error);
+      showToast('Có lỗi xảy ra khi tải thống kê', 'error');
+    } finally {
+      setIsFetchingStats(false);
+    }
   };
 
   const formatScore = (score: number | null) => {
@@ -115,9 +162,33 @@ const StudentListWithScorePage: React.FC = () => {
         <div className="bg-white rounded-lg shadow-sm border">
           {/* Header with Course Section Info */}
           <div className="px-6 py-6 border-b border-gray-200">
-            <h1 className="text-2xl font-bold text-gray-800 mb-6 text-center">
-              Danh sách sinh viên và điểm số
-            </h1>
+            <div className="flex justify-between items-center mb-6">
+              <h1 className="text-2xl font-bold text-gray-800">
+                Danh sách sinh viên và điểm số
+              </h1>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => navigate(`/lecturer/clazz/students-attendance/${course_section_id}`)}
+                  className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors duration-200"
+                >
+                  Xem buổi điểm danh
+                </button>
+                <button
+                  onClick={handleShowStatistics}
+                  disabled={!courseSectionData}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors duration-200"
+                >
+                  Thống kê
+                </button>
+                <button
+                  onClick={() => setShowSendFormModal(true)}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors duration-200"
+                >
+                  Gửi thông báo
+                </button>
+              </div>
+            </div>
             
             {/* Course Section Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 bg-blue-50 rounded-lg p-4">
@@ -280,6 +351,53 @@ const StudentListWithScorePage: React.FC = () => {
           studentInfo={studentInfo}
           loading={loading}
         />
+      )}
+
+      {/* Send Form Modal */}
+      {showSendFormModal && (
+        <SendFormModal
+          isOpen={showSendFormModal}
+          onClose={() => setShowSendFormModal(false)}
+          onSuccess={(message) => {
+            showToast(message, 'success');
+            setShowSendFormModal(false);
+          }}
+          subjectName={courseSectionData?.subjectName}
+          courseSectionId={courseSectionData?.course_section_id}
+        />
+      )}
+
+      {/* Course Statistics Modal */}
+      <CourseStatisticsModal
+        isOpen={showStatisticsModal}
+        onClose={() => {
+          setShowStatisticsModal(false);
+          setStatisticsData(null);
+        }}
+        data={statisticsData}
+        loading={isFetchingStats}
+      />
+
+      {/* Toast Notification */}
+      {toast.show && (
+        <div className={`fixed top-4 right-4 z-[9999] p-4 rounded-lg shadow-lg transform transition-all duration-300 ${
+          toast.type === 'success' 
+            ? 'bg-green-500 text-white' 
+            : 'bg-red-500 text-white'
+        }`}>
+          <div className="flex items-center">
+            {toast.type === 'success' ? (
+              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            )}
+            <span className="font-medium">{toast.message}</span>
+          </div>
+        </div>
       )}
     </div>
   );

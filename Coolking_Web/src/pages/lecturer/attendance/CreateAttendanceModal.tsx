@@ -1,19 +1,49 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
 interface CreateAttendanceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (startLesson: number, endLesson: number) => void;
+  onConfirm: (startLesson: number, endLesson: number, lessonType: 'LT' | 'TH', practiceGroup: number) => void;
+  start_lesson?: number | null;
+  end_lesson?: number | null;
+  allowedPracticeGroupsStr: string | null;
 }
 
 const CreateAttendanceModal: React.FC<CreateAttendanceModalProps> = ({
   isOpen,
   onClose,
-  onConfirm
+  onConfirm,
+  start_lesson,
+  end_lesson,
+  allowedPracticeGroupsStr
 }) => {
-  const [startLesson, setStartLesson] = useState<number>(1);
-  const [endLesson, setEndLesson] = useState<number>(1);
+  const [startLesson, setStartLesson] = useState<number>(start_lesson ?? 1);
+  const [endLesson, setEndLesson] = useState<number>(end_lesson ?? 1);
+  const [lessonType, setLessonType] = useState<'LT' | 'TH'>('LT');
+  const [practiceGroup, setPracticeGroup] = useState<number>(1);
   const [error, setError] = useState<string>('');
+
+  //Chuyển đổi chuỗi "1,2" thành mảng số [1, 2]. Nếu null trả về mảng rỗng.
+  const allowedGroups = useMemo(() => {
+    if (!allowedPracticeGroupsStr) return [];
+    return allowedPracticeGroupsStr
+      .split(',')
+      .map(s => parseInt(s.trim()))
+      .filter(n => !isNaN(n));
+  }, [allowedPracticeGroupsStr]);
+
+  //Kiểm tra xem có được phép dạy thực hành không
+  const canTeachPractice = allowedGroups.length > 0;
+
+  //Khi chọn sang TH, đảm bảo nhóm được chọn mặc định là nhóm hợp lệ đầu tiên
+  useEffect(() => {
+    if (lessonType === 'TH' && canTeachPractice) {
+        // Nếu nhóm hiện tại không nằm trong danh sách cho phép, set về nhóm đầu tiên
+        if (!allowedGroups.includes(practiceGroup)) {
+            setPracticeGroup(allowedGroups[0]);
+        }
+    }
+  }, [lessonType, allowedGroups, canTeachPractice, practiceGroup]);
 
   const handleConfirm = () => {
     // Validation
@@ -31,15 +61,28 @@ const CreateAttendanceModal: React.FC<CreateAttendanceModalProps> = ({
       setError('Tiết học không được vượt quá 15');
       return;
     }
+
+    if (lessonType === 'TH') {
+        if (!canTeachPractice) {
+            setError('Giảng viên không phụ trách lớp thực hành nào.');
+            return;
+        }
+        if (!allowedGroups.includes(practiceGroup)) {
+            setError(`Bạn không được phân công dạy nhóm ${practiceGroup}.`);
+            return;
+        }
+    }
     
     setError('');
-    onConfirm(startLesson, endLesson);
+    onConfirm(startLesson, endLesson, lessonType, practiceGroup);
   };
 
   const handleClose = () => {
     setError('');
     setStartLesson(1);
     setEndLesson(1);
+    setLessonType('LT');
+    setPracticeGroup(1);
     onClose();
   };
 
@@ -55,6 +98,63 @@ const CreateAttendanceModal: React.FC<CreateAttendanceModalProps> = ({
         </div>
         
         <div className="px-6 py-4">
+          {/* Phần chọn Loại tiết học */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Loại tiết học <span className="text-red-500">*</span>
+            </label>
+            <div className="flex gap-6">
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  value="LT"
+                  checked={lessonType === 'LT'}
+                  onChange={(e) => setLessonType(e.target.value as 'LT' | 'TH')}
+                  className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                />
+                <span className="ml-2 text-sm text-gray-700">Lý thuyết (LT)</span>
+              </label>
+              
+              {/*Radio button TH sẽ bị disabled nếu practice_gr là null */}
+              <label className={`flex items-center ${!canTeachPractice ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
+                <input
+                  type="radio"
+                  value="TH"
+                  checked={lessonType === 'TH'}
+                  onChange={(e) => setLessonType(e.target.value as 'LT' | 'TH')}
+                  disabled={!canTeachPractice}
+                  className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                />
+                <span className="ml-2 text-sm text-gray-700">
+                    Thực hành (TH)
+                    {!canTeachPractice && <span className="text-xs ml-1 text-red-500">(Không phụ trách)</span>}
+                </span>
+              </label>
+            </div>
+          </div>
+
+          {/* Phần chọn Nhóm thực hành (Chỉ hiện khi chọn TH) */}
+          {lessonType === 'TH' && canTeachPractice && (
+            <div className="mb-4 animate-fadeIn">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Nhóm thực hành <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={practiceGroup}
+                onChange={(e) => setPracticeGroup(parseInt(e.target.value))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              >
+                {/*Chỉ render các nhóm nằm trong allowedGroups */}
+                {allowedGroups.map(group => (
+                    <option key={group} value={group}>Nhóm {group}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500 italic">
+                * Bạn chỉ có thể chọn nhóm được phân công: {allowedPracticeGroupsStr}.
+              </p>
+            </div>
+          )}
+          
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -93,7 +193,7 @@ const CreateAttendanceModal: React.FC<CreateAttendanceModalProps> = ({
           
           <div className="mt-4 p-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-sm">
             <strong>Lưu ý:</strong> Buổi điểm danh sẽ được tạo với ngày hôm nay. 
-            Tiết học từ 1 đến 12, tiết bắt đầu phải nhỏ hơn hoặc bằng tiết kết thúc.
+            Tiết học từ 1 đến 15, tiết bắt đầu phải nhỏ hơn hoặc bằng tiết kết thúc.
           </div>
         </div>
         
