@@ -49,26 +49,4 @@ const sequelize = new Sequelize(
     },
   }
 );
-
-// Export the sequelize instance
-// const sequelize = new Sequelize(
-//   process.env.PG_DB,
-//   process.env.PG_USER,
-//   process.env.PG_PASS,
-//   {
-//     host: process.env.PG_HOST,
-//     port: Number(process.env.PG_PORT || 5432),
-//     dialect: 'postgres',
-//     logging: false,
-//     pool: { max: 10, min: 0, acquire: 30000, idle: 10000 },
-//     dialectOptions: process.env.PG_SSL === 'true'
-//       ? {
-//           ssl: {
-//             require: true,
-//             rejectUnauthorized: false, // Neon dùng cert public, có thể bật true nếu bạn có CA
-//           },
-//         }
-//       : undefined,
-//   }
-// );
 module.exports = sequelize;
