@@ -47,6 +47,7 @@ expo start
 |---|---|---|
 | **Student** | `SV2100001` | `V123456@` |
 | **Parent** | `PA00001` | `12345678` |
+Download app: https://drive.google.com/file/d/18lk5PZ2jL1Y3OJTPEgLh5dZB8KLVOcZ4/view?usp=sharing
 
 ## 🎯 Tính năng chính
 
