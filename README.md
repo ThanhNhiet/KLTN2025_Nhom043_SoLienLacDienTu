@@ -33,6 +33,7 @@ cd Coolking_Mobile
 npm install
 expo start
 ```
+Download link: https://drive.google.com/file/d/18lk5PZ2jL1Y3OJTPEgLh5dZB8KLVOcZ4/view?usp=sharing
 
 ## 🔐 Tài khoản Demo
 
